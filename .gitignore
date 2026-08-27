@@ -17,18 +17,16 @@ __pycache__/
 .DS_Store
 Thumbs.db
 
-# Archives and legacy/unwanted folders
+# Archives and legacy folders
 archives/
 data/dam/
 data/river/
 data/*.zip
 nul
 
-# Large raw datasets (>50MB) - auto-downloaded by scripts in /scripts/
+# Heavy unclipped Asia raw files (>100MB) - use hydrorivers_clip.* instead
 data/raw/rivers/HydroRIVERS_v10_as_shp/
 data/raw/dams/NRLD 2023-1_final.pdf
-data/raw/rainfall/imd_1979.nc
-data/raw/lulc/lulc_raw.tif
 
 # Temporary / Log files
 *.log
