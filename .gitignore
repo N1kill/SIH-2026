@@ -11,6 +11,9 @@ __pycache__/
 *.so
 .pytest_cache/
 
+# Local Node tooling
+node_modules/
+
 # IDE & OS
 .vscode/
 .idea/
@@ -34,3 +37,7 @@ data/raw/dams/NRLD 2023-1_final.pdf
 download_log.txt
 powershell.bat
 powershell.cmd
+
+# Reproducible generated GIS products
+data/processed/
+outputs/gis/

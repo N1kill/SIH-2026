@@ -1,7 +1,7 @@
 # Machhu-II Dam Breach 3D Flood Simulation — Status & Roadmap
 
 **Repository**: [https://github.com/N1kill/SIH-2026](https://github.com/N1kill/SIH-2026)  
-**Last Updated**: 2026-08-27  
+**Last Updated**: 2026-08-28  
 
 ---
 
@@ -35,7 +35,7 @@ All raw spatial, meteorological, and hydraulic inputs for the Machhu-II Dam (Mor
 ```mermaid
 graph TD
     D0["Directive 0: Project Setup (Done)"] --> D1["Directive 1: Data Collection (Done)"]
-    D1 --> D2["Directive 2: DEM Conditioning & Catchment Delineation"]
+    D1 --> D2["Directive 2: DEM Conditioning & Catchment Delineation (Done)"]
     D2 --> D3["Directive 3: SCS-CN Hydrology & Inflow Hydrograph"]
     D3 --> D4["Directive 4: Froehlich Dam Breach Parameters"]
     D4 --> D5["Directive 5: HEC-RAS 2D Hydrodynamic Modeling"]
@@ -49,13 +49,18 @@ graph TD
 ### ⏳ Phase 1: Hydrology & Catchment Analysis
 
 #### **Directive 2: DEM Conditioning & Catchment Delineation**
-- **Tasks**:
-  1. Reproject DEM to UTM Zone 42N (**EPSG:32642**).
-  2. Fill sinks and depressions using `richdem` / depression-filling algorithms.
-  3. Compute D8 flow direction and accumulation rasters.
-  4. Reproject pour point (**22.82°N, 70.84°E**) and snap to the channel.
-  5. Delineate upstream watershed boundary and verify area matches **1,928 km² ± 10%**.
-- **Outputs**: `data/processed/dem_conditioned.tif`, `data/processed/flow_acc.tif`, `data/processed/watershed.shp`.
+- **Status**: ✅ Implemented and outputs generated.
+- **Completed**:
+  1. Reprojected the DEM to UTM Zone 42N (**EPSG:32642**) and retained a full-extent clip.
+  2. Filled pits/depressions and resolved flats with `pysheds` conditioning.
+  3. Generated D8 flow direction, flow accumulation, and stream rasters.
+  4. Reprojected the pour point (**22.82°N, 70.84°E**) and snapped it to the highest-accumulation channel cell within 500 m.
+  5. Delineated watershed raster and polygon outputs; calculated area and wrote a validation report.
+  6. Calibrated the stream threshold against the clipped HydroRIVERS network (564 segments): **5,000 accumulation cells** selected.
+  7. Generated conditioned-DEM, flow-accumulation, and watershed GIS maps.
+- **Area validation note**: The delineated area is **1,024.33 km²**, compared with the plan target of **1,928 km² ± 10%** (accepted range **1,735.20–2,120.80 km²**). It is outside that range, but is an accepted project deviation. The target and observed value remain recorded in `data/processed/dem_catchment_report.json`.
+- **Performance note**: Existing-output reruns are fast. A full fresh-run benchmark has not yet demonstrated the original 2–5 minute target on this Windows/Python 3.13 machine.
+- **Outputs**: `data/processed/dem_conditioned.tif`, `data/processed/flow_dir.tif`, `data/processed/flow_acc.tif`, `data/processed/streams.tif`, `data/processed/pour_point.shp`, `data/processed/pour_point_snapped.shp`, `data/processed/watershed.tif`, `data/processed/watershed.shp`, `data/processed/dem_catchment_report.json`, and `outputs/gis/{dem_map.png,flow_accumulation.png,watershed_map.png}`.
 
 #### **Directive 3: Rainfall, LULC, Soil $\rightarrow$ SCS-CN Runoff Hydrograph**
 - **Tasks**:

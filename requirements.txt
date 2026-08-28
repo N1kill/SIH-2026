@@ -4,7 +4,14 @@ numpy>=1.24.0
 pandas>=2.0.0
 matplotlib>=3.7.0
 imdlib>=0.1.7
-richdem>=0.3.4
+# Optional legacy hydrology backend. Not required for Directive 2 on
+# Windows/Python 3.13, where richdem wheels are commonly unavailable.
+# richdem>=0.3.4
+pysheds>=0.5
+# Python 3.13-compatible Numba keeps pysheds' conditioning and D8 operations
+# compiled; older releases prompted the previous no-JIT workaround.
+numba>=0.67
+pyproj>=3.6.0
 requests>=2.31.0
 pdfplumber>=0.11.0
 shapely>=2.0.0
