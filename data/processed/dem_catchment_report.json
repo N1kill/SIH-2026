@@ -1,0 +1,102 @@
+{
+  "config": {
+    "overwrite": false,
+    "stream_threshold": null,
+    "snap_radius_m": 500.0,
+    "expected_area_km2": 1928.0,
+    "area_tolerance": 0.1
+  },
+  "summary": {
+    "dem": {
+      "path": "C:\\PS\\SIH-2026\\data\\raw\\dem\\dem_raw.tif",
+      "crs": "EPSG:4326",
+      "width": 3240,
+      "height": 4320,
+      "dtype": "int16",
+      "nodata": -32768.0,
+      "bounds": [
+        70.39986111114428,
+        22.000138888883853,
+        71.2998611111444,
+        23.200138888884013
+      ],
+      "resolution": [
+        0.0002777777777778146,
+        0.0002777777777778146
+      ],
+      "min": -35.0,
+      "max": 347.0,
+      "mean": 95.3583698416781
+    },
+    "stream_threshold": 5000,
+    "stream_threshold_diagnostics": {
+      "mode": "hydro_rivers_calibrated",
+      "candidates": {
+        "500": 12156.299020755225,
+        "750": 9699.566522372834,
+        "1000": 8236.700941250863,
+        "1500": 6482.971619429795,
+        "2000": 5435.874148530764,
+        "3000": 4234.6929680006415,
+        "5000": 3104.0160306279126,
+        "7500": 2429.1425776232218,
+        "10000": 2042.6137855961392
+      },
+      "hydro_rivers_path": "C:\\PS\\SIH-2026\\data\\raw\\rivers\\hydrorivers_clip.shp",
+      "hydro_rivers_feature_count": 564,
+      "hydro_rivers_length_km": 2859.375304923331
+    },
+    "pour_point_utm": [
+      688837.9621219923,
+      2524770.3090984593
+    ],
+    "snapped_pour_point_utm": [
+      688825.7775941928,
+      2525267.5786251165
+    ],
+    "snap_distance_m": 497.4187821740902,
+    "watershed_area_km2": 1024.3334375528418,
+    "validation": {
+      "status": "FAIL",
+      "errors": [
+        "Watershed area 1024.33 km2 is outside target range 1735.20-2120.80 km2"
+      ],
+      "rasters": {
+        "dem_utm42.tif": {
+          "crs_epsg_32642": true,
+          "has_valid_data": true
+        },
+        "dem_clip.tif": {
+          "crs_epsg_32642": true,
+          "has_valid_data": true
+        },
+        "dem_conditioned.tif": {
+          "crs_epsg_32642": true,
+          "has_valid_data": true
+        },
+        "flow_dir.tif": {
+          "crs_epsg_32642": true,
+          "has_valid_data": true
+        },
+        "flow_acc.tif": {
+          "crs_epsg_32642": true,
+          "has_valid_data": true
+        },
+        "streams.tif": {
+          "crs_epsg_32642": true,
+          "has_valid_data": true
+        },
+        "watershed.tif": {
+          "crs_epsg_32642": true,
+          "has_valid_data": true
+        }
+      },
+      "target_area_km2": 1928.0,
+      "target_range_km2": [
+        1735.2,
+        2120.8
+      ],
+      "snap_radius_m": 500.0
+    }
+  }
+}

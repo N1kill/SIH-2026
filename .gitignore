@@ -27,17 +27,9 @@ data/river/
 data/*.zip
 nul
 
-# Heavy unclipped Asia raw files (>100MB) - use hydrorivers_clip.* instead
-data/raw/rivers/HydroRIVERS_v10_as_shp/
-data/raw/dams/NRLD 2023-1_final.pdf
-
 # Temporary / Log files
 *.log
 *.tmp
 download_log.txt
 powershell.bat
 powershell.cmd
-
-# Reproducible generated GIS products
-data/processed/
-outputs/gis/
