@@ -1,0 +1,100 @@
+{
+  "catchment_properties": {
+    "delineated_area_km2": 1024.3334375528418,
+    "historical_area_km2": 1928.0,
+    "longest_flow_path_m": 68585.62367921267,
+    "mean_slope_percent": 3.1327128410339355,
+    "mean_curve_number_amc2": 81.69046783447266,
+    "potential_max_retention_s_mm": 56.92978989259041,
+    "lag_time_hours": 12.958600566034383,
+    "time_of_concentration_hours": 21.64086294527742,
+    "time_to_peak_hours": 13.458600566034383
+  },
+  "rainfall_runoff_routing": {
+    "daily_records": [
+      {
+        "date": "1979-08-05",
+        "rainfall_mm": 9.843498985483581,
+        "antecedent_5d_mm": 158.7575633088323,
+        "amc": 3,
+        "runoff_mm": 1.2084053754806519
+      },
+      {
+        "date": "1979-08-06",
+        "rainfall_mm": 11.127940392141028,
+        "antecedent_5d_mm": 168.40124387227533,
+        "amc": 3,
+        "runoff_mm": 1.6533772945404053
+      },
+      {
+        "date": "1979-08-07",
+        "rainfall_mm": 36.29445998977779,
+        "antecedent_5d_mm": 135.81397521702212,
+        "amc": 3,
+        "runoff_mm": 17.862335205078125
+      },
+      {
+        "date": "1979-08-08",
+        "rainfall_mm": 25.270913581481363,
+        "antecedent_5d_mm": 117.19816374067514,
+        "amc": 3,
+        "runoff_mm": 9.588132858276367
+      },
+      {
+        "date": "1979-08-09",
+        "rainfall_mm": 6.558821167126634,
+        "antecedent_5d_mm": 117.90522071109959,
+        "amc": 3,
+        "runoff_mm": 0.422245055437088
+      },
+      {
+        "date": "1979-08-10",
+        "rainfall_mm": 32.0302994932387,
+        "antecedent_5d_mm": 89.0956341160104,
+        "amc": 3,
+        "runoff_mm": 14.529036521911621
+      },
+      {
+        "date": "1979-08-11",
+        "rainfall_mm": 187.97194805479904,
+        "antecedent_5d_mm": 111.28243462376552,
+        "amc": 3,
+        "runoff_mm": 160.97857666015625
+      },
+      {
+        "date": "1979-08-12",
+        "rainfall_mm": 167.67357414547882,
+        "antecedent_5d_mm": 288.1264422864235,
+        "amc": 3,
+        "runoff_mm": 141.0343475341797
+      },
+      {
+        "date": "1979-08-13",
+        "rainfall_mm": 13.331359018001216,
+        "antecedent_5d_mm": 419.50555644212454,
+        "amc": 3,
+        "runoff_mm": 2.560729742050171
+      },
+      {
+        "date": "1979-08-14",
+        "rainfall_mm": 22.970819773769286,
+        "antecedent_5d_mm": 407.5660018786444,
+        "amc": 3,
+        "runoff_mm": 8.031229972839355
+      },
+      {
+        "date": "1979-08-15",
+        "rainfall_mm": 0.4001364872372177,
+        "antecedent_5d_mm": 423.97800048528705,
+        "amc": 3,
+        "runoff_mm": 0.01069707702845335
+      }
+    ],
+    "unscaled_peak_inflow_m3s": 2206.7651107831466,
+    "scaled_peak_inflow_m3s": 4153.572438047474,
+    "calibrated_peak_inflow_m3s": 5600.0,
+    "calibrated_peak_rate_factor": 652.5467029712174,
+    "peak_time_hours_since_aug05": 169,
+    "peak_datetime": "1979-08-12 01:00:00"
+  }
+}

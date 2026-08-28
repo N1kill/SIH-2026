@@ -36,7 +36,7 @@ All raw spatial, meteorological, and hydraulic inputs for the Machhu-II Dam (Mor
 graph TD
     D0["Directive 0: Project Setup (Done)"] --> D1["Directive 1: Data Collection (Done)"]
     D1 --> D2["Directive 2: DEM Conditioning & Catchment Delineation (Done)"]
-    D2 --> D3["Directive 3: SCS-CN Hydrology & Inflow Hydrograph"]
+    D2 --> D3["Directive 3: SCS-CN Hydrology & Inflow Hydrograph (Done)"]
     D3 --> D4["Directive 4: Froehlich Dam Breach Parameters"]
     D4 --> D5["Directive 5: HEC-RAS 2D Hydrodynamic Modeling"]
     D5 --> D6["Directive 6: Sensitivity & Uncertainty Scenarios"]
@@ -61,27 +61,10 @@ graph TD
 - **Area validation note**: The delineated area is **1,024.33 km²**, compared with the plan target of **1,928 km² ± 10%** (accepted range **1,735.20–2,120.80 km²**). It is outside that range, but is an accepted project deviation. The target and observed value remain recorded in `data/processed/dem_catchment_report.json`.
 - **Performance note**: Existing-output reruns are fast. A full fresh-run benchmark has not yet demonstrated the original 2–5 minute target on this Windows/Python 3.13 machine.
 - **Outputs**: `data/processed/dem_conditioned.tif`, `data/processed/flow_dir.tif`, `data/processed/flow_acc.tif`, `data/processed/streams.tif`, `data/processed/pour_point.shp`, `data/processed/pour_point_snapped.shp`, `data/processed/watershed.tif`, `data/processed/watershed.shp`, `data/processed/dem_catchment_report.json`, and `outputs/gis/{dem_map.png,flow_accumulation.png,watershed_map.png}`.
-
-#### **Directive 3: Rainfall, LULC, Soil $\rightarrow$ SCS-CN Runoff Hydrograph**
-- **Tasks**:
-  1. Clip IMD rainfall to delineated watershed for the critical event (5–15 Aug 1979).
-  2. Reclassify ESA 10m LULC raster and assign Hydrologic Soil Groups (HSG).
-  3. Generate composite AMC-II Curve Number (CN) raster and adjust for antecedent moisture.
-  4. Compute runoff depth using SCS-CN formula:
-     $$S = \frac{25400}{CN} - 254, \quad I_a = 0.2S, \quad Q = \frac{(P - I_a)^2}{P - I_a + S}$$
-  5. Route runoff into an inflow hydrograph using the SCS Dimensionless Unit Hydrograph.
-  6. Sanity-check peak flow against historical records (~5,550–5,663 m³/s).
-- **Outputs**: `outputs/gis/inflow_hydrograph.png`, `outputs/gis/hydrograph.csv`, `data/processed/curve_number.tif`.
-
----
-
-### ⏳ Phase 2: Dam Breach & Hydrodynamic Modeling
-
-#### **Directive 4: Breach Parameters Estimation**
 - **Tasks**:
   1. Compute Froehlich (2008) breach geometry equations (average breach width $B_{avg}$, side slopes $Z$, formation time $t_f$) using dam height (22.56 m) and reservoir volume (101 Mm³).
   2. Formulate comparison table comparing Froehlich empirical estimates vs. Wahl (1998) historical observed breach dimensions.
-- **Outputs**: `scripts/08_breach_parameters.py`, `docs/breach_param_comparison.md`.
+- **Outputs**: `scripts/09_breach_parameters.py`, `docs/breach_param_comparison.md`.
 
 #### **Directive 5: HEC-RAS 2D Hydrodynamic Modeling**
 - **Tasks**:
