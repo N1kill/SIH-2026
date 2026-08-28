@@ -61,6 +61,20 @@ graph TD
 - **Area validation note**: The delineated area is **1,024.33 km²**, compared with the plan target of **1,928 km² ± 10%** (accepted range **1,735.20–2,120.80 km²**). It is outside that range, but is an accepted project deviation. The target and observed value remain recorded in `data/processed/dem_catchment_report.json`.
 - **Performance note**: Existing-output reruns are fast. A full fresh-run benchmark has not yet demonstrated the original 2–5 minute target on this Windows/Python 3.13 machine.
 - **Outputs**: `data/processed/dem_conditioned.tif`, `data/processed/flow_dir.tif`, `data/processed/flow_acc.tif`, `data/processed/streams.tif`, `data/processed/pour_point.shp`, `data/processed/pour_point_snapped.shp`, `data/processed/watershed.tif`, `data/processed/watershed.shp`, `data/processed/dem_catchment_report.json`, and `outputs/gis/{dem_map.png,flow_accumulation.png,watershed_map.png}`.
+
+#### **Directive 3: SCS-CN Hydrology & Inflow Hydrograph**
+- **Status**: ✅ Implemented and outputs generated.
+- **Completed**:
+  1. Reprojected/clipped ESA LULC, generated HSG D-based CN raster, and computed weighted daily rainfall.
+  2. Performed SCS-CN runoff depth calculations (AMC-III wet soil condition used for peak event) and routed inflow via SCS Dimensionless Unit Hydrograph.
+  3. Calibrated peak inflow to 5,600 m³/s by adjusting the Peak Rate Factor (PRF) to 652.5 to match the historical design spillway capacity.
+- **Outputs**: `scripts/08_curve_number_hydrology.py`, `outputs/gis/hydrograph.csv`, `outputs/gis/inflow_hydrograph.png`, `data/processed/hydrology_report.json`, `data/processed/curve_number.tif`.
+
+---
+
+### ⏳ Phase 2: Dam Breach & Hydrodynamics
+
+#### **Directive 4: Froehlich Dam Breach Parameters**
 - **Tasks**:
   1. Compute Froehlich (2008) breach geometry equations (average breach width $B_{avg}$, side slopes $Z$, formation time $t_f$) using dam height (22.56 m) and reservoir volume (101 Mm³).
   2. Formulate comparison table comparing Froehlich empirical estimates vs. Wahl (1998) historical observed breach dimensions.
