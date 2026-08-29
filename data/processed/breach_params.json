@@ -1,0 +1,63 @@
+{
+  "project": "Machhu-II Dam Breach Analysis",
+  "directive": 4,
+  "generated": "2026-08-28T23:49:29.405750Z",
+  "dam_parameters": {
+    "name": "Machhu-II Dam",
+    "location": "Morbi, Gujarat, India",
+    "embankment_height_m": 22.56,
+    "reservoir_volume_m3": 101000000.0,
+    "failure_mode": "overtopping",
+    "failure_year": 1979
+  },
+  "froehlich_2008_geometry": {
+    "B_avg_m": 156.0,
+    "Z_HV": 1.4,
+    "t_f_hours": 2.497,
+    "t_f_seconds": 8989.0,
+    "B_avg_lower_95_m": 108.8,
+    "B_avg_upper_95_m": 223.5,
+    "t_f_lower_95_hr": 1.831,
+    "t_f_upper_95_hr": 3.404,
+    "k_o": 1.4,
+    "reference": "Froehlich (2008), J. Hydraul. Eng. 134(12)"
+  },
+  "froehlich_1995_peak_flow": {
+    "Q_p_m3s": 6647.0,
+    "h_w_m": 22.56,
+    "reference": "Froehlich (1995), J. Water Resour. Plann. Manage. 121(1)"
+  },
+  "comparative_methods": {
+    "von_thun_gillette_1990": {
+      "B_avg_m": 111.3,
+      "note": "Storage class C_b = 54.9 m for V_w = 101 Mm3"
+    },
+    "macdonald_langridge_monopolis_1984": {
+      "breach_formation_factor_m3": 409903.0,
+      "Q_p_m3s": 27006.0
+    },
+    "xu_zhang_2009": {
+      "B_avg_m": 14.5,
+      "t_f_hours": 4.614,
+      "note": "Overtopping failure mode"
+    }
+  },
+  "historical_observed": {
+    "B_avg_m": 620.0,
+    "Z_HV": 1.0,
+    "t_f_hours": 1.5,
+    "Q_p_m3s": 16300.0,
+    "sources": [
+      "Central Water Commission (CWC), India",
+      "NDMA (2009) \u2014 Machhu-II Dam Failure Case Study",
+      "Singh & Adams (1983) \u2014 Indian J. Power River Valley Dev."
+    ]
+  },
+  "design_values_for_hecras": {
+    "description": "Recommended Froehlich (2008) values for use in Delft3D/HEC-RAS simulation",
+    "B_avg_m": 156.0,
+    "Z_HV": 1.4,
+    "t_f_hours": 2.5,
+    "Q_p_m3s": 6647.0
+  }
+}

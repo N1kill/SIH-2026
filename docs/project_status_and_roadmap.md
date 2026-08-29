@@ -73,13 +73,16 @@ graph TD
 
 ### Phase 2: Modeling & Analysis Engines
 
-#### Directive 4: Breach Parameter Estimation
+#### Directive 4: Breach Parameter Estimation (DONE)
 - **Architecture Layer**: Data Validation & Pre-processing - Parameter Generation
-- **Tasks**:
-  1. Compute Froehlich (2008) breach geometry equations - average breach width B_avg, side slopes Z, formation time t_f - using dam height (22.56 m) and reservoir volume (101 Mm3).
-  2. Compute peak breach outflow using Froehlich (1995) peak flow regression.
-  3. Formulate comparison table: Froehlich empirical estimates vs. Wahl (1998) historical observed breach dimensions.
-- **Outputs**: scripts/09_breach_parameters.py, docs/breach_param_comparison.md, data/processed/breach_params.json.
+- **Status**: Implemented and outputs generated.
+- **Completed**:
+  1. Computed Froehlich (2008) breach geometry: B_avg = 156.0 m, Z = 1.4 (H:V), t_f = 2.50 hr.
+  2. Computed Froehlich (1995) peak breach outflow: Q_p = 6,647 m3/s.
+  3. Generated comparison table: Froehlich vs. Von Thun & Gillette (1990), MacDonald & L-M (1984), Xu & Zhang (2009), and historical observed values (CWC/NDMA).
+- **Design values for Directive 5A (Delft3D)**:
+  - B_avg = 156.0 m | Z = 1.4 (H:V) | t_f = 2.50 hr | Q_p = 6,647 m3/s
+- **Outputs**: scripts/09_breach_parameters.py, docs/breach_param_comparison.md, data/processed/breach_params.json, outputs/gis/breach_parameter_plot.png.
 
 #### Directive 5A: Physics-based Flood Simulation Engine (Delft3D)
 - **Architecture Layer**: Modeling & Analysis Engines - Flood Simulation Engine (Physics-based) - SPH Model / Delft3D Model / Scenario Simulation
