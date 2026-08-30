@@ -435,6 +435,110 @@ input:checked + .slider:before {
   border-radius: 2px;
 }
 
+/* Animated Flow Streamlines (Water Current Effect) */
+@keyframes flowDash {
+  to {
+    stroke-dashoffset: -40;
+  }
+}
+
+.animated-streamline {
+  stroke-dasharray: 10, 12;
+  animation: flowDash 1.2s linear infinite;
+  filter: drop-shadow(0 0 6px rgba(0, 255, 255, 0.8));
+}
+
+.animated-streamline-fast {
+  stroke-dasharray: 6, 10;
+  animation: flowDash 0.8s linear infinite;
+  filter: drop-shadow(0 0 4px rgba(144, 224, 239, 0.6));
+}
+
+@keyframes wavePulse {
+  0% { fill-opacity: 0.50; stroke-width: 2px; }
+  50% { fill-opacity: 0.65; stroke-width: 3px; }
+  100% { fill-opacity: 0.50; stroke-width: 2px; }
+}
+
+.pulsing-flood-wave {
+  animation: wavePulse 2.5s ease-in-out infinite;
+}
+
+/* Station Badges & Callout Pills */
+.custom-station-badge, .custom-wavefront-badge {
+  background: transparent;
+  border: none;
+}
+
+.station-pill {
+  background: rgba(10, 14, 23, 0.88);
+  backdrop-filter: blur(10px);
+  border: 1.5px solid #00b4d8;
+  border-radius: 20px;
+  padding: 4px 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+  white-space: nowrap;
+}
+
+.station-pill:hover {
+  transform: scale(1.08);
+  background: rgba(18, 26, 43, 0.95);
+}
+
+.pill-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.pill-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: #f1faee;
+  line-height: 1.1;
+}
+
+.pill-sub {
+  font-size: 9px;
+  font-family: var(--font-mono);
+  font-weight: 600;
+}
+
+/* Wave Front Tracking Pill */
+.wavefront-pill {
+  background: rgba(230, 57, 70, 0.92);
+  color: white;
+  border: 1.5px solid white;
+  border-radius: 16px;
+  padding: 4px 10px;
+  font-size: 10px;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  box-shadow: 0 0 14px rgba(230, 57, 70, 0.9);
+  white-space: nowrap;
+  animation: waveBounce 1.5s ease-in-out infinite alternate;
+}
+
+.wavefront-pulse {
+  width: 8px;
+  height: 8px;
+  background: #ffffff;
+  border-radius: 50%;
+  box-shadow: 0 0 8px #ffffff;
+  animation: pulse 1s infinite;
+}
+
+@keyframes waveBounce {
+  from { transform: translateY(0); }
+  to { transform: translateY(-4px); }
+}
+
 /* Playback Bar */
 .playback-bar {
   position: absolute;

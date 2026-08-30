@@ -119,81 +119,237 @@ document.addEventListener("DOMContentLoaded", () => {
   const maliaLoc = [22.980, 70.750];
 
   // ------------------------------------------------------------------------
-  // 3. MAP MARKERS & MONITORING GAUGES
+  // 3. HIGH-CLARITY MAP LABELS & MARKERS
   // ------------------------------------------------------------------------
-  const damIcon = L.divIcon({
-    className: 'custom-map-pin dam-pin',
-    html: '<i class="fa-solid fa-dam" style="color:#d90429; font-size:18px; text-shadow:0 0 8px #d90429;"></i>',
-    iconSize: [24, 24]
-  });
+  function createStationLabel(text, subtext, color, iconClass) {
+    return L.divIcon({
+      className: 'custom-station-badge',
+      html: `
+        <div class="station-pill" style="border-color: ${color}; box-shadow: 0 0 10px ${color}66;">
+          <i class="${iconClass}" style="color: ${color};"></i>
+          <div class="pill-text">
+            <div class="pill-title">${text}</div>
+            <div class="pill-sub" style="color: ${color};">${subtext}</div>
+          </div>
+        </div>
+      `,
+      iconSize: [180, 36],
+      iconAnchor: [90, 18]
+    });
+  }
 
-  const cityIcon = L.divIcon({
-    className: 'custom-map-pin city-pin',
-    html: '<i class="fa-solid fa-city" style="color:#00b4d8; font-size:16px; text-shadow:0 0 8px #00b4d8;"></i>',
-    iconSize: [22, 22]
-  });
+  // Station Locations with High-Clarity Pins
+  const markerDam = L.marker(damLoc, { 
+    icon: createStationLabel("Machhu-II Dam", "BREACH ORIGIN (0 km)", "#e63946", "fa-solid fa-burst")
+  }).addTo(map);
 
-  const shelterIcon = L.divIcon({
-    className: 'custom-map-pin shelter-pin',
-    html: '<i class="fa-solid fa-shield-heart" style="color:#06d6a0; font-size:18px; text-shadow:0 0 8px #06d6a0;"></i>',
-    iconSize: [24, 24]
-  });
+  const markerMorbi = L.marker(morbiLoc, { 
+    icon: createStationLabel("Morbi City Center", "INUNDATED (5.2 km)", "#f4a261", "fa-solid fa-city")
+  }).addTo(map);
 
-  L.marker(damLoc, { icon: damIcon }).addTo(map)
-    .bindPopup(`<b>Machhu-II Dam (Failure Origin)</b><br>Coordinates: 22.82°N, 70.84°E<br>Height: 22.56m | Gross Storage: 101 Mm³<br>Failure Mode: Overtopping (11 Aug 1979)`);
+  const markerLilapar = L.marker(lilaparLoc, { 
+    icon: createStationLabel("Lilapar Bridge", "RIVER CROSSING (12 km)", "#00b4d8", "fa-solid fa-bridge-water")
+  }).addTo(map);
 
-  L.marker(morbiLoc, { icon: cityIcon }).addTo(map)
-    .bindPopup(`<b>Morbi City Center (5.2 km Downstream)</b><br>Historical Flood Stage: ~3.0 m (10 ft)<br>Critical Wave Arrival: 2.5 hours post-breach`);
+  const markerMalia = L.marker(maliaLoc, { 
+    icon: createStationLabel("Malia Miyana", "COASTAL DELTA (32 km)", "#2a9d8f", "fa-solid fa-water")
+  }).addTo(map);
 
-  L.marker([22.835, 70.885], { icon: shelterIcon }).addTo(map)
-    .bindPopup(`<b>Morbi East Safe High Ground Shelter</b><br>Ridge Elevation: 56.4 m (Above Inundation)<br>Capacity: 25,000 Persons`);
+  const markerShelter1 = L.marker([22.835, 70.885], { 
+    icon: createStationLabel("East Ridge Shelter", "SAFE ZONE (>56m MSL)", "#06d6a0", "fa-solid fa-shield-heart")
+  }).addTo(map);
 
-  L.marker([22.795, 70.875], { icon: shelterIcon }).addTo(map)
-    .bindPopup(`<b>South-East Relief Center</b><br>Safe Elevation: 54.2 m<br>Capacity: 18,000 Persons`);
+  const markerShelter2 = L.marker([22.795, 70.875], { 
+    icon: createStationLabel("SE Relief Complex", "SAFE ZONE (>54m MSL)", "#06d6a0", "fa-solid fa-campground")
+  }).addTo(map);
+
+  // Flow Streamlines & Wave Front Group
+  const flowStreamlineGroup = L.layerGroup().addTo(map);
+  const waveFrontMarkerGroup = L.layerGroup().addTo(map);
 
   // ------------------------------------------------------------------------
-  // 4. DRAW INUNDATION CORRIDOR & EVACUATION ROUTES
+  // 4. DYNAMIC FLOOD WAVE PROPAGATION & MULTI-TIER CONTOURS
   // ------------------------------------------------------------------------
-  function renderMapLayers() {
+  // Accurate Downstream Thalweg Coordinates from Dam (South) to Little Rann Delta (North)
+  const channelWaypoints = [
+    [22.820, 70.842], // 0.0 km - Machhu-II Dam Toe
+    [22.823, 70.840], // 1.2 km
+    [22.828, 70.836], // 2.5 km
+    [22.833, 70.833], // 3.8 km
+    [22.838, 70.830], // 5.2 km - Central Morbi
+    [22.846, 70.825], // 7.5 km - North Morbi Industrial Zone
+    [22.858, 70.818], // 9.8 km
+    [22.870, 70.810], // 12.0 km - Lilapar Bridge
+    [22.890, 70.798], // 16.5 km
+    [22.915, 70.782], // 21.0 km
+    [22.945, 70.762], // 26.5 km
+    [22.975, 70.745], // 32.0 km - Malia Coastal Delta
+  ];
+
+  function renderMapLayers(t) {
     depthLayerGroup.clearLayers();
     riskLayerGroup.clearLayers();
-    evacuationLayerGroup.clearLayers();
+    flowStreamlineGroup.clearLayers();
+    waveFrontMarkerGroup.clearLayers();
 
-    // Inundation Footprint Polygon (Simulated Corridor)
-    const floodPolygonCoords = [
-      [22.822, 70.838],
-      [22.828, 70.835],
-      [22.845, 70.825],
-      [22.870, 70.810],
-      [22.910, 70.785],
-      [22.970, 70.745],
-      [22.985, 70.760],
-      [22.920, 70.805],
-      [22.860, 70.835],
-      [22.835, 70.848],
-      [22.820, 70.842]
-    ];
+    if (t <= 0.2) {
+      const initDamPool = L.circle([22.820, 70.842], {
+        radius: 450,
+        color: '#00b4d8',
+        fillColor: '#0077b6',
+        fillOpacity: 0.7
+      }).addTo(depthLayerGroup);
+      initDamPool.bindPopup("<b>Machhu-II Dam Reservoir</b><br>Initial Pre-Breach Storage: 101 Mm³");
+      return;
+    }
 
-    const floodPoly = L.polygon(floodPolygonCoords, {
+    // 1. Calculate Flood Wave Front Position
+    // Wave moves at ~2.2 km/h; reaches Morbi (5.2 km) at t = 2.4h, Malia (32 km) at t = 14h
+    const reachKm = Math.min(32.0, t * 2.3);
+    const progressFrac = Math.min(1.0, Math.max(0.08, reachKm / 32.0));
+    const activeWaypointsCount = Math.max(2, Math.floor(progressFrac * channelWaypoints.length));
+    const activeChannel = channelWaypoints.slice(0, activeWaypointsCount);
+    const currentFrontPos = activeChannel[activeChannel.length - 1];
+
+    // Hydrograph Stage Intensity
+    const hydroFactor = Math.exp(-Math.pow((t - 3.5) / 4.0, 2));
+    const channelDepth = (3.02 * hydroFactor).toFixed(2);
+
+    // Dynamic Floodplain Contours:
+    // Outer Zone (Shallow 0.1 - 1.5m): Wide lateral spread
+    const outerWidth = 0.005 + 0.016 * hydroFactor;
+    const outerLeft = [];
+    const outerRight = [];
+    activeChannel.forEach((pt, idx) => {
+      const taper = Math.sin((idx / (activeChannel.length - 1)) * Math.PI) * 0.4 + 0.6;
+      const w = outerWidth * taper;
+      outerLeft.push([pt[0] + w * 0.8, pt[1] - w * 1.1]);
+      outerRight.unshift([pt[0] - w * 0.8, pt[1] + w * 1.1]);
+    });
+    const outerPoly = L.polygon(outerLeft.concat(outerRight), {
+      color: '#f4a261',
+      weight: 1.5,
+      fillColor: '#e76f51',
+      fillOpacity: 0.35
+    }).addTo(depthLayerGroup);
+    outerPoly.bindPopup(`<b>Flood Margin Zone (0.5 – 1.5 m)</b><br>Time: T + ${t.toFixed(1)}h | Area: Shallow Inundation`);
+
+    // Core Channel Zone (Deep 1.5 - 3.0m): High velocity central corridor
+    const coreWidth = 0.0025 + 0.007 * hydroFactor;
+    const coreLeft = [];
+    const coreRight = [];
+    activeChannel.forEach((pt, idx) => {
+      const taper = Math.sin((idx / (activeChannel.length - 1)) * Math.PI) * 0.4 + 0.6;
+      const w = coreWidth * taper;
+      coreLeft.push([pt[0] + w * 0.7, pt[1] - w * 0.9]);
+      coreRight.unshift([pt[0] - w * 0.7, pt[1] + w * 0.9]);
+    });
+    const corePoly = L.polygon(coreLeft.concat(coreRight), {
       color: '#e63946',
       weight: 2,
       fillColor: '#d62828',
-      fillOpacity: 0.45
+      fillOpacity: 0.65,
+      className: 'pulsing-flood-wave'
     }).addTo(depthLayerGroup);
+    corePoly.bindPopup(`<b>High-Hazard Deep Channel (1.5 – 3.02 m)</b><br>Peak Depth: ${channelDepth} m | Velocity: ~2.8 m/s`);
 
-    floodPoly.bindPopup(`<b>Machhu-II 2D Inundation Corridor</b><br>Max Simulated Depth: 3.02m (Morbi)<br>Total Inundation: 27.75 km²`);
+    // 2. Animated Flow Velocity Streamlines with Glowing Dash Arrows
+    if (activeChannel.length >= 2) {
+      // Main Centerline Flow
+      L.polyline(activeChannel, {
+        color: '#00ffff',
+        weight: 4.5,
+        opacity: 0.9,
+        dashArray: '12, 14',
+        className: 'animated-streamline'
+      }).addTo(flowStreamlineGroup);
 
-    // Evacuation Route Lines
+      // Flank Currents
+      const leftCurrent = activeChannel.map(pt => [pt[0] + 0.0025, pt[1] - 0.0035]);
+      const rightCurrent = activeChannel.map(pt => [pt[0] - 0.0025, pt[1] + 0.0035]);
+
+      L.polyline(leftCurrent, {
+        color: '#70e000',
+        weight: 2.5,
+        opacity: 0.75,
+        dashArray: '8, 12',
+        className: 'animated-streamline-fast'
+      }).addTo(flowStreamlineGroup);
+
+      L.polyline(rightCurrent, {
+        color: '#70e000',
+        weight: 2.5,
+        opacity: 0.75,
+        dashArray: '8, 12',
+        className: 'animated-streamline-fast'
+      }).addTo(flowStreamlineGroup);
+    }
+
+    // 3. Moving Wave Front Indicator Callout
+    const waveFrontIcon = L.divIcon({
+      className: 'custom-wavefront-badge',
+      html: `
+        <div class="wavefront-pill">
+          <span class="wavefront-pulse"></span>
+          <i class="fa-solid fa-water"></i>
+          <span>WAVE FRONT: ${reachKm.toFixed(1)} km (${t.toFixed(1)}h)</span>
+        </div>
+      `,
+      iconSize: [200, 30],
+      iconAnchor: [100, 15]
+    });
+
+    L.marker(currentFrontPos, { icon: waveFrontIcon }).addTo(waveFrontMarkerGroup);
+  }
+
+  // 4. Interactive Click-to-Inspect Tool on Map
+  map.on("click", (e) => {
+    const lat = e.latlng.lat.toFixed(4);
+    const lon = e.latlng.lng.toFixed(4);
+    
+    // Approximate distance from river channel thalweg
+    let minDist = 999;
+    channelWaypoints.forEach(pt => {
+      const d = Math.hypot(e.latlng.lat - pt[0], e.latlng.lng - pt[1]);
+      if (d < minDist) minDist = d;
+    });
+
+    const isFlooded = minDist < 0.018 && currentTime >= 1.0;
+    const estDepth = isFlooded ? Math.max(0.2, (3.0 - (minDist / 0.018) * 2.8)).toFixed(2) : "0.00";
+    const estVelocity = isFlooded ? (estDepth * 0.9 + 0.4).toFixed(2) : "0.00";
+    const hazardLevel = isFlooded ? (estDepth > 2.0 ? "<span style='color:#e63946;'>CRITICAL (>2m)</span>" : (estDepth > 0.8 ? "<span style='color:#f4a261;'>MODERATE</span>" : "<span style='color:#00b4d8;'>LOW</span>")) : "<span style='color:#06d6a0;'>DRY GROUND</span>";
+
+    L.popup()
+      .setLatLng(e.latlng)
+      .setContent(`
+        <div style="font-family:'Inter',sans-serif; min-width:180px;">
+          <div style="font-weight:700; color:#00b4d8; font-size:12px; margin-bottom:6px; border-bottom:1px solid rgba(255,255,255,0.1); padding-bottom:4px;">
+            <i class="fa-solid fa-crosshairs"></i> Grid Point Inspection
+          </div>
+          <div style="font-size:11px; margin-bottom:3px;"><b>Coords:</b> ${lat}°N, ${lon}°E</div>
+          <div style="font-size:11px; margin-bottom:3px;"><b>Simulation Time:</b> T + ${currentTime.toFixed(1)}h</div>
+          <div style="font-size:11px; margin-bottom:3px;"><b>Water Depth:</b> <span style="font-family:'JetBrains Mono'; font-weight:700;">${estDepth} m</span></div>
+          <div style="font-size:11px; margin-bottom:3px;"><b>Flow Velocity:</b> <span style="font-family:'JetBrains Mono';">${estVelocity} m/s</span></div>
+          <div style="font-size:11px;"><b>Hazard Tier:</b> ${hazardLevel}</div>
+        </div>
+      `)
+      .openOn(map);
+  });
+
+  // 3. Evacuation Corridors & Shelters Layer
+  function renderEvacuationRoutes() {
+    evacuationLayerGroup.clearLayers();
     const routeEast = [
       morbiLoc,
       [22.825, 70.860],
       [22.835, 70.885]
     ];
     L.polyline(routeEast, { color: '#06d6a0', weight: 4, dashArray: '6, 8' }).addTo(evacuationLayerGroup)
-      .bindPopup("<b>Primary Safe Evacuation Corridor (East Bypass Ridge)</b>");
+      .bindPopup("<b>Primary Safe Evacuation Corridor (East Bypass Ridge)</b><br>Status: Elevated above maximum flood line");
   }
 
-  renderMapLayers();
+  renderEvacuationRoutes();
+  renderMapLayers(currentTime);
 
   // ------------------------------------------------------------------------
   // 5. CHART.JS HYDROGRAPH
@@ -269,6 +425,9 @@ document.addEventListener("DOMContentLoaded", () => {
     const hrs = Math.floor(timeVal);
     const mins = Math.round((timeVal - hrs) * 60);
     document.getElementById("time-val").innerText = `T + ${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')} hrs`;
+
+    // Dynamic Map Flood Wave & Flow Streamlines Update
+    renderMapLayers(timeVal);
   }
 
   // Scenario Button Events

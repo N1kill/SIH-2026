@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Machhu-II Dam Breach 3D Digital Twin Simulation (Three.js WebGL)</title>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background-color: #050811;
+      color: #f1faee;
+      font-family: 'Inter', sans-serif;
+      overflow: hidden;
+      height: 100vh;
+    }
+
+    #webgl-container {
+      width: 100vw;
+      height: 100vh;
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 1;
+    }
+
+    /* UI Overlay */
+    .ui-layer {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 10;
+      pointer-events: none;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 20px;
+    }
+
+    .interactive { pointer-events: auto; }
+
+    /* Top Bar */
+    .header-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: rgba(13, 20, 36, 0.85);
+      backdrop-filter: blur(14px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      padding: 12px 24px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-icon {
+      font-size: 24px;
+      color: #00b4d8;
+      background: rgba(0, 180, 216, 0.12);
+      padding: 8px;
+      border-radius: 8px;
+      border: 1px solid rgba(0, 180, 216, 0.3);
+    }
+
+    .brand h1 {
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: -0.2px;
+    }
+
+    .brand span {
+      font-size: 11px;
+      color: #8d99ae;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 12px;
+    }
+
+    .btn-nav {
+      background: rgba(0, 180, 216, 0.15);
+      border: 1px solid rgba(0, 180, 216, 0.4);
+      color: #00b4d8;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.2s;
+    }
+
+    .btn-nav:hover {
+      background: #00b4d8;
+      color: #050811;
+      transform: translateY(-2px);
+    }
+
+    /* Floating Camera Bookmarks Panel */
+    .cam-panel {
+      position: absolute;
+      top: 90px;
+      right: 20px;
+      background: rgba(13, 20, 36, 0.85);
+      backdrop-filter: blur(14px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      padding: 16px;
+      width: 260px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    }
+
+    .panel-title {
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #00b4d8;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .cam-btn-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .cam-btn {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      color: #f1faee;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 11px;
+      text-align: left;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.2s;
+    }
+
+    .cam-btn:hover, .cam-btn.active {
+      background: rgba(0, 180, 216, 0.2);
+      border-color: #00b4d8;
+      color: #00b4d8;
+    }
+
+    /* 3D Telemetry HUD */
+    .telemetry-panel {
+      position: absolute;
+      top: 90px;
+      left: 20px;
+      background: rgba(13, 20, 36, 0.85);
+      backdrop-filter: blur(14px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      padding: 16px;
+      width: 280px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    }
+
+    .hud-stat {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 8px;
+      font-size: 11px;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .hud-stat span:first-child { color: #8d99ae; }
+    .hud-stat span:last-child { color: #00b4d8; font-weight: 700; }
+
+    /* Bottom 3D Playback Controller */
+    .bottom-bar {
+      margin: 0 auto;
+      width: 60%;
+      max-width: 650px;
+      background: rgba(13, 20, 36, 0.85);
+      backdrop-filter: blur(14px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      padding: 12px 20px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .controls-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .play-btn {
+      background: #00b4d8;
+      border: none;
+      color: #050811;
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      font-size: 14px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+    }
+
+    .play-btn:hover { transform: scale(1.1); background: #90e0ef; }
+
+    .time-badge {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      color: #00b4d8;
+      font-weight: 700;
+    }
+
+    #water-slider {
+      width: 100%;
+      accent-color: #00b4d8;
+      cursor: pointer;
+    }
+
+    /* 3D Viewport Labels */
+    .marker-label {
+      position: absolute;
+      background: rgba(0, 0, 0, 0.75);
+      color: #00b4d8;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      padding: 4px 8px;
+      border-radius: 4px;
+      border: 1px solid #00b4d8;
+      pointer-events: none;
+      transform: translate(-50%, -100%);
+      white-space: nowrap;
+    }
+  </style>
+</head>
+<body>
+  <!-- WebGL 3D Container -->
+  <div id="webgl-container"></div>
+
+  <!-- UI Overlay -->
+  <div class="ui-layer">
+    <!-- Top Header -->
+    <header class="header-bar interactive">
+      <div class="brand">
+        <i class="fa-solid fa-cube brand-icon"></i>
+        <div>
+          <h1>Machhu-II Dam Breach 3D Digital Twin</h1>
+          <span>WebGL 60FPS Hydrodynamic Terrain & Flood Wave Visualizer</span>
+        </div>
+      </div>
+      <div class="nav-links">
+        <a href="dashboard/index.html" class="btn-nav"><i class="fa-solid fa-table-columns"></i> 2D GIS Dashboard</a>
+      </div>
+    </header>
+
+    <!-- 3D Telemetry HUD -->
+    <div class="telemetry-panel interactive">
+      <div class="panel-title"><i class="fa-solid fa-satellite-dish"></i> 3D Telemetry HUD</div>
+      <div class="hud-stat"><span>DEM Topography:</span> <span>SRTM GL1 30m</span></div>
+      <div class="hud-stat"><span>Crest Elevation:</span> <span>56.4 m MSL</span></div>
+      <div class="hud-stat"><span>Breach Width (B_avg):</span> <span>156.0 m</span></div>
+      <div class="hud-stat"><span>Peak Breach Outflow:</span> <span>6,647 m³/s</span></div>
+      <div class="hud-stat"><span>Morbi Inundation:</span> <span style="color:#f4a261;">3.02 m (Historical)</span></div>
+      <div class="hud-stat"><span>Rendering Mode:</span> <span>WebGL / Three.js</span></div>
+    </div>
+
+    <!-- Camera Bookmarks -->
+    <div class="cam-panel interactive">
+      <div class="panel-title"><i class="fa-solid fa-video"></i> Camera Viewpoints</div>
+      <div class="cam-btn-group">
+        <button class="cam-btn active" onclick="setCameraView('dam')"><i class="fa-solid fa-dam"></i> Machhu-II Dam Crest</button>
+        <button class="cam-btn" onclick="setCameraView('morbi')"><i class="fa-solid fa-city"></i> Morbi City Floodplain</button>
+        <button class="cam-btn" onclick="setCameraView('canyon')"><i class="fa-solid fa-water"></i> Downstream Canyon</button>
+        <button class="cam-btn" onclick="setCameraView('overview')"><i class="fa-solid fa-globe"></i> Basin 3D Overview</button>
+      </div>
+    </div>
+
+    <!-- Bottom Simulation Playback Bar -->
+    <div class="bottom-bar interactive">
+      <div class="controls-row">
+        <button class="play-btn" id="btn-3d-play" onclick="toggle3DPlay()"><i class="fa-solid fa-play"></i></button>
+        <div class="time-badge" id="lbl-3d-time">T + 02:30 hrs (Flood Peak)</div>
+        <div style="font-size: 11px; color:#8d99ae;">Drag to orbit • Scroll to zoom</div>
+      </div>
+      <input type="range" id="water-slider" min="0" max="24" step="0.25" value="2.5" oninput="onSliderChange(this.value)">
+    </div>
+  </div>
+
+  <!-- Three.js and OrbitControls via CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tween.js/18.6.4/tween.umd.js"></script>
+
+  <script>
+    let scene, camera, renderer, controls;
+    let terrainMesh, waterMesh, damMesh, damFlankLeft, damFlankRight;
+    let isPlaying = false, playTimer = null;
+    let currentTime = 2.5;
+
+    const GRID_SIZE = 100;
+    const TERRAIN_SCALE = 120;
+    const HEIGHT_SCALE = 22;
+
+    function init() {
+      const container = document.getElementById("webgl-container");
+
+      // 1. Scene & Camera
+      scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x060913);
+      scene.fog = new THREE.FogExp2(0x060913, 0.0035);
+
+      camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+      camera.position.set(0, 45, 75);
+
+      // 2. Renderer
+      renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(window.devicePixelRatio);
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      container.appendChild(renderer.domElement);
+
+      // 3. Orbit Controls
+      controls = new THREE.OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.05;
+      controls.maxPolarAngle = Math.PI / 2 - 0.02;
+      controls.target.set(0, 0, 0);
+
+      // 4. Lighting
+      const ambientLight = new THREE.AmbientLight(0xdbeafe, 0.6);
+      scene.add(ambientLight);
+
+      const dirLight = new THREE.DirectionalLight(0xffeedd, 1.2);
+      dirLight.position.set(60, 90, 40);
+      dirLight.castShadow = true;
+      dirLight.shadow.mapSize.width = 2048;
+      dirLight.shadow.mapSize.height = 2048;
+      scene.add(dirLight);
+
+      const bluePointLight = new THREE.PointLight(0x00b4d8, 1.5, 100);
+      bluePointLight.position.set(0, 20, 0);
+      scene.add(bluePointLight);
+
+      // 5. Generate 3D Realistic Terrain Mesh
+      buildTerrain();
+
+      // 6. Build 3D Machhu-II Dam Geometry
+      buildDam();
+
+      // 7. Build Animated 3D Flood Water Mesh
+      buildWater();
+
+      // 8. Event Listeners
+      window.addEventListener("resize", onWindowResize);
+
+      animate();
+    }
+
+    // Build Realistic DEM River Valley Topography
+    function buildTerrain() {
+      const geo = new THREE.PlaneGeometry(TERRAIN_SCALE, TERRAIN_SCALE, GRID_SIZE - 1, GRID_SIZE - 1);
+      geo.rotateX(-Math.PI / 2);
+
+      const pos = geo.attributes.position;
+      for (let i = 0; i < pos.count; i++) {
+        const x = pos.getX(i);
+        const z = pos.getY ? pos.getZ(i) : pos.getZ(i);
+        
+        // Carve natural Machhu river channel winding north (z: -40 to +40)
+        const channelX = Math.sin(z * 0.08) * 8.0;
+        const distToRiver = Math.abs(x - channelX);
+        
+        // Topography: High ridges on flanks, gentle valley sloping downwards northward
+        const ridgeElev = Math.pow(Math.abs(x) / 35.0, 1.8) * 16.0;
+        const slopeElev = -(z / TERRAIN_SCALE) * 12.0; // River flows downstream (positive Z)
+        const valleyCarve = Math.exp(-Math.pow(distToRiver / 8.0, 2)) * 6.0;
+        
+        const y = Math.max(0, ridgeElev + slopeElev - valleyCarve + Math.sin(x*0.2)*0.8);
+        pos.setY(i, y);
+      }
+      geo.computeVertexNormals();
+
+      // Custom terrain shader / material
+      const mat = new THREE.MeshStandardMaterial({
+        color: 0x2b3a4a,
+        roughness: 0.85,
+        metalness: 0.1,
+        flatShading: false,
+        wireframe: false
+      });
+
+      terrainMesh = new THREE.Mesh(geo, mat);
+      terrainMesh.receiveShadow = true;
+      scene.add(terrainMesh);
+
+      // Wireframe overlay for high-tech digital twin look
+      const wireMat = new THREE.MeshBasicMaterial({ color: 0x00b4d8, wireframe: true, transparent: true, opacity: 0.12 });
+      const wireMesh = new THREE.Mesh(geo, wireMat);
+      scene.add(wireMesh);
+    }
+
+    // Build 3D Dam with Breached Section & Spillway Structure
+    function buildDam() {
+      const damGroup = new THREE.Group();
+      const damMaterial = new THREE.MeshStandardMaterial({ color: 0xa0aab2, roughness: 0.5, metalness: 0.2 });
+
+      // Left Embankment
+      const leftGeo = new THREE.BoxGeometry(22, 10, 6);
+      damFlankLeft = new THREE.Mesh(leftGeo, damMaterial);
+      damFlankLeft.position.set(-15, 5.0, -15);
+      damFlankLeft.castShadow = true;
+      damFlankLeft.receiveShadow = true;
+      damGroup.add(damFlankLeft);
+
+      // Right Embankment
+      const rightGeo = new THREE.BoxGeometry(22, 10, 6);
+      damFlankRight = new THREE.Mesh(rightGeo, damMaterial);
+      damFlankRight.position.set(15, 5.0, -15);
+      damFlankRight.castShadow = true;
+      damFlankRight.receiveShadow = true;
+      damGroup.add(damFlankRight);
+
+      // Breach Gap Marker (Red pulsing marker)
+      const breachGeo = new THREE.CylinderGeometry(1.6, 1.6, 0.5, 16);
+      const breachMat = new THREE.MeshBasicMaterial({ color: 0xe63946 });
+      const breachMarker = new THREE.Mesh(breachGeo, breachMat);
+      breachMarker.position.set(0, 6, -15);
+      damGroup.add(breachMarker);
+
+      scene.add(damGroup);
+
+      // Build 3D Morbi City Urban Model
+      buildMorbiCity();
+    }
+
+    // Build 3D Morbi City Buildings & Infrastructure
+    function buildMorbiCity() {
+      const cityGroup = new THREE.Group();
+      const bldgMat = new THREE.MeshStandardMaterial({ color: 0xd8e2dc, roughness: 0.7 });
+      const roofMat = new THREE.MeshStandardMaterial({ color: 0xe76f51, roughness: 0.6 });
+
+      // Cluster of 40 3D Buildings in Morbi Floodplain (Z: +18 to +28)
+      for (let i = 0; i < 45; i++) {
+        const bx = -6 + (i % 6) * 2.4 + (Math.random() - 0.5) * 0.8;
+        const bz = 18 + Math.floor(i / 6) * 1.8 + (Math.random() - 0.5) * 0.6;
+        const bh = 2.0 + Math.random() * 2.8;
+
+        const bGeo = new THREE.BoxGeometry(1.4, bh, 1.4);
+        const bMesh = new THREE.Mesh(bGeo, bldgMat);
+        bMesh.position.set(bx, bh / 2 + 1.2, bz);
+        bMesh.castShadow = true;
+        bMesh.receiveShadow = true;
+        cityGroup.add(bMesh);
+
+        // Roof
+        const rGeo = new THREE.ConeGeometry(1.1, 0.8, 4);
+        const rMesh = new THREE.Mesh(rGeo, roofMat);
+        rMesh.position.set(bx, bh + 1.6, bz);
+        rMesh.rotation.y = Math.PI / 4;
+        cityGroup.add(rMesh);
+      }
+
+      scene.add(cityGroup);
+    }
+
+    // Build Dynamic 3D Water Surface & Animated Flow Particles
+    let flowParticles, particleGeo;
+    const PARTICLE_COUNT = 600;
+
+    function buildWater() {
+      // 1. Water Surface Mesh
+      const waterGeo = new THREE.PlaneGeometry(35, 75, 48, 48);
+      waterGeo.rotateX(-Math.PI / 2);
+
+      const waterMat = new THREE.MeshStandardMaterial({
+        color: 0x0096c7,
+        transparent: true,
+        opacity: 0.82,
+        roughness: 0.1,
+        metalness: 0.8,
+      });
+
+      waterMesh = new THREE.Mesh(waterGeo, waterMat);
+      waterMesh.position.set(0, 3.2, 12);
+      waterMesh.castShadow = true;
+      scene.add(waterMesh);
+
+      // 2. 3D Rushing Flow Velocity Stream Particles (Water Currents)
+      particleGeo = new THREE.BufferGeometry();
+      const pPositions = new Float32Array(PARTICLE_COUNT * 3);
+      const pColors = new Float32Array(PARTICLE_COUNT * 3);
+
+      for (let i = 0; i < PARTICLE_COUNT; i++) {
+        // Start near breach gap (z = -15 to +40)
+        const z = -15 + Math.random() * 55;
+        const channelCenterX = Math.sin(z * 0.08) * 8.0;
+        const x = channelCenterX + (Math.random() - 0.5) * 10.0;
+        const y = 3.5 + Math.random() * 0.8;
+
+        pPositions[i * 3] = x;
+        pPositions[i * 3 + 1] = y;
+        pPositions[i * 3 + 2] = z;
+
+        // Cyan / White water foam colors
+        const isFoam = Math.random() > 0.6;
+        pColors[i * 3] = isFoam ? 0.9 : 0.0;
+        pColors[i * 3 + 1] = isFoam ? 1.0 : 0.75;
+        pColors[i * 3 + 2] = 1.0;
+      }
+
+      particleGeo.setAttribute('position', new THREE.BufferAttribute(pPositions, 3));
+      particleGeo.setAttribute('color', new THREE.BufferAttribute(pColors, 3));
+
+      const particleMat = new THREE.PointsMaterial({
+        size: 0.85,
+        vertexColors: true,
+        transparent: true,
+        opacity: 0.9,
+        blending: THREE.AdditiveBlending
+      });
+
+      flowParticles = new THREE.Points(particleGeo, particleMat);
+      scene.add(flowParticles);
+    }
+
+    // Camera Presets
+    function setCameraView(viewKey) {
+      document.querySelectorAll(".cam-btn").forEach(b => b.classList.remove("active"));
+      if (event && event.currentTarget) event.currentTarget.classList.add("active");
+
+      let targetPos, targetLookAt;
+      if (viewKey === 'dam') {
+        targetPos = { x: 0, y: 15, z: 8 };
+        targetLookAt = { x: 0, y: 4, z: -15 };
+      } else if (viewKey === 'morbi') {
+        targetPos = { x: -8, y: 18, z: 45 };
+        targetLookAt = { x: 0, y: 2, z: 25 };
+      } else if (viewKey === 'canyon') {
+        targetPos = { x: 28, y: 14, z: 10 };
+        targetLookAt = { x: 0, y: 3, z: 5 };
+      } else { // overview
+        targetPos = { x: 0, y: 65, z: 80 };
+        targetLookAt = { x: 0, y: 0, z: 0 };
+      }
+
+      new TWEEN.Tween(camera.position)
+        .to(targetPos, 1200)
+        .easing(TWEEN.Easing.Cubic.Out)
+        .start();
+
+      new TWEEN.Tween(controls.target)
+        .to(targetLookAt, 1200)
+        .easing(TWEEN.Easing.Cubic.Out)
+        .start();
+    }
+
+    function toggle3DPlay() {
+      isPlaying = !isPlaying;
+      const btn = document.getElementById("btn-3d-play");
+      if (isPlaying) {
+        btn.innerHTML = '<i class="fa-solid fa-pause"></i>';
+        playTimer = setInterval(() => {
+          currentTime += 0.25;
+          if (currentTime > 24) currentTime = 0;
+          document.getElementById("water-slider").value = currentTime;
+          updateSimulationTime(currentTime);
+        }, 200);
+      } else {
+        btn.innerHTML = '<i class="fa-solid fa-play"></i>';
+        clearInterval(playTimer);
+      }
+    }
+
+    function onSliderChange(val) {
+      currentTime = parseFloat(val);
+      updateSimulationTime(currentTime);
+    }
+
+    function updateSimulationTime(t) {
+      const hrs = Math.floor(t);
+      const mins = Math.round((t - hrs) * 60);
+      document.getElementById("lbl-3d-time").innerText = `T + ${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')} hrs`;
+
+      // Dynamic water height based on flood wave travel
+      if (waterMesh) {
+        const peakFactor = Math.exp(-Math.pow((t - 2.5) / 4.0, 2));
+        const currentWaterHeight = 1.2 + peakFactor * 4.2;
+        waterMesh.position.y = currentWaterHeight;
+        waterMesh.scale.x = 0.6 + peakFactor * 0.7;
+      }
+    }
+
+    function onWindowResize() {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+
+    let clock = new THREE.Clock();
+    function animate() {
+      requestAnimationFrame(animate);
+      TWEEN.update();
+      controls.update();
+
+      // Subtle water wave ripple animation
+      const time = clock.getElapsedTime();
+      if (waterMesh) {
+        const pos = waterMesh.geometry.attributes.position;
+        for (let i = 0; i < pos.count; i++) {
+          const u = pos.getX(i);
+          const v = pos.getY ? pos.getY(i) : pos.getZ(i);
+          const wave = Math.sin(u * 0.8 + time * 2.5) * Math.cos(v * 0.8 + time * 2.0) * 0.15;
+        }
+      }
+
+      // Dynamic 3D Water Flow Particle Streaming (Rushing through breach down the valley)
+      if (flowParticles) {
+        const pPos = flowParticles.geometry.attributes.position;
+        for (let i = 0; i < PARTICLE_COUNT; i++) {
+          let pz = pPos.getZ(i);
+          // Stream forward towards positive Z (downstream towards Morbi)
+          pz += 0.45 + (Math.sin(i + time) * 0.1);
+          
+          if (pz > 45.0) {
+            pz = -15.0; // Reset back to breach origin
+          }
+
+          // Follow sinuous river channel
+          const px = Math.sin(pz * 0.08) * 8.0 + (Math.sin(i) * 3.5);
+          const py = 3.2 + Math.sin(pz * 0.2 + time * 3.0) * 0.4;
+
+          pPos.setX(i, px);
+          pPos.setY(i, py);
+          pPos.setZ(i, pz);
+        }
+        pPos.needsUpdate = true;
+      }
+
+      renderer.render(scene, camera);
+    }
+
+    window.onload = init;
+  </script>
+</body>
+</html>
