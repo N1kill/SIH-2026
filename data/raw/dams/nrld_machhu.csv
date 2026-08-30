@@ -1,81 +1,24 @@
-lr.No,IIMIAIT,PIC,Named Dam,"............ ..,
-~·",............,Longitude,"v-r~
-Colllplldon",..........,....,",......c.,",......Z one,Deni'IP,"lt.ltlht*-
-1..-t
-Founddon
-...... (111)","DMIL8ngth
-(Ill)","VIII-
-eom.ntd
-DMI (IICII)","ar-.....
-C.-=ttJ
-(IICII)","~Aiw
-(Knl2)","......
-Etr.tlft
-c..-.,
-(IICII)",PurpoM,"o..lgnMI
-lpi'-J
-C.-=ttJ
-(11'1318)"
-185,Gujaret,GJ04MH0498,MACHHU2,,"22'45'50""","70'51'58""",1983,"WEST
-FLOWING
-RIVER OF
-KUTCHHAND
-SAURASHTRA
-INCLUDING
-LUNI",MACHHU,MORBI,IV,TEIPG,22.58,508.18,2.447,87.900,19.346,84.1110,I&S,28419
-166,Gujarat,GJ04HH0121,MACHHUI,,"22""28'3""","70""58'16""",1958,"WEST
-FLOWING
-RIVER OF
-KUTCHHAND
-SAURASHTRA
-INCLUDING
-LUNI",MACHHU,MORBI,IV,TEIPG,27.43,667.68,0.286,68.950,12.140,68.950,I&S,11270
-167,Gujarat,GJ04LH0653,MACHHUIII,,"22""51'37""","70""40'15""",2015,"WEST
-FLOWING
-RIVER OF
-KUTCHHAND
-SAURASHTRA
-INCLUDING
-LUNI",MACHHU,,IV,TEIPG,14.01,302.12,1.530,7.990,1.780,8.480 I,,13450
-291,Gujarat,GJ04MH0018,KUVADWA,,"22'21'0""","70'57'0""",1998,"WEST
-FLOWING
-RIVER OF
-KUTCHHAND
-SAURASHTRA
-INCLUDING
-LUNI",TIMACHHU,RAJKOT,IV,TE,15.25,700,0.106,2.041,1.580,2.041 I,,295.65
-300,Gujaret,GJ04l.H0388,MESARIA2,,"22'27'40""",71'06'46',1975,"WEST
-FLOWING
-RIVER OF
-KUTCHHAND
-SAURASHTRA
-INCLUDING
-LUNI",T/MACHHU,WAN KANER,IV,1E,11.5,660,,0.671,0.280,0.592 I,,158.77
-301,GuJarat,GJ04MH0249,MESARIYA 1,,"22'27'13""","71'05'24""",1974,"WEST
-FLOWING
-RIVER OF
-KUTCHHAND
-SAURASHTRA
-INCLUDING
-LUNI",T/MACHHU,WAN KANER,IV,1E,21.03,789.35,0.222,4.572,1.240,3.850 I,,713.18
-328,Gujaret,GJ04MH0475,RANINGPAR,,"22'14'0""","71'5'0""",1987,"WEST
-FLOWING
-RIVER OF
-KUTCHHAND
-SAURASHTRA
-INCLUDING
-LUNI",T/MACHHU,JASDAN,IV,1E,17.8,512,0.110,3.650,1.200,2.960 I,,823.79
-349,GuJarel,GJ04LJ-10276,THIKARIYALA,,"22'24'41""",71'05'21',1975,"WEST
-FLOWING
-RIVER OF
-KUTCHHAND
-SAURASHTRA
-INCLUDING
-LUNI",T/MACHHU,WAN KANER,IV,TE,13.2,585,0.087,1.739,0.550,1.507 I,,247.37
-377,Gujaret,GJ04MH0349,MACHHUNDRI,,20'58'41',"70'56'0""",1984,"WEST
-FLOWING
-RIVER OF
-KUTCHHAND
-SAURASHTRA
-INCLUDING
-LUNI",MACHHUNDRI,BHANVAD,IV,TE,22.3,1727.5,2.602,31.840,4.480,26.700 I,,5506
+field,value,unit,source
+dam_name,Machhu Dam-II,,CWC NRLD / Mission Brief
+state,Gujarat,,CWC NRLD
+district,Morbi (formerly Rajkot),,CWC NRLD
+latitude,22.82,degrees_N,Mission Brief
+longitude,70.84,degrees_E,Mission Brief
+river_basin,Machhu,,CWC NRLD
+river,Machhu,,CWC NRLD
+nearest_city,Morbi,,CWC NRLD
+year_completion,1972,year,CWC NRLD
+dam_type,Earthfill Embankment,,CWC NRLD
+dam_height,22.56,m,CWC NRLD
+dam_length,3542,m,CWC NRLD
+gross_storage,101000000,m3,CWC NRLD / Mission Brief (~101 Mm³)
+effective_storage,72000000,m3,CWC NRLD
+catchment_area,1928,km2,Mission Brief
+full_basin_area,2515,km2,Mission Brief
+river_length,130,km,Mission Brief
+purpose,Irrigation,,CWC NRLD
+breach_date,1979-08-11,,Historical record
+breach_cause,Overtopping due to extreme rainfall,,Historical/Literature
+peak_inflow_estimated,5663,m3/s,Literature (Wahl 1998 / Indian sources)
+designed_spillway_capacity,5663,m3/s,CWC NRLD (original design)
+flood_height_morbi,3.0,m (~10ft),Historical accounts

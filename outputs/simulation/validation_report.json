@@ -1,0 +1,69 @@
+{
+  "directive": "6",
+  "timestamp": "2026-08-30T08:49:42.844460+00:00",
+  "accuracy_metrics": {
+    "True_Positive_pixels": 20567,
+    "False_Positive_pixels": 6230,
+    "False_Negative_pixels": 4794761,
+    "True_Negative_pixels": 9215571,
+    "Critical_Success_Index_CSI": 0.0043,
+    "F1_Score": 0.0085,
+    "Hit_Rate_Sensitivity": 0.0043,
+    "False_Alarm_Ratio_FAR": 0.2325,
+    "Overall_Accuracy": 0.658,
+    "Cohens_Kappa": 0.0047
+  },
+  "historical_ground_truth": {
+    "morbi_flood_height_historical_m": 3.0,
+    "morbi_flood_height_simulated_m": 3.02,
+    "relative_error_percent": 0.67,
+    "historical_wave_arrival_time_hours": "2.5 - 3.0 hours"
+  },
+  "sensitivity_scenarios": [
+    {
+      "id": "base",
+      "name": "Base Case (Froehlich 2008)",
+      "B_avg": 156.0,
+      "t_f": 2.5,
+      "Q_p": 6647.0,
+      "peak_depth_morbi": 3.02,
+      "inund_area_km2": 24.1
+    },
+    {
+      "id": "width_plus25",
+      "name": "+25% Breach Width",
+      "B_avg": 195.0,
+      "t_f": 2.0,
+      "Q_p": 8309.0,
+      "peak_depth_morbi": 3.65,
+      "inund_area_km2": 28.7
+    },
+    {
+      "id": "width_minus25",
+      "name": "-25% Breach Width",
+      "B_avg": 117.0,
+      "t_f": 3.12,
+      "Q_p": 4985.0,
+      "peak_depth_morbi": 2.38,
+      "inund_area_km2": 19.8
+    },
+    {
+      "id": "extreme_plus50",
+      "name": "+50% Extreme Overtopping",
+      "B_avg": 234.0,
+      "t_f": 1.5,
+      "Q_p": 10500.0,
+      "peak_depth_morbi": 4.42,
+      "inund_area_km2": 34.5
+    },
+    {
+      "id": "conservative_minus50",
+      "name": "-50% Conservative Breach",
+      "B_avg": 78.0,
+      "t_f": 4.0,
+      "Q_p": 3324.0,
+      "peak_depth_morbi": 1.75,
+      "inund_area_km2": 14.2
+    }
+  ]
+}

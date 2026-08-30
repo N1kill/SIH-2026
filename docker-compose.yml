@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  # 1. PostGIS Spatial Database
+  postgis:
+    image: postgis/postgis:15-3.3
+    container_name: sih_machhu_postgis
+    environment:
+      POSTGRES_DB: machhu_sim_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgrespassword
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/init.sql
+    restart: unless-stopped
+
+  # 2. Web Dashboard & Spatial Tile Server (Nginx)
+  dashboard:
+    image: nginx:alpine
+    container_name: sih_machhu_dashboard
+    ports:
+      - "8080:80"
+    volumes:
+      - ./outputs/3d/dashboard:/usr/share/nginx/html:ro
+    depends_on:
+      - postgis
+    restart: unless-stopped
+
+volumes:
+  pgdata:

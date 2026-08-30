@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Machhu-II Dam Breach 3D Flood Inundation & Disaster Management System</title>
+  
+  <!-- Google Fonts & Font Awesome -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Top Navigation Header -->
+    <header class="navbar">
+      <div class="brand">
+        <i class="fa-solid fa-water-ladder logo-icon"></i>
+        <div>
+          <h1>SIH-2026: Machhu-II Dam Breach Simulation</h1>
+          <span class="subtitle">2D Hydrodynamic Modeling, GEE Earth Observation & HADR Decision Support System</span>
+        </div>
+      </div>
+      <div class="header-badges">
+        <div class="badge status-badge"><span class="pulse-dot"></span> LIVE SIMULATION ENGINE</div>
+        <div class="badge crs-badge"><i class="fa-solid fa-earth-americas"></i> UTM 42N (EPSG:32642)</div>
+        <div class="badge location-badge"><i class="fa-solid fa-location-dot"></i> Morbi, Gujarat (22.82°N, 70.84°E)</div>
+      </div>
+    </header>
+
+    <!-- Main Workspace -->
+    <div class="main-layout">
+      <!-- Left Sidebar: Controls & Scenarios -->
+      <aside class="sidebar left-sidebar">
+        <!-- Scenario Selector -->
+        <div class="card glass-card">
+          <div class="card-header">
+            <i class="fa-solid fa-sliders"></i>
+            <h3>Breach Scenario Selector</h3>
+          </div>
+          <div class="scenario-buttons">
+            <button class="scenario-btn active" data-scenario="base">
+              <div class="sc-title">Base Case (Froehlich 2008)</div>
+              <div class="sc-meta">B_avg: 156m | Q_p: 6,647 m³/s | t_f: 2.5h</div>
+            </button>
+            <button class="scenario-btn" data-scenario="plus25">
+              <div class="sc-title">+25% Breach Width</div>
+              <div class="sc-meta">B_avg: 195m | Q_p: 8,309 m³/s | t_f: 2.0h</div>
+            </button>
+            <button class="scenario-btn" data-scenario="minus25">
+              <div class="sc-title">-25% Conservative</div>
+              <div class="sc-meta">B_avg: 117m | Q_p: 4,985 m³/s | t_f: 3.1h</div>
+            </button>
+            <button class="scenario-btn" data-scenario="extreme50">
+              <div class="sc-title">+50% Extreme Overtopping</div>
+              <div class="sc-meta">B_avg: 234m | Q_p: 10,500 m³/s | t_f: 1.5h</div>
+            </button>
+          </div>
+        </div>
+
+        <!-- Layer Visibility Toggles -->
+        <div class="card glass-card">
+          <div class="card-header">
+            <i class="fa-solid fa-layer-group"></i>
+            <h3>GIS Map Overlays</h3>
+          </div>
+          <div class="toggle-group">
+            <label class="toggle-item">
+              <input type="checkbox" id="layer-depth" checked>
+              <span class="slider"></span>
+              <span class="label-text"><i class="fa-solid fa-water"></i> 2D Inundation Depth</span>
+            </label>
+            <label class="toggle-item">
+              <input type="checkbox" id="layer-risk" checked>
+              <span class="slider"></span>
+              <span class="label-text"><i class="fa-solid fa-triangle-exclamation"></i> Composite Risk Zones</span>
+            </label>
+            <label class="toggle-item">
+              <input type="checkbox" id="layer-satellite">
+              <span class="slider"></span>
+              <span class="label-text"><i class="fa-solid fa-satellite"></i> Sentinel-1 SAR Extent</span>
+            </label>
+            <label class="toggle-item">
+              <input type="checkbox" id="layer-evacuation" checked>
+              <span class="slider"></span>
+              <span class="label-text"><i class="fa-solid fa-person-walking-arrow-right"></i> Evacuation Corridors</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Monitoring Gauges Live Metrics -->
+        <div class="card glass-card">
+          <div class="card-header">
+            <i class="fa-solid fa-gauge-high"></i>
+            <h3>Monitoring Station Telemetry</h3>
+          </div>
+          <div class="gauge-list">
+            <div class="gauge-item">
+              <div class="gauge-header">
+                <span>Machhu-II Dam Toe (0 km)</span>
+                <span class="gauge-val" id="val-dam-depth">2.28 m</span>
+              </div>
+              <div class="progress-bar"><div class="progress-fill fill-danger" id="bar-dam" style="width: 45%;"></div></div>
+            </div>
+            <div class="gauge-item">
+              <div class="gauge-header">
+                <span>Morbi City Center (5.2 km)</span>
+                <span class="gauge-val highlight" id="val-morbi-depth">3.02 m</span>
+              </div>
+              <div class="progress-bar"><div class="progress-fill fill-warning" id="bar-morbi" style="width: 60%;"></div></div>
+              <small class="historical-note">Historical 1979 Benchmark: ~3.0 m (10 ft)</small>
+            </div>
+            <div class="gauge-item">
+              <div class="gauge-header">
+                <span>Lilapar Bridge (12 km)</span>
+                <span class="gauge-val" id="val-lilapar-depth">1.85 m</span>
+              </div>
+              <div class="progress-bar"><div class="progress-fill fill-info" id="bar-lilapar" style="width: 37%;"></div></div>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Center: Interactive Map & Time Playback -->
+      <main class="map-section">
+        <div id="map" class="map-viewport"></div>
+
+        <!-- Floating Map Legend -->
+        <div class="map-legend glass-panel">
+          <h4><i class="fa-solid fa-bars-staggered"></i> Flood Severity Legend</h4>
+          <div class="legend-scale">
+            <div class="scale-item"><span class="color-box" style="background: #2a9d8f;"></span> 0.1 - 0.5m (Low)</div>
+            <div class="scale-item"><span class="color-box" style="background: #e9c46a;"></span> 0.5 - 1.5m (Moderate)</div>
+            <div class="scale-item"><span class="color-box" style="background: #f4a261;"></span> 1.5 - 3.0m (High)</div>
+            <div class="scale-item"><span class="color-box" style="background: #d62828;"></span> > 3.0m (Critical Danger)</div>
+          </div>
+        </div>
+
+        <!-- Floating Playback Controller -->
+        <div class="playback-bar glass-panel">
+          <div class="playback-controls">
+            <button id="btn-play" class="control-btn"><i class="fa-solid fa-play"></i></button>
+            <button id="btn-reset" class="control-btn"><i class="fa-solid fa-rotate-left"></i></button>
+            <div class="time-display">
+              <span class="time-label">Simulation Time:</span>
+              <span class="time-val" id="time-val">T + 02:30 hrs</span>
+            </div>
+          </div>
+          <div class="slider-container">
+            <input type="range" id="time-slider" min="0" max="24" step="0.5" value="2.5">
+            <div class="timeline-ticks">
+              <span>0h (Breach)</span>
+              <span>2.5h (Peak Outflow)</span>
+              <span>6h (Morbi Peak)</span>
+              <span>12h (Recession)</span>
+              <span>24h (Drainage)</span>
+            </div>
+          </div>
+        </div>
+      </main>
+
+      <!-- Right Sidebar: Impact Analytics & HADR Support -->
+      <aside class="sidebar right-sidebar">
+        <!-- Disaster Impact KPI Cards -->
+        <div class="kpi-grid">
+          <div class="kpi-card glass-card">
+            <div class="kpi-icon icon-danger"><i class="fa-solid fa-users"></i></div>
+            <div class="kpi-info">
+              <div class="kpi-label">Population Exposed</div>
+              <div class="kpi-val" id="kpi-pop">70,252</div>
+            </div>
+          </div>
+          <div class="kpi-card glass-card">
+            <div class="kpi-icon icon-warning"><i class="fa-solid fa-map-location-dot"></i></div>
+            <div class="kpi-info">
+              <div class="kpi-label">Inundated Area</div>
+              <div class="kpi-val" id="kpi-area">27.75 km²</div>
+            </div>
+          </div>
+          <div class="kpi-card glass-card">
+            <div class="kpi-icon icon-info"><i class="fa-solid fa-building-circle-exclamation"></i></div>
+            <div class="kpi-info">
+              <div class="kpi-label">Structures Affected</div>
+              <div class="kpi-val" id="kpi-buildings">14,635</div>
+            </div>
+          </div>
+          <div class="kpi-card glass-card">
+            <div class="kpi-icon icon-success"><i class="fa-solid fa-indian-rupee-sign"></i></div>
+            <div class="kpi-info">
+              <div class="kpi-label">Estimated Loss</div>
+              <div class="kpi-val" id="kpi-loss">₹1,070.1 Cr</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Hydrograph Chart -->
+        <div class="card glass-card">
+          <div class="card-header">
+            <i class="fa-solid fa-chart-area"></i>
+            <h3>Dynamic Hydrograph Curve</h3>
+          </div>
+          <div class="chart-container">
+            <canvas id="hydrographChart"></canvas>
+          </div>
+        </div>
+
+        <!-- Safe High Ground Shelters -->
+        <div class="card glass-card">
+          <div class="card-header">
+            <i class="fa-solid fa-shield-heart"></i>
+            <h3>Designated Safe Relief Shelters</h3>
+          </div>
+          <div class="shelter-list">
+            <div class="shelter-item">
+              <div class="shelter-icon"><i class="fa-solid fa-campground"></i></div>
+              <div class="shelter-details">
+                <div class="shelter-name">Morbi East High Ground Shelter 1</div>
+                <div class="shelter-meta">Elevation: 56.4m | Capacity: 25,000 Persons</div>
+              </div>
+            </div>
+            <div class="shelter-item">
+              <div class="shelter-icon"><i class="fa-solid fa-hospital"></i></div>
+              <div class="shelter-details">
+                <div class="shelter-name">Morbi South-East Relief Complex</div>
+                <div class="shelter-meta">Elevation: 54.2m | Capacity: 18,000 Persons</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

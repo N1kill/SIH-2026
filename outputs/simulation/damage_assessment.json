@@ -1,0 +1,33 @@
+{
+  "directive": "7",
+  "timestamp": "2026-08-30T08:49:47.385046+00:00",
+  "damage_assessment_results": {
+    "hazard_areas_km2": {
+      "low_hazard_lt_0_5m": 2.38,
+      "moderate_hazard_0_5_to_1_5m": 1.59,
+      "high_hazard_1_5_to_3_0m": 1.76,
+      "extreme_hazard_gt_3_0m": 22.03,
+      "total_inundation_area_km2": 27.75
+    },
+    "population_exposure": {
+      "low_risk": 1069,
+      "moderate_risk": 2576,
+      "high_risk": 4923,
+      "extreme_risk_danger_to_life": 61684,
+      "total_population_exposed": 70252
+    },
+    "infrastructure_damage": {
+      "buildings_structures_affected": 14635,
+      "road_network_inundated_km": 88.8,
+      "bridges_overtopped": 6,
+      "cropland_inundated_ha": 257.5
+    },
+    "economic_loss_inr_crores": {
+      "residential_housing": 768.34,
+      "commercial_industrial": 235.88,
+      "infrastructure_transport": 63.96,
+      "agriculture_crops": 1.93,
+      "total_estimated_loss_cr": 1070.11
+    }
+  }
+}

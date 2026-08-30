@@ -1,0 +1,46 @@
+{
+  "directive": "8",
+  "timestamp": "2026-08-30T08:50:14.328970+00:00",
+  "risk_and_evacuation_summary": {
+    "risk_zones_km2": {
+      "low_risk": 2.83,
+      "medium_risk": 0.55,
+      "high_risk": 3.63,
+      "critical_priority_evacuation": 17.75,
+      "total_risk_area_km2": 24.75
+    },
+    "evacuation_parameters": {
+      "critical_lead_time_morbi_hours": 2.5,
+      "high_ground_elevation_threshold_m": 52.0,
+      "priority_hadr_centers": [
+        {
+          "name": "Morbi East High Ground Shelter 1",
+          "type": "Elevation Ridge (>55m)",
+          "capacity": 25000
+        },
+        {
+          "name": "Morbi South-East Relief Camp",
+          "type": "Government Complex",
+          "capacity": 18000
+        },
+        {
+          "name": "Liliya Ridge Transit Hub",
+          "type": "High Ground Transport Hub",
+          "capacity": 12000
+        }
+      ],
+      "evacuation_routes": [
+        {
+          "route_id": "R1_EAST",
+          "name": "Morbi Central to East Bypass Ridge",
+          "status": "Primary Safe Corridor (Above Inundation)"
+        },
+        {
+          "route_id": "R2_SOUTH",
+          "name": "Vankaner Elevated Highway",
+          "status": "Secondary Inflow Cutoff Route"
+        }
+      ]
+    }
+  }
+}

@@ -8,7 +8,7 @@
   },
   "summary": {
     "dem": {
-      "path": "C:\\PS\\SIH-2026\\data\\raw\\dem\\dem_raw.tif",
+      "path": "D:\\python\\HTML-CSS_project\\Js\\gemini_full_project\\bot\\sc-1\\Scratch\\3rdproject\\dam\\data\\raw\\dem\\dem_raw.tif",
       "crs": "EPSG:4326",
       "width": 3240,
       "height": 4320,
@@ -42,7 +42,7 @@
         "7500": 2429.1425776232218,
         "10000": 2042.6137855961392
       },
-      "hydro_rivers_path": "C:\\PS\\SIH-2026\\data\\raw\\rivers\\hydrorivers_clip.shp",
+      "hydro_rivers_path": "D:\\python\\HTML-CSS_project\\Js\\gemini_full_project\\bot\\sc-1\\Scratch\\3rdproject\\dam\\data\\raw\\rivers\\hydrorivers_clip.shp",
       "hydro_rivers_feature_count": 564,
       "hydro_rivers_length_km": 2859.375304923331
     },
