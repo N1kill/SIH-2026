@@ -2,7 +2,7 @@
 
 **Project**: Machhu-II Dam Failure Disaster Risk Management (SIH-2026)  
 **Study Region**: Morbi Urban & Floodplain Corridor, Gujarat  
-**Generated**: 2026-08-30 08:50:14 UTC
+**Generated**: 2026-09-13 07:50:33 UTC
 
 ---
 
@@ -13,30 +13,33 @@ $$\text{CRI} = 0.45 \cdot \text{Hazard (Depth} \times \text{Velocity)} + 0.35 \c
 
 | Priority Zone | CRI Range | Inundated Area (km²) | Population Action Directive | Emergency Response Strategy |
 | :--- | :---: | :---: | :--- | :--- |
-| **Zone 4: Critical Priority** | $\ge 75$ | **17.75** | **Immediate Mandatory Evacuation** | Rapid deployment of NDRF/SDRF boats & air rescue |
-| **Zone 3: High Risk** | $50 - 74$ | **3.63** | **Vertical / Rapid Evacuation** | Relocate to verified multi-story RCC shelters |
-| **Zone 2: Medium Risk** | $25 - 49$ | **0.55** | **Preparedness & Shelter-in-Place** | Stock emergency rations, cut power lines |
-| **Zone 1: Low Risk** | $< 25$ | **2.83** | **Caution & Monitoring** | Monitor municipal broadcast channels |
+| **Zone 4: Critical Priority** | $\ge 75$ | **6.82** | **Immediate Mandatory Evacuation** | Rapid deployment of NDRF/SDRF boats & air rescue |
+| **Zone 3: High Risk** | $50 - 74$ | **26.49** | **Vertical / Rapid Evacuation** | Relocate to verified multi-story RCC shelters |
+| **Zone 2: Medium Risk** | $25 - 49$ | **7.78** | **Preparedness & Shelter-in-Place** | Stock emergency rations, cut power lines |
+| **Zone 1: Low Risk** | $< 25$ | **50.75** | **Caution & Monitoring** | Monitor municipal broadcast channels |
 
 ---
 
 ## 2. Emergency Evacuation Timeline & Lead Time
 
 - **Dam Breach Initiation ($T = 0.0\text{ h}$)**: Automated sirens and SMS warning broadcast.
-- **Wave Arrival at Morbi ($T = 2.5\text{ h}$)**: Total evacuation window = **$150\text{ minutes}$**.
-- **Peak Flood Submersion ($T = 3.5 - 4.5\text{ h}$)**: Flood depths reach peak **$3.02\text{ m}$** in urban Morbi.
+- **Initial Wave Arrival at Morbi ($T \approx 2.5 - 3.5\text{ h}$)**: Minimum warning lead window for immediate channel clearing.
+- **Destructive Flood Wave Peak ($T \approx 7.5 - 19.3\text{ h}$)**: Peak water stage reaches ~6.32 m depth in central Morbi channel corridor.
 
 ---
 
 ## 3. High-Ground Safe Relief Shelters
 
+> **Methodological Disclaimer**:  
+> Designated relief center names and capacities listed below are **illustrative emergency planning placeholders** situated on topographically verified high ground (>52 m MSL ridge lines), designed to demonstrate spatial HADR decision support capabilities. They do not represent officially gazetted municipal evacuation shelters.
+
 All designated relief centers are situated above the **$52\text{ m}$** elevation contour:
 
-| Relief Shelter Name | Structure / Location | Safe Elevation | Capacity |
+| Relief Shelter Name | Structure / Location | Safe Elevation | Capacity (Illustrative Benchmark) |
 | :--- | :--- | :---: | :---: |
-| **Morbi East High Ground Shelter 1** | East Bypass Ridge Complex | $56.4\text{ m}$ | 25,000 Persons |
-| **Morbi South-East Relief Camp** | Government Administrative Complex | $54.2\text{ m}$ | 18,000 Persons |
-| **Liliya Ridge Transit Hub** | Elevated Transit Interchange | $53.8\text{ m}$ | 12,000 Persons |
+| **Morbi East High Ground Shelter 1** | East Bypass Ridge Complex | $56.4\text{ m}$ | 25,000 Persons (Illustrative) |
+| **Morbi South-East Relief Camp** | Government Administrative Complex | $54.2\text{ m}$ | 18,000 Persons (Illustrative) |
+| **Liliya Ridge Transit Hub** | Elevated Transit Interchange | $53.8\text{ m}$ | 12,000 Persons (Illustrative) |
 
 ---
 

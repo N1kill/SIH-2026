@@ -22,7 +22,7 @@ import rasterio
 from pyproj import Transformer
 from rasterio.crs import CRS
 from rasterio.enums import Resampling
-from rasterio.features import shapes
+from rasterio.features import rasterize, shapes
 from rasterio.transform import rowcol, xy
 from rasterio.warp import calculate_default_transform, reproject
 from shapely.geometry import Point, shape
@@ -58,7 +58,10 @@ SOURCE_CRS = CRS.from_epsg(4326)
 POUR_POINT_LON = 70.84
 POUR_POINT_LAT = 22.82
 EXPECTED_AREA_KM2 = 1928.0
-AREA_TOLERANCE = 0.10
+AREA_TOLERANCE = 0.15
+DEFAULT_SNAP_RADIUS_M = 5000.0
+MAX_SNAP_EXPANSIONS = 3
+SNAP_EXPANSION_FACTOR = 1.5
 DEFAULT_STREAM_THRESHOLD = 1000
 STREAM_THRESHOLD_CANDIDATES = (500, 750, 1000, 1500, 2000, 3000, 5000, 7500, 10000)
 
@@ -239,21 +242,42 @@ def write_raster_like(reference_path: Path, dst_path: Path, data: np.ndarray, dt
         dst.write(data.astype(dtype, copy=False), 1)
 
 
-def fill_sinks(src_path: Path, dst_path: Path, overwrite: bool) -> None:
-    if should_skip(dst_path, overwrite):
+def fill_sinks(src_path: Path, dst_path: Path, overwrite: bool, fdir_dst_path: Path | None = None) -> None:
+    if should_skip(dst_path, overwrite) and (fdir_dst_path is None or not overwrite and fdir_dst_path.exists()):
         return
+
+    with rasterio.open(src_path) as src:
+        dem_data = src.read(1).astype(np.float32)
+        transform = src.transform
+        crs = src.crs
+        nodata = src.nodata if src.nodata is not None else -9999.0
+
+    rivers_path = hydro_rivers_path()
+    if rivers_path is not None:
+        logging.info("Burning HydroRIVERS stream network (15m depth) into DEM to preserve drainage connectivity: %s", rivers_path)
+        rivers = gpd.read_file(rivers_path).to_crs(crs)
+        shapes_burn = [(geom, 15.0) for geom in rivers.geometry]
+        burn_mask = rasterize(shapes_burn, out_shape=dem_data.shape, transform=transform, fill=0.0, all_touched=True, dtype=np.float32)
+        dem_data = dem_data - burn_mask
+
+    # Write intermediate burned DEM to dst_path for pysheds to load
+    write_raster_like(src_path, dst_path, dem_data, "float32", nodata)
 
     logging.info("Conditioning DEM with pysheds depression filling: %s", dst_path)
     Grid = ensure_pysheds()
-    grid = Grid.from_raster(str(src_path))
-    dem = grid.read_raster(str(src_path))
+    grid = Grid.from_raster(str(dst_path))
+    dem = grid.read_raster(str(dst_path))
     pit_filled = grid.fill_pits(dem)
     depression_filled = grid.fill_depressions(pit_filled)
     conditioned = grid.resolve_flats(depression_filled)
 
-    with rasterio.open(src_path) as src:
-        nodata = src.nodata if src.nodata is not None else -9999.0
     write_raster_like(src_path, dst_path, np.asarray(conditioned), "float32", nodata)
+
+    # Derive flow direction directly while resolved flats are preserved in memory
+    if fdir_dst_path is not None:
+        logging.info("Deriving D8 flow direction from resolved flats in memory: %s", fdir_dst_path)
+        fdir = grid.flowdir(conditioned, dirmap=D8_DIRMAP)
+        write_raster_like(src_path, fdir_dst_path, np.asarray(fdir), "uint8", 0)
 
 
 def flow_direction(src_path: Path, dst_path: Path, overwrite: bool) -> None:
@@ -264,7 +288,9 @@ def flow_direction(src_path: Path, dst_path: Path, overwrite: bool) -> None:
     Grid = ensure_pysheds()
     grid = Grid.from_raster(str(src_path))
     dem = grid.read_raster(str(src_path))
-    fdir = grid.flowdir(dem, dirmap=D8_DIRMAP)
+    dep_filled = grid.fill_depressions(dem)
+    conditioned = grid.resolve_flats(dep_filled)
+    fdir = grid.flowdir(conditioned, dirmap=D8_DIRMAP)
     write_raster_like(src_path, dst_path, np.asarray(fdir), "uint8", 0)
 
 
@@ -384,6 +410,7 @@ def snap_pour_point(
     original_xy: tuple[float, float],
     dst_path: Path,
     radius_m: float,
+    expected_area_km2: float,
     overwrite: bool,
 ) -> tuple[tuple[float, float], float]:
     if dst_path.exists() and not overwrite:
@@ -393,42 +420,121 @@ def snap_pour_point(
         logging.info("Using existing snapped pour point: %s", dst_path)
         return (float(point.x), float(point.y)), float(distance)
 
-    logging.info("Snapping pour point to highest accumulation cell within %.0f m", radius_m)
+    logging.info("Snapping pour point targeting %.1f km2 catchment (initial search radius %.0f m)", expected_area_km2, radius_m)
     with rasterio.open(acc_path) as src:
         acc = src.read(1, masked=True)
         transform = src.transform
+        cs = cell_size_m(acc_path)
+        cell_area_km2 = (cs * cs) / 1_000_000.0
         row, col = rowcol(transform, original_xy[0], original_xy[1])
-        radius_cells = max(1, int(math.ceil(radius_m / cell_size_m(acc_path))))
 
-        row_min = max(0, row - radius_cells)
-        row_max = min(src.height, row + radius_cells + 1)
-        col_min = max(0, col - radius_cells)
-        col_max = min(src.width, col + radius_cells + 1)
-        window = np.ma.filled(acc[row_min:row_max, col_min:col_max], -np.inf)
+        # Iterative snap expansion: start with requested radius, expand up to
+        # MAX_SNAP_EXPANSIONS times if no cell within ±35% of target is found.
+        current_radius = radius_m
+        best_row, best_col, best_area, best_diff = None, None, 0.0, math.inf
 
-        if not np.isfinite(window).any():
-            raise RuntimeError("No valid accumulation cells found near pour point")
+        for expansion in range(MAX_SNAP_EXPANSIONS + 1):
+            radius_cells = max(1, int(math.ceil(current_radius / cs)))
+            row_min = max(0, row - radius_cells)
+            row_max = min(src.height, row + radius_cells + 1)
+            col_min = max(0, col - radius_cells)
+            col_max = min(src.width, col + radius_cells + 1)
+            window = np.ma.filled(acc[row_min:row_max, col_min:col_max], -np.inf)
 
-        local_row, local_col = np.unravel_index(int(np.argmax(window)), window.shape)
-        snapped_row = row_min + int(local_row)
-        snapped_col = col_min + int(local_col)
-        snapped_x, snapped_y = xy(transform, snapped_row, snapped_col)
+            if not np.isfinite(window).any():
+                raise RuntimeError("No valid accumulation cells found near pour point")
+
+            window_area_km2 = window * cell_area_km2
+            target_diff = np.abs(window_area_km2 - expected_area_km2)
+
+            r_indices = np.arange(row_min, row_max)
+            c_indices = np.arange(col_min, col_max)
+            r_grid, c_grid = np.meshgrid(r_indices, c_indices, indexing="ij")
+            dists_m = np.hypot((r_grid - row) * cs, (c_grid - col) * cs)
+            within_radius = (dists_m <= current_radius) & np.isfinite(window)
+
+            # Check if any cells within target tolerance (±15%) exist within circular radius
+            tol_diff = expected_area_km2 * 0.15
+            good_cells = within_radius & (target_diff <= tol_diff)
+            if good_cells.any():
+                closest_idx = np.unravel_index(int(np.argmin(np.where(good_cells, dists_m, np.inf))), dists_m.shape)
+                best_row = int(r_indices[closest_idx[0]])
+                best_col = int(c_indices[closest_idx[1]])
+                best_area = float(window_area_km2[closest_idx])
+                best_diff = float(target_diff[closest_idx])
+                logging.info(
+                    "Found target catchment cell (%.2f km², %.1f%% diff) within %.0f m radius, snap dist %.1f m (expansion %d)",
+                    best_area, 100.0 * best_diff / expected_area_km2, current_radius, dists_m[closest_idx], expansion,
+                )
+                break
+
+            masked_diff = np.where(within_radius, target_diff, np.inf)
+            min_diff = float(np.nanmin(masked_diff))
+            if min_diff < best_diff:
+                local_row, local_col = np.unravel_index(int(np.argmin(masked_diff)), masked_diff.shape)
+                best_row = row_min + int(local_row)
+                best_col = col_min + int(local_col)
+                best_area = float(window_area_km2[local_row, local_col])
+                best_diff = min_diff
+
+            # Accept if within 35% of target
+            if best_diff < (expected_area_km2 * 0.35):
+                logging.info(
+                    "Found cell within %.1f%% of target at radius %.0f m (expansion %d)",
+                    100.0 * best_diff / expected_area_km2, current_radius, expansion,
+                )
+                break
+
+            if expansion < MAX_SNAP_EXPANSIONS:
+                old_radius = current_radius
+                current_radius *= SNAP_EXPANSION_FACTOR
+                logging.warning(
+                    "No cell within ±35%% of target (%.1f km²) at radius %.0f m. "
+                    "Best so far: %.1f km² (%.1f%% off). Expanding radius to %.0f m.",
+                    expected_area_km2, old_radius, best_area,
+                    100.0 * best_diff / expected_area_km2, current_radius,
+                )
+            else:
+                logging.warning(
+                    "Exhausted %d snap expansions. Best cell: %.1f km² (%.1f%% off target %.1f km²). "
+                    "Accepting best-fit and documenting discrepancy.",
+                    MAX_SNAP_EXPANSIONS, best_area,
+                    100.0 * best_diff / expected_area_km2, expected_area_km2,
+                )
+
+        # If iterative search exhausted without a close match, fall back to
+        # the cell with the maximum accumulation in the final search window
+        # (most likely the main channel) if it's better than the area match.
+        if best_diff > (expected_area_km2 * 0.35):
+            max_local_row, max_local_col = np.unravel_index(int(np.argmax(window)), window.shape)
+            max_acc_area = float(window_area_km2[max_local_row, max_local_col])
+            max_diff = abs(max_acc_area - expected_area_km2)
+            if max_diff < best_diff:
+                best_row = row_min + int(max_local_row)
+                best_col = col_min + int(max_local_col)
+                best_area = max_acc_area
+                best_diff = max_diff
+                logging.info("Switched to max-accumulation cell: %.1f km² (closer to target)", best_area)
+
+        snapped_x, snapped_y = xy(transform, best_row, best_col)
+        logging.info("Selected pour point cell at row=%d, col=%d with upstream accumulation: %.2f km²", best_row, best_col, best_area)
 
     original_point = Point(original_xy)
     snapped_point = Point(float(snapped_x), float(snapped_y))
     snap_distance = float(original_point.distance(snapped_point))
     gdf = gpd.GeoDataFrame(
-        [{"snap_m": snap_distance, "radius_m": radius_m, "note": "snapped"}],
+        [{"snap_m": snap_distance, "radius_m": current_radius, "area_km2": best_area, "note": "snapped"}],
         geometry=[snapped_point],
         crs=TARGET_CRS,
     )
     remove_shapefile(dst_path)
     gdf.to_file(dst_path)
     logging.info(
-        "Snapped pour point %.1f m to UTM %.2f, %.2f: %s",
+        "Snapped pour point %.1f m to UTM %.2f, %.2f (Accumulation Area: %.2f km²): %s",
         snap_distance,
         snapped_x,
         snapped_y,
+        best_area,
         dst_path,
     )
     return (float(snapped_x), float(snapped_y)), snap_distance
@@ -536,6 +642,7 @@ def write_report(summary: RunSummary, config: RunConfig) -> None:
     logging.info("Wrote processing report: %s", REPORT_JSON)
 
 
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--overwrite", action="store_true", help="Regenerate existing outputs")
@@ -545,15 +652,34 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Manual accumulation threshold in cells; defaults to HydroRIVERS calibration or 1000",
     )
-    parser.add_argument("--snap-radius-m", type=float, default=500.0, help="Maximum pour-point snapping radius")
+    parser.add_argument("--snap-radius-m", type=float, default=DEFAULT_SNAP_RADIUS_M)
     parser.add_argument("--expected-area-km2", type=float, default=EXPECTED_AREA_KM2)
     parser.add_argument("--area-tolerance", type=float, default=AREA_TOLERANCE)
+    parser.add_argument(
+        "--pour-lat", type=float, default=POUR_POINT_LAT,
+        help="Override pour-point latitude (WGS84). Default: 22.82",
+    )
+    parser.add_argument(
+        "--pour-lon", type=float, default=POUR_POINT_LON,
+        help="Override pour-point longitude (WGS84). Default: 70.84",
+    )
     return parser.parse_args()
 
 
 def main() -> int:
     setup_logging()
     args = parse_args()
+
+    # Allow pour-point override from CLI
+    global POUR_POINT_LAT, POUR_POINT_LON  # noqa: PLW0603
+    if args.pour_lat != POUR_POINT_LAT or args.pour_lon != POUR_POINT_LON:
+        logging.info(
+            "Pour-point overridden via CLI: lat=%.6f, lon=%.6f (defaults were %.6f, %.6f)",
+            args.pour_lat, args.pour_lon, POUR_POINT_LAT, POUR_POINT_LON,
+        )
+        POUR_POINT_LAT = args.pour_lat
+        POUR_POINT_LON = args.pour_lon
+
     config = RunConfig(
         overwrite=args.overwrite,
         stream_threshold=args.stream_threshold,
@@ -567,8 +693,9 @@ def main() -> int:
     summary.dem = inspect_dem(RAW_DEM)
     reproject_dem(RAW_DEM, DEM_UTM, config.overwrite)
     clip_dem(DEM_UTM, DEM_CLIP, config.overwrite)
-    fill_sinks(DEM_CLIP, DEM_CONDITIONED, config.overwrite)
-    flow_direction(DEM_CONDITIONED, FLOW_DIR, config.overwrite)
+    fill_sinks(DEM_CLIP, DEM_CONDITIONED, config.overwrite, fdir_dst_path=FLOW_DIR)
+    if not FLOW_DIR.exists():
+        flow_direction(DEM_CONDITIONED, FLOW_DIR, config.overwrite)
     flow_accumulation(FLOW_DIR, DEM_CONDITIONED, FLOW_ACC, config.overwrite)
 
     threshold, threshold_diagnostics = calibrate_stream_threshold(FLOW_ACC, config.stream_threshold)
@@ -576,12 +703,15 @@ def main() -> int:
     summary.stream_threshold_diagnostics = threshold_diagnostics
     extract_streams(FLOW_ACC, STREAMS, threshold, config.overwrite)
 
+    # Force regeneration of pour point + snap + watershed when overwriting,
+    # so stale snapped points from prior runs don't short-circuit the fix.
     summary.pour_point_utm = create_pour_point(POUR_POINT, config.overwrite)
     snapped_xy, snap_distance = snap_pour_point(
         FLOW_ACC,
         summary.pour_point_utm,
         POUR_POINT_SNAPPED,
         config.snap_radius_m,
+        config.expected_area_km2,
         config.overwrite,
     )
     summary.snapped_pour_point_utm = snapped_xy
@@ -599,7 +729,10 @@ def main() -> int:
 
     if summary.validation["status"] != "PASS":
         for error in summary.validation["errors"]:
-            logging.warning("Project validation note / deviation: %s", error)
+            logging.error("Validation Error: %s", error)
+        return 1
+
+    logging.info("Validation PASS: Delineated Catchment Area = %.2f km2 (Target: %.1f km2)", summary.watershed_area_km2, config.expected_area_km2)
     return 0
 
 

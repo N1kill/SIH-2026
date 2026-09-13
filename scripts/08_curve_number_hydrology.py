@@ -354,29 +354,30 @@ def main():
     # Convolve hourly runoff with Unit Hydrograph
     inflow_unscaled = np.convolve(hourly_runoff, q_uh)[:11 * 24]
 
-    # Area Scaling to historical catchment area (1,928 km2)
+    # Physically derived inflow using standard SCS PRF = 484
+    # NO area-scaling or force-calibration — let the result speak honestly.
     historical_area_km2 = 1928.0
-    area_scale_ratio = historical_area_km2 / area_km2
-    inflow_scaled = inflow_unscaled * area_scale_ratio
+    inflow_phys = np.convolve(hourly_runoff, q_uh)[:len(hourly_runoff)]
+    peak_inflow = float(np.max(inflow_phys))
+    peak_hour = int(np.argmax(inflow_phys))
 
-    # Calibration to historical peak flow (~5,600 m3/s)
-    # Let's find the unscaled and scaled peak flows
-    unscaled_peak = float(np.max(inflow_unscaled))
-    scaled_peak = float(np.max(inflow_scaled))
-    
-    target_peak = 5600.0  # m3/s
-    calibration_factor = target_peak / unscaled_peak
-    inflow_calibrated = inflow_unscaled * calibration_factor
-    
-    # Calibrated Peak Rate Factor:
-    # Scale factor = Calibration factor / Area scale ratio
-    # Calibrated PRF = Standard PRF (484) * Scale factor
-    calibrated_prf = 484.0 * (calibration_factor / area_scale_ratio)
+    # Compare honestly against historical estimate
+    historical_peak_m3s = 5600.0  # CWC estimate ~5,550–5,663 m³/s
+    relative_error_pct = abs(peak_inflow - historical_peak_m3s) / historical_peak_m3s * 100.0
 
-    logging.info(f"Unscaled Inflow Peak: {unscaled_peak:.2f} m3/s")
-    logging.info(f"Area-Scaled Inflow Peak: {scaled_peak:.2f} m3/s")
-    logging.info(f"Calibrated Inflow Peak (Target {target_peak:.1f}): {np.max(inflow_calibrated):.2f} m3/s")
-    logging.info(f"Calibrated Peak Rate Factor: {calibrated_prf:.1f} (compared to standard 484)")
+    logging.info("=" * 65)
+    logging.info("  PHYSICALLY DERIVED SCS HYDROLOGIC INFLOW HYDROGRAPH (PRF=484)")
+    logging.info("=" * 65)
+    logging.info(f"  Catchment Delineated Area : {area_km2:.2f} km²")
+    logging.info(f"  Historical Catchment Area : {historical_area_km2:.1f} km²")
+    logging.info(f"  Mean Curve Number (AMC-II): {cn2_avg:.2f}")
+    logging.info(f"  Peak Rate Factor (PRF)   : 484.0 (Standard SCS Dimensionless UH)")
+    logging.info(f"  Derived Peak Inflow (Qp) : {peak_inflow:.2f} m³/s at Hour {peak_hour}")
+    logging.info(f"  Historical Peak (CWC)    : {historical_peak_m3s:.0f} m³/s")
+    logging.info(f"  Relative Error           : {relative_error_pct:.1f}%")
+    logging.info(f"  Total Inflow Volume      : {(np.sum(inflow_phys) * 3600.0 / 1e6):.2f} Mm³")
+    logging.info(f"  NOTE: Peak derived honestly — NOT forced to match historical")
+    logging.info("=" * 65)
 
     # 6. Save hourly hydrograph series to CSV
     date_range_hourly = pd.date_range(start="1979-08-05 00:00:00", periods=11 * 24, freq="h")
@@ -384,9 +385,7 @@ def main():
         "datetime": date_range_hourly.strftime("%Y-%m-%d %H:%M:%S"),
         "rainfall_mm": hourly_rainfall,
         "runoff_mm": hourly_runoff,
-        "inflow_unscaled_m3s": inflow_unscaled,
-        "inflow_scaled_m3s": inflow_scaled,
-        "inflow_calibrated_m3s": inflow_calibrated,
+        "inflow_m3s": inflow_phys,
     })
     df_out.to_csv(HYDROGRAPH_CSV, index=False)
     logging.info(f"Saved hourly hydrograph data to {HYDROGRAPH_CSV}")
@@ -396,16 +395,14 @@ def main():
     plt.rcParams.update({"font.size": 11, "font.family": "sans-serif"})
     fig, ax1 = plt.subplots(figsize=(12, 7))
 
-    # Plot inflow hydrographs
-    color_unscaled = "#3498db"
-    color_scaled = "#e67e22"
-    color_calib = "#e74c3c"
+    # Plot inflow hydrograph
+    color_phys = "#e74c3c"
+    time_hours_arr = np.arange(len(inflow_phys))
     
-    time_hours = np.arange(len(inflow_unscaled))
-    
-    ax1.plot(time_hours, inflow_unscaled, label=f"Unscaled Delineated Inflow (Area: {area_km2:.1f} km²)", color=color_unscaled, linewidth=2)
-    ax1.plot(time_hours, inflow_scaled, label=f"Area-Scaled Inflow (Area: {historical_area_km2:.1f} km²)", color=color_scaled, linewidth=2, linestyle="--")
-    ax1.plot(time_hours, inflow_calibrated, label=f"Calibrated Inflow (Peak: {target_peak:.0f} m³/s, PRF: {calibrated_prf:.0f})", color=color_calib, linewidth=2.5)
+    ax1.plot(time_hours_arr, inflow_phys, label=f"Physically Derived Inflow (Area: {area_km2:.1f} km², PRF: 484)", color=color_phys, linewidth=2.5)
+
+    # Add historical comparison line
+    ax1.axhline(y=historical_peak_m3s, color="#3498db", linestyle="--", linewidth=1.5, alpha=0.7, label=f"Historical CWC Peak Estimate ({historical_peak_m3s:.0f} m³/s)")
 
     ax1.set_xlabel("Hours since August 5, 1979, 00:00")
     ax1.set_ylabel("Inflow Discharge (m³/s)", color="black")
@@ -413,29 +410,18 @@ def main():
     ax1.grid(True, linestyle=":", alpha=0.6)
     
     # Set y-axis limit with some padding
-    ax1.set_ylim(0, target_peak * 1.15)
+    y_max = max(peak_inflow, historical_peak_m3s) * 1.15
+    ax1.set_ylim(0, y_max)
 
     # Highlight peak points
-    peak_h_cal = np.argmax(inflow_calibrated)
-    ax1.scatter([peak_h_cal], [target_peak], color=color_calib, s=60, zorder=5)
+    ax1.scatter([peak_hour], [peak_inflow], color=color_phys, s=60, zorder=5)
     ax1.annotate(
-        f"Peak Inflow: {target_peak:.1f} m³/s\n(Hour {peak_h_cal}, Aug 11-12)",
-        xy=(peak_h_cal, target_peak),
-        xytext=(peak_h_cal - 55, target_peak * 0.85),
-        arrowprops=dict(facecolor=color_calib, shrink=0.08, width=1.5, headwidth=6),
+        f"Derived Peak: {peak_inflow:.1f} m³/s\n(Hour {peak_hour})",
+        xy=(peak_hour, peak_inflow),
+        xytext=(peak_hour - 45, peak_inflow * 0.85),
+        arrowprops=dict(facecolor=color_phys, shrink=0.08, width=1.5, headwidth=6),
         fontweight="bold",
     )
-
-    # Highlight unscaled peak
-    peak_h_un = np.argmax(inflow_unscaled)
-    ax1.scatter([peak_h_un], [unscaled_peak], color=color_unscaled, s=40, zorder=5)
-    ax1.annotate(
-        f"{unscaled_peak:.1f} m³/s",
-        xy=(peak_h_un, unscaled_peak),
-        xytext=(peak_h_un + 10, unscaled_peak * 1.1),
-        fontsize=9,
-    )
-
     # Second y-axis for daily rainfall bars
     ax2 = ax1.twinx()
     
@@ -468,7 +454,8 @@ def main():
     plt.close()
     logging.info(f"Saved hydrograph visualization to {HYDROGRAPH_PNG}")
 
-    # 8. Write a comprehensive hydrology report to JSON
+    # 8. Write honest hydrology report to JSON — no forced calibration
+    peak_datetime = date_range_hourly[peak_hour].strftime("%Y-%m-%d %H:%M:%S")
     report = {
         "catchment_properties": {
             "delineated_area_km2": area_km2,
@@ -483,17 +470,25 @@ def main():
         },
         "rainfall_runoff_routing": {
             "daily_records": daily_stats,
-            "unscaled_peak_inflow_m3s": unscaled_peak,
-            "scaled_peak_inflow_m3s": scaled_peak,
-            "calibrated_peak_inflow_m3s": target_peak,
-            "calibrated_peak_rate_factor": calibrated_prf,
-            "peak_time_hours_since_aug05": int(peak_h_cal),
-            "peak_datetime": date_range_hourly[peak_h_cal].strftime("%Y-%m-%d %H:%M:%S"),
+            "physically_derived_peak_inflow_m3s": peak_inflow,
+            "peak_rate_factor_used": 484.0,
+            "historical_comparison_peak_m3s": historical_peak_m3s,
+            "relative_error_percent": round(relative_error_pct, 2),
+            "peak_time_hours_since_aug05": peak_hour,
+            "peak_datetime": peak_datetime,
+            "note": "Peak derived using standard SCS PRF=484, not forced to match historical.",
         }
     }
     with open(HYDROLOGY_REPORT, "w") as f:
         json.dump(report, f, indent=2)
     logging.info(f"Saved hydrology summary report to {HYDROLOGY_REPORT}")
+    return 0
+
 
 if __name__ == "__main__":
-    main()
+    try:
+        exit_code = main()
+    except Exception:
+        logging.exception("Directive 3 failed with an unhandled exception")
+        exit_code = 1
+    raise SystemExit(exit_code)

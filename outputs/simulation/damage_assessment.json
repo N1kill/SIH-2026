@@ -1,33 +1,34 @@
 {
   "directive": "7",
-  "timestamp": "2026-08-30T08:49:47.385046+00:00",
+  "timestamp": "2026-09-13T07:50:21.183352+00:00",
+  "methodology_disclaimer": "Population and structure figures are area-based density estimates (not GIS-verified building footprints or parcel census data). See Methods for the specific constants and loss coefficients used.",
   "damage_assessment_results": {
     "hazard_areas_km2": {
-      "low_hazard_lt_0_5m": 2.38,
-      "moderate_hazard_0_5_to_1_5m": 1.59,
-      "high_hazard_1_5_to_3_0m": 1.76,
-      "extreme_hazard_gt_3_0m": 22.03,
-      "total_inundation_area_km2": 27.75
+      "low_hazard_lt_0_5m": 45.64,
+      "moderate_hazard_0_5_to_1_5m": 20.12,
+      "high_hazard_1_5_to_3_0m": 15.29,
+      "extreme_hazard_gt_3_0m": 42.33,
+      "total_inundation_area_km2": 123.38
     },
     "population_exposure": {
-      "low_risk": 1069,
-      "moderate_risk": 2576,
-      "high_risk": 4923,
-      "extreme_risk_danger_to_life": 61684,
-      "total_population_exposed": 70252
+      "low_risk": 20537,
+      "moderate_risk": 32702,
+      "high_risk": 42806,
+      "extreme_risk_danger_to_life": 118514,
+      "total_population_exposed": 214559
     },
     "infrastructure_damage": {
-      "buildings_structures_affected": 14635,
-      "road_network_inundated_km": 88.8,
+      "buildings_structures_affected": 44699,
+      "road_network_inundated_km": 394.8,
       "bridges_overtopped": 6,
-      "cropland_inundated_ha": 257.5
+      "cropland_inundated_ha": 4274.7
     },
     "economic_loss_inr_crores": {
-      "residential_housing": 768.34,
-      "commercial_industrial": 235.88,
-      "infrastructure_transport": 63.96,
-      "agriculture_crops": 1.93,
-      "total_estimated_loss_cr": 1070.11
+      "residential_housing": 2346.7,
+      "commercial_industrial": 1048.72,
+      "infrastructure_transport": 201.66,
+      "agriculture_crops": 32.06,
+      "total_estimated_loss_cr": 3629.14
     }
   }
 }

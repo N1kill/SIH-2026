@@ -1,7 +1,7 @@
 {
-  "project": "Machhu-II Dam Breach 3D Simulation",
+  "project": "Machhu-II Dam Breach Simulation",
   "directive": "5A",
-  "timestamp": "2026-08-30T08:49:30.168932+00:00",
+  "timestamp": "2026-09-13T07:49:51.346025+00:00",
   "model_engine": "2D Unsteady Hydrodynamic Raster Engine (Manning / Diffusive Wave)",
   "grid_resolution_m": 29.989044303443436,
   "breach_parameters_used": {
@@ -12,32 +12,41 @@
     "V_reservoir_m3": 101000000.0,
     "H_dam_m": 22.56
   },
-  "peak_discharge_m3s": 7091.036928527295,
-  "total_inundation_area_km2": 24.1,
-  "area_depth_gt_2m_km2": 20.13,
-  "max_simulated_depth_m": 499.14,
+  "peak_discharge_m3s": 6641.06594847223,
+  "total_inundation_area_km2": 71.49,
+  "area_depth_gt_2m_km2": 19.58,
+  "max_simulated_depth_m": 22.56,
   "max_simulated_velocity_ms": 12.0,
+  "sanity_check_passed": true,
+  "metrics": {
+    "peak_discharge_m3s": 6641.06594847223,
+    "total_inundated_area_km2": 71.49,
+    "morbi_peak_depth_m": 6.32,
+    "morbi_arrival_time_hours": 7.47,
+    "max_depth_m": 22.56,
+    "max_velocity_ms": 12.0
+  },
   "monitoring_gauges": {
     "dam_toe": {
       "name": "Machhu-II Dam Toe (0 km)",
-      "peak_depth_m": 392.17,
-      "arrival_time_hours": 0.03,
-      "peak_time_hours": 4.17
+      "peak_depth_m": 22.56,
+      "arrival_time_hours": 0.07,
+      "peak_time_hours": 1.23
     },
     "morbi": {
       "name": "Morbi City Center (5.2 km)",
-      "peak_depth_m": 0.0,
-      "arrival_time_hours": null,
-      "peak_time_hours": 0.0
+      "peak_depth_m": 6.32,
+      "arrival_time_hours": 7.47,
+      "peak_time_hours": 19.3
     },
     "lilapar": {
-      "name": "Lilapar Bridge (12 km)",
-      "peak_depth_m": 0.0,
-      "arrival_time_hours": null,
-      "peak_time_hours": 0.0
+      "name": "Lilapar / Dhuva (12 km)",
+      "peak_depth_m": 3.87,
+      "arrival_time_hours": 17.5,
+      "peak_time_hours": 23.73
     },
     "malia": {
-      "name": "Malia Miyana (32 km)",
+      "name": "Malia Miyana (25 km)",
       "peak_depth_m": 0.0,
       "arrival_time_hours": null,
       "peak_time_hours": 0.0

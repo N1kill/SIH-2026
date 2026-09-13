@@ -26,16 +26,20 @@ $scripts = @(
     @{ Name = "11_gee_flood_analysis.py"; Desc = "Directive 5B: GEE / Satellite Flood Extent Analysis" },
     @{ Name = "12_validation_and_sensitivity.py"; Desc = "Directive 6: Accuracy Assessment & Sensitivity Analysis" },
     @{ Name = "13_damage_analysis.py"; Desc = "Directive 7: Population, Infrastructure & Economic Damage Assessment" },
-    @{ Name = "14_risk_analysis.py"; Desc = "Directive 8: Composite Risk Zoning & Evacuation Plan" }
+    @{ Name = "14_risk_analysis.py"; Desc = "Directive 8: Composite Risk Zoning & Evacuation Plan" },
+    @{ Name = "16_export_gis_formats.py"; Desc = "Deliverables: Multi-Format Vector GIS Export (.shp / .kml)" }
 )
+
+$pyExe = if (Test-Path ".\.venv\Scripts\python.exe") { ".\.venv\Scripts\python.exe" } else { "python" }
 
 foreach ($item in $scripts) {
     $scriptPath = "scripts\$($item.Name)"
     if (Test-Path $scriptPath) {
         Write-Host "`n>>> Running: $($item.Name) [$($item.Desc)]" -ForegroundColor Green
-        python $scriptPath
+        & $pyExe $scriptPath
         if ($LASTEXITCODE -ne 0) {
-            Write-Host "[!] Error encountered in $scriptPath (Exit Code: $LASTEXITCODE)" -ForegroundColor Red
+            Write-Host "`n[FATAL ERROR] $scriptPath failed validation (Exit Code: $LASTEXITCODE). Halting pipeline immediately." -ForegroundColor Red
+            exit $LASTEXITCODE
         }
     } else {
         Write-Host "[!] Script not found: $scriptPath" -ForegroundColor DarkYellow

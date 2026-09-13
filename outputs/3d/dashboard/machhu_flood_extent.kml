@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>Machhu-II Dam Breach 2D Inundation Extent</name>
+    <description>SIH-2026: Hydrodynamic Simulation Output for Google Earth</description>
+    
+    <Placemark>
+      <name>Extreme Hazard (>3.0m)</name>
+      <description>Depth: 6.32m Peak (~6.1m sustained) | Machhu-II 2D Inundation Zone</description>
+      <Style>
+        <LineStyle><color>ff0000ff</color><width>2</width></LineStyle>
+        <PolyStyle><color>7f0000ff</color></PolyStyle>
+      </Style>
+      <Polygon>
+        <outerBoundaryIs>
+          <LinearRing>
+            <coordinates>70.8504,22.8068,0 70.8474,22.8108,0 70.8444,22.814799999999998,0 70.8414,22.819799999999997,0 70.8384,22.8248,0 70.8334,22.8328,0 70.82639999999999,22.8448,0 70.8184,22.8568,0 70.8064,22.8768,0 70.79039999999999,22.901799999999998,0 70.7704,22.9318,0 70.7534,22.9618,0 70.73660000000001,22.988200000000003,0 70.7536,22.9582,0 70.7736,22.9282,0 70.78960000000001,22.903200000000002,0 70.80160000000001,22.883200000000002,0 70.8096,22.8712,0 70.81660000000001,22.8592,0 70.8216,22.851200000000002,0 70.8246,22.8462,0 70.8276,22.8412,0 70.8306,22.837200000000003,0 70.8336,22.8332,0 70.8504,22.8068,0</coordinates>
+          </LinearRing>
+        </outerBoundaryIs>
+      </Polygon>
+    </Placemark>
+    <Placemark>
+      <name>High Hazard (1.5–3.0m)</name>
+      <description>Depth: 1.5 – 3.0m | Machhu-II 2D Inundation Zone</description>
+      <Style>
+        <LineStyle><color>ff0000ff</color><width>2</width></LineStyle>
+        <PolyStyle><color>7f0000ff</color></PolyStyle>
+      </Style>
+      <Polygon>
+        <outerBoundaryIs>
+          <LinearRing>
+            <coordinates>70.8483,22.810100000000002,0 70.8453,22.814100000000003,0 70.8423,22.8181,0 70.8393,22.8231,0 70.8363,22.828100000000003,0 70.8313,22.836100000000002,0 70.8243,22.848100000000002,0 70.8163,22.860100000000003,0 70.8043,22.880100000000002,0 70.78829999999999,22.9051,0 70.7683,22.935100000000002,0 70.7513,22.965100000000003,0 70.73870000000001,22.9849,0 70.7557,22.9549,0 70.7757,22.924899999999997,0 70.7917,22.8999,0 70.8037,22.8799,0 70.8117,22.8679,0 70.8187,22.8559,0 70.8237,22.8479,0 70.8267,22.842899999999997,0 70.8297,22.837899999999998,0 70.8327,22.8339,0 70.8357,22.8299,0 70.8483,22.810100000000002,0</coordinates>
+          </LinearRing>
+        </outerBoundaryIs>
+      </Polygon>
+    </Placemark>
+    <Placemark>
+      <name>Moderate Hazard (0.5–1.5m)</name>
+      <description>Depth: 0.5 – 1.5m | Machhu-II 2D Inundation Zone</description>
+      <Style>
+        <LineStyle><color>ff0000ff</color><width>2</width></LineStyle>
+        <PolyStyle><color>7f0000ff</color></PolyStyle>
+      </Style>
+      <Polygon>
+        <outerBoundaryIs>
+          <LinearRing>
+            <coordinates>70.8462,22.8134,0 70.8432,22.817400000000003,0 70.8402,22.8214,0 70.8372,22.8264,0 70.8342,22.831400000000002,0 70.8292,22.8394,0 70.8222,22.8514,0 70.8142,22.863400000000002,0 70.8022,22.8834,0 70.7862,22.9084,0 70.7662,22.9384,0 70.7492,22.968400000000003,0 70.74080000000001,22.9816,0 70.7578,22.9516,0 70.7778,22.921599999999998,0 70.7938,22.8966,0 70.8058,22.8766,0 70.8138,22.8646,0 70.8208,22.8526,0 70.8258,22.8446,0 70.8288,22.839599999999997,0 70.8318,22.8346,0 70.8348,22.8306,0 70.8378,22.8266,0 70.8462,22.8134,0</coordinates>
+          </LinearRing>
+        </outerBoundaryIs>
+      </Polygon>
+    </Placemark>
+    <Placemark>
+      <name>Low Hazard (<0.5m)</name>
+      <description>Depth: 0.1 – 0.5m | Machhu-II 2D Inundation Zone</description>
+      <Style>
+        <LineStyle><color>ff0000ff</color><width>2</width></LineStyle>
+        <PolyStyle><color>7f0000ff</color></PolyStyle>
+      </Style>
+      <Polygon>
+        <outerBoundaryIs>
+          <LinearRing>
+            <coordinates>70.8441,22.8167,0 70.8411,22.820700000000002,0 70.8381,22.8247,0 70.8351,22.8297,0 70.8321,22.8347,0 70.8271,22.8427,0 70.8201,22.8547,0 70.8121,22.8667,0 70.8001,22.8867,0 70.7841,22.9117,0 70.7641,22.9417,0 70.7471,22.971700000000002,0 70.7429,22.9783,0 70.7599,22.9483,0 70.7799,22.9183,0 70.7959,22.8933,0 70.8079,22.8733,0 70.8159,22.8613,0 70.8229,22.8493,0 70.8279,22.8413,0 70.8309,22.836299999999998,0 70.8339,22.8313,0 70.8369,22.8273,0 70.8399,22.8233,0 70.8441,22.8167,0</coordinates>
+          </LinearRing>
+        </outerBoundaryIs>
+      </Polygon>
+    </Placemark>
+  </Document>
+</kml>

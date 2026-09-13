@@ -141,9 +141,9 @@ def compute_risk_and_evacuation(depth_file, velocity_file, arrival_file, dem_fil
             "critical_lead_time_morbi_hours": 2.50,
             "high_ground_elevation_threshold_m": 52.0,
             "priority_hadr_centers": [
-                {"name": "Morbi East High Ground Shelter 1", "type": "Elevation Ridge (>55m)", "capacity": 25000},
-                {"name": "Morbi South-East Relief Camp", "type": "Government Complex", "capacity": 18000},
-                {"name": "Liliya Ridge Transit Hub", "type": "High Ground Transport Hub", "capacity": 12000},
+                {"name": "Morbi East High Ground Shelter 1 (Illustrative)", "type": "Elevation Ridge (>55m) - Planning Benchmark", "capacity": 25000, "status": "Illustrative Planning Benchmark"},
+                {"name": "Morbi South-East Relief Camp (Illustrative)", "type": "Government Complex - Planning Benchmark", "capacity": 18000, "status": "Illustrative Planning Benchmark"},
+                {"name": "Liliya Ridge Transit Hub (Illustrative)", "type": "High Ground Transport Hub - Planning Benchmark", "capacity": 12000, "status": "Illustrative Planning Benchmark"},
             ],
             "evacuation_routes": [
                 {"route_id": "R1_EAST", "name": "Morbi Central to East Bypass Ridge", "status": "Primary Safe Corridor (Above Inundation)"},
@@ -196,6 +196,11 @@ def export_evacuation_plan(results):
     report_data = {
         "directive": "8",
         "timestamp": datetime.now(timezone.utc).isoformat(),
+        "methodology_disclaimer": (
+            "Designated relief shelters, capacities (25k, 18k, 12k), and evacuation routes are "
+            "illustrative emergency planning benchmarks situated on topographically verified high ground (>52m MSL), "
+            "not officially gazetted municipal disaster infrastructure."
+        ),
         "risk_and_evacuation_summary": results,
     }
 
@@ -231,20 +236,23 @@ $$\\text{{CRI}} = 0.45 \\cdot \\text{{Hazard (Depth}} \\times \\text{{Velocity)}
 ## 2. Emergency Evacuation Timeline & Lead Time
 
 - **Dam Breach Initiation ($T = 0.0\\text{{ h}}$)**: Automated sirens and SMS warning broadcast.
-- **Wave Arrival at Morbi ($T = 2.5\\text{{ h}}$)**: Total evacuation window = **$150\\text{{ minutes}}$**.
-- **Peak Flood Submersion ($T = 3.5 - 4.5\\text{{ h}}$)**: Flood depths reach peak **$3.02\\text{{ m}}$** in urban Morbi.
+- **Initial Wave Arrival at Morbi ($T \\approx 2.5 - 3.5\\text{{ h}}$)**: Minimum warning lead window for immediate channel clearing.
+- **Destructive Flood Wave Peak ($T \\approx 7.5 - 19.3\\text{{ h}}$)**: Peak water stage reaches ~6.32 m depth in central Morbi channel corridor.
 
 ---
 
 ## 3. High-Ground Safe Relief Shelters
 
+> **Methodological Disclaimer**:  
+> Designated relief center names and capacities listed below are **illustrative emergency planning placeholders** situated on topographically verified high ground (>52 m MSL ridge lines), designed to demonstrate spatial HADR decision support capabilities. They do not represent officially gazetted municipal evacuation shelters.
+
 All designated relief centers are situated above the **$52\\text{{ m}}$** elevation contour:
 
-| Relief Shelter Name | Structure / Location | Safe Elevation | Capacity |
+| Relief Shelter Name | Structure / Location | Safe Elevation | Capacity (Illustrative Benchmark) |
 | :--- | :--- | :---: | :---: |
-| **Morbi East High Ground Shelter 1** | East Bypass Ridge Complex | $56.4\\text{{ m}}$ | 25,000 Persons |
-| **Morbi South-East Relief Camp** | Government Administrative Complex | $54.2\\text{{ m}}$ | 18,000 Persons |
-| **Liliya Ridge Transit Hub** | Elevated Transit Interchange | $53.8\\text{{ m}}$ | 12,000 Persons |
+| **Morbi East High Ground Shelter 1** | East Bypass Ridge Complex | $56.4\\text{{ m}}$ | 25,000 Persons (Illustrative) |
+| **Morbi South-East Relief Camp** | Government Administrative Complex | $54.2\\text{{ m}}$ | 18,000 Persons (Illustrative) |
+| **Liliya Ridge Transit Hub** | Elevated Transit Interchange | $53.8\\text{{ m}}$ | 12,000 Persons (Illustrative) |
 
 ---
 
@@ -275,6 +283,7 @@ def main():
     print(f"  Total Risk Area          : {results['risk_zones_km2']['total_risk_area_km2']} km²")
     print(f"  Risk GeoTIFF             : {RISK_TIF}")
     print(f"  Evacuation Plan Report   : {REPORT_MD}")
+    print(f"  Planning Note            : Shelter capacities and routes are illustrative planning benchmarks")
     print("=" * 70)
 
 

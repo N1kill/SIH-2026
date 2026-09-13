@@ -216,6 +216,11 @@ def export_damage_report(results):
     report_data = {
         "directive": "7",
         "timestamp": datetime.now(timezone.utc).isoformat(),
+        "methodology_disclaimer": (
+            "Population and structure figures are area-based density estimates "
+            "(not GIS-verified building footprints or parcel census data). "
+            "See Methods for the specific constants and loss coefficients used."
+        ),
         "damage_assessment_results": results,
     }
 
@@ -238,15 +243,18 @@ def export_damage_report(results):
 
 ## 1. Summary of Disaster Impact
 
+> **Methodological Disclaimer**:  
+> Population exposure, housing counts, and infrastructure figures are **area-based density estimates** derived from regional census proxies (450 rural / 2,800 urban persons/km²; 4.8 persons/structure) and standard infrastructure densities (3.2 km road/km²; 6 illustrative bridge crossings), not parcel-level GIS building footprints or cadastral census surveys. See Section 5 (Methods & Loss Coefficients) for exact constants used.
+
 | Impact Category | Metric / Quantity | Units |
 | :--- | :--- | :--- |
 | **Total Inundated Floodplain Area** | **{haz['total_inundation_area_km2']:.2f}** | $\\text{{km}}^2$ |
 | **High & Extreme Hazard Zone ($>1.5\\text{{ m}}$)** | **{(haz['high_hazard_1_5_to_3_0m'] + haz['extreme_hazard_gt_3_0m']):.2f}** | $\\text{{km}}^2$ |
 | **Total Population Exposed** | **{pop['total_population_exposed']:,}** | Persons |
 | **High / Immediate Life Threat Population** | **{pop['extreme_risk_danger_to_life']:,}** | Persons |
-| **Buildings & Housing Units Affected** | **{inf['buildings_structures_affected']:,}** | Structures |
-| **Road Network Cutoff / Submerged** | **{inf['road_network_inundated_km']:.1f}** | $\\text{{km}}$ |
-| **Inundated Agricultural Cropland** | **{inf['cropland_inundated_ha']:,}** | Hectares |
+| **Buildings & Housing Units Affected** | **{inf['buildings_structures_affected']:,}** | Structures (Estimated) |
+| **Road Network Cutoff / Submerged** | **{inf['road_network_inundated_km']:.1f}** | $\\text{{km}}$ (Estimated) |
+| **Inundated Agricultural Cropland** | **{inf['cropland_inundated_ha']:,}** | Hectares (Estimated) |
 | **Total Estimated Economic Damage** | **₹{eco['total_estimated_loss_cr']:,.2f}** | Crores (INR) |
 
 ---
@@ -277,6 +285,15 @@ def export_damage_report(results):
 ## 4. Emergency Management Recommendations
 1. **Priority Evacuation Zones**: Establish immediate warning triggers for the **{pop['extreme_risk_danger_to_life']:,}** residents located in the high-velocity extreme inundation corridor.
 2. **Safe Evacuation Corridors**: Route emergency evacuations towards eastern and southeastern elevated ridges ($>55\\text{{m}}$ elevation) away from the low-lying Machhu river channel.
+
+---
+
+## 5. Methods & Baseline Constants
+- **Population Density**: 450 persons/km² (rural), 2,800 persons/km² (urban/peri-urban), blended 50/50 in moderate flood zones.
+- **Household Multiplier**: 4.8 persons per dwelling structure.
+- **Road Network Density**: 3.2 km of roads per km² of inundated corridor.
+- **Bridge Benchmark**: 6 major crossing structures (illustrative planning benchmark).
+- **Unit Loss Rates**: Residential: ₹0.0525 Cr/structure; Commercial/Industrial: ₹8.5 Cr/km²; Roads: ₹0.45 Cr/km; Bridges: ₹4.0 Cr/structure; Agriculture: ₹7,500/ha across 65% cropland fraction.
 """
 
     with open(REPORT_MD, "w", encoding="utf-8") as f:
@@ -297,9 +314,10 @@ def main():
     print("\n" + "=" * 70)
     print("  Directive 7 Completed Successfully!")
     print(f"  Total Inundation Area  : {results['hazard_areas_km2']['total_inundation_area_km2']} km²")
-    print(f"  Total Pop. Exposed     : {results['population_exposure']['total_population_exposed']:,} Persons")
-    print(f"  Structures Affected    : {results['infrastructure_damage']['buildings_structures_affected']:,}")
+    print(f"  Total Pop. Exposed     : {results['population_exposure']['total_population_exposed']:,} Persons (Density estimate)")
+    print(f"  Structures Affected    : {results['infrastructure_damage']['buildings_structures_affected']:,} (Density estimate)")
     print(f"  Total Economic Loss    : ₹{results['economic_loss_inr_crores']['total_estimated_loss_cr']:,.2f} Crores")
+    print(f"  Methodology Note       : Figures are macro area-based density estimates (see documentation)")
     print(f"  Damage Report          : {REPORT_MD}")
     print("=" * 70)
 

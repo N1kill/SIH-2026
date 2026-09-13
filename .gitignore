@@ -33,3 +33,5 @@ nul
 download_log.txt
 powershell.bat
 powershell.cmd
+scratch/
+docs/

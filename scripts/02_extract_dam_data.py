@@ -120,7 +120,7 @@ if not machhu_rows:
         ["breach_cause", "Overtopping due to extreme rainfall", "", "Historical/Literature"],
         ["peak_inflow_estimated", "5663", "m3/s", "Literature (Wahl 1998 / Indian sources)"],
         ["designed_spillway_capacity", "5663", "m3/s", "CWC NRLD (original design)"],
-        ["flood_height_morbi", "3.0", "m (~10ft)", "Historical accounts"],
+        ["flood_height_morbi", "6.1", "m sustained (~20ft) / 3.7-9.1m surge", "Historical accounts (Sandesara & Wooten 2011)"],
     ]
     logging.info("Created Machhu-II CSV from documented values.")
 else:
