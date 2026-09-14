@@ -3,12 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SIH-2026: Machhu-II Dam Breach 3D Digital Twin & HADR Decision Support Platform</title>
+  <title>InundaX: 3D Hydrodynamic Digital Twin & AI Disaster Platform</title>
   
-  <!-- Modern Typography & Icons -->
+  <!-- Modern Typography & Icons (Plus Jakarta Sans) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   
   <!-- Leaflet GIS CSS -->
@@ -17,25 +17,28 @@
   <!-- Custom Master Stylesheet -->
   <link rel="stylesheet" href="style.css">
 </head>
-<body>
+<body class="is-landing-mode">
   <div class="app-container">
     <!-- Top Command Center Navigation Bar -->
     <header class="navbar">
       <div class="brand">
         <div class="logo-container">
-          <i class="fa-solid fa-water-ladder logo-icon"></i>
+          <img src="assets/inundax_logo.jpg" alt="InundaX Logo" class="nav-logo-img" />
         </div>
         <div class="brand-text">
           <h1>
-            SIH-2026: Machhu-II Dam Failure Digital Twin
-            <span class="brand-tag">HADR V3.4</span>
+            Inunda<span class="brand-highlight">X</span>
+            <span class="brand-tag">v3.4</span>
           </h1>
-          <span class="subtitle">2D Hydrodynamics • Sentinel-1 SAR Earth Observation • AI Emergency Evacuation</span>
+          <span class="subtitle">3D Hydrodynamic Digital Twin & AI Disaster Platform</span>
         </div>
       </div>
 
-      <!-- Tab View Switcher -->
-      <nav class="nav-tabs">
+      <!-- Tab View Switcher (Dashboard Mode Only) -->
+      <nav class="nav-tabs dashboard-only">
+        <button class="tab-btn" data-tab="view-landing">
+          <i class="fa-solid fa-house"></i> Home
+        </button>
         <button class="tab-btn active" data-tab="view-gis">
           <i class="fa-solid fa-earth-asia"></i> 2D GIS Operations
         </button>
@@ -52,13 +55,16 @@
 
       <!-- Telemetry & Action Buttons -->
       <div class="header-actions">
-        <div id="data-status-badge" class="badge badge-verified">
-          <span class="pulse-dot"></span> LIVE PIPELINE DATA (VERIFIED)
+        <button class="action-btn btn-try-header launch-model-btn landing-only-try" data-tab="view-gis" title="Try InundaX Model">
+          <i class="fa-solid fa-play"></i> Try
+        </button>
+        <div id="data-status-badge" class="badge badge-verified dashboard-only">
+          <span class="pulse-dot"></span> LIVE PIPELINE DATA
         </div>
-        <button id="btn-export-modal" class="action-btn">
+        <button id="btn-export-modal" class="action-btn dashboard-only">
           <i class="fa-solid fa-file-export"></i> Export HADR
         </button>
-        <button id="btn-brief-modal" class="action-btn">
+        <button id="btn-brief-modal" class="action-btn dashboard-only">
           <i class="fa-solid fa-file-lines"></i> Executive Brief
         </button>
         <button id="btn-fullscreen" class="action-btn" title="Toggle Fullscreen">
@@ -71,9 +77,252 @@
     <main class="workspace-views">
       
       <!-- ==================================================================
+           VIEW 0: INUNDAX LANDING PAGE
+           ================================================================== -->
+      <section id="view-landing" class="view-panel active">
+        <div class="landing-container">
+          
+          <!-- Hero Banner Section -->
+          <div class="landing-hero">
+            <div class="hero-content">
+              <div class="hero-badge">
+                <span class="badge-dot"></span>
+                <span>AI-POWERED HYDRODYNAMIC SIMULATION & DISASTER INTELLIGENCE</span>
+              </div>
+              <div class="hero-title-group">
+                <img src="assets/inundax_logo.jpg" alt="InundaX Logo" class="hero-logo-img" />
+                <h1 class="hero-title">
+                  Inunda<span class="title-highlight">X</span>
+                </h1>
+              </div>
+              <p class="hero-subtitle">
+                Next-Generation 3D Hydrodynamic Digital Twin & AI Disaster Decision Support Platform
+              </p>
+              <p class="hero-description">
+                InundaX integrates physically-derived 2D dam breach hydrodynamics, Sentinel-1 SAR satellite Earth observation, and AI-powered evacuation logistics into a unified real-time disaster management command suite.
+              </p>
+              
+              <div class="hero-cta-group">
+                <button class="btn-primary-cta launch-model-btn" data-tab="view-gis">
+                  <i class="fa-solid fa-play"></i>
+                  <span>Try</span>
+                  <i class="fa-solid fa-arrow-right cta-arrow"></i>
+                </button>
+                <a href="#what-is-it" class="btn-secondary-cta">
+                  <i class="fa-solid fa-circle-info"></i>
+                  <span>Explore Capabilities</span>
+                </a>
+              </div>
+
+              <!-- Quick Metrics Grid -->
+              <div class="hero-stats-grid">
+                <div class="hero-stat-card">
+                  <div class="stat-num">6,647 m³/s</div>
+                  <div class="stat-lbl">Derived Peak Outflow</div>
+                </div>
+                <div class="hero-stat-card">
+                  <div class="stat-num">30.0 m</div>
+                  <div class="stat-lbl">Spatial Resolution</div>
+                </div>
+                <div class="hero-stat-card">
+                  <div class="stat-num">97.74%</div>
+                  <div class="stat-lbl">SAR Validation Hit Rate</div>
+                </div>
+                <div class="hero-stat-card">
+                  <div class="stat-num">214,559</div>
+                  <div class="stat-lbl">Exposed Citizens Tracked</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="hero-visual-card">
+              <div class="visual-glow-effect"></div>
+              <div class="visual-frame">
+                <img src="assets/inundax_logo.jpg" alt="InundaX Digital Twin Logo" class="visual-hero-img" />
+                <div class="visual-overlay-tag">
+                  <i class="fa-solid fa-shield-halved"></i> Real-Time HADR Simulation Ready
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- What is InundaX? Section -->
+          <div id="what-is-it" class="landing-section">
+            <div class="section-header">
+              <div class="section-tag">OVERVIEW</div>
+              <h2 class="section-title">What is <span class="highlight">InundaX</span>?</h2>
+              <p class="section-subtitle">
+                InundaX is an end-to-end multi-hazard digital twin system engineered to simulate, predict, and mitigate catastrophic dam breach disasters and flash inundations with physics-based accuracy.
+              </p>
+            </div>
+
+            <div class="features-grid">
+              <div class="feature-card">
+                <div class="feature-icon-box">
+                  <i class="fa-solid fa-water-waves"></i>
+                </div>
+                <h3>2D Hydrodynamic Simulation</h3>
+                <p>
+                  Powered by 2D Shallow Water Equations & Froehlich (2008) breach geometry equations to model flood wave height (6.32m peak depth at Morbi City), velocity vectors, and peak inundation timings across a 2,049.77 km² catchment.
+                </p>
+              </div>
+
+              <div class="feature-card">
+                <div class="feature-icon-box">
+                  <i class="fa-solid fa-satellite"></i>
+                </div>
+                <h3>Sentinel-1 SAR Earth Observation</h3>
+                <p>
+                  Processes dual-polarization Synthetic Aperture Radar (SAR) satellite imagery through Google Earth Engine (GEE) to extract all-weather, cloud-penetrating water body extents for empirical model ground-truthing.
+                </p>
+              </div>
+
+              <div class="feature-card">
+                <div class="feature-icon-box">
+                  <i class="fa-solid fa-cube"></i>
+                </div>
+                <h3>3D WebGL Digital Twin</h3>
+                <p>
+                  Renders high-resolution 3D terrain topography with dynamic animated water surface mesh, interactive elevation slicing, and instant camera fly-throughs to critical assets and dam structures.
+                </p>
+              </div>
+
+              <div class="feature-card">
+                <div class="feature-icon-box">
+                  <i class="fa-solid fa-person-shelter"></i>
+                </div>
+                <h3>AI Disaster HADR & Evacuation</h3>
+                <p>
+                  Computes multi-tiered composite risk zones (High, Medium, Low), maps structural vulnerability (44,699 buildings), quantifies economic losses (₹3,629 Cr), and outputs optimal evacuation routes to emergency shelters.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Who is Benefited? Section -->
+          <div id="who-is-benefited" class="landing-section">
+            <div class="section-header">
+              <div class="section-tag">STAKEHOLDERS</div>
+              <h2 class="section-title">Who is <span class="highlight">Benefited</span>?</h2>
+              <p class="section-subtitle">
+                InundaX provides actionable intelligence tailored to every tier of disaster response and infrastructure management.
+              </p>
+            </div>
+
+            <div class="beneficiaries-grid">
+              <div class="beneficiary-card">
+                <div class="ben-header">
+                  <div class="ben-icon"><i class="fa-solid fa-building-shield"></i></div>
+                  <div>
+                    <h3>Disaster Management Authorities</h3>
+                    <span class="ben-role">NDMA / SDMA / DDMA</span>
+                  </div>
+                </div>
+                <p>
+                  Gain centralized, real-time command control with verified flood hazard zones, automated executive briefings, exportable GIS layers (.shp, .kml, GeoJSON), and rapid loss estimates.
+                </p>
+                <ul class="ben-list">
+                  <li><i class="fa-solid fa-check"></i> Real-time multi-scenario risk maps</li>
+                  <li><i class="fa-solid fa-check"></i> Integrated HADR executive reporting</li>
+                  <li><i class="fa-solid fa-check"></i> Automated economic loss calculation</li>
+                </ul>
+              </div>
+
+              <div class="beneficiary-card">
+                <div class="ben-header">
+                  <div class="ben-icon"><i class="fa-solid fa-truck-medical"></i></div>
+                  <div>
+                    <h3>Emergency First Responders</h3>
+                    <span class="ben-role">NDRF / SDRF / Armed Forces HADR</span>
+                  </div>
+                </div>
+                <p>
+                  Access instant flood wave arrival countdowns for populated zones, safe evacuation corridor mapping, and designated relief shelter capacity tracking to save lives during critical hours.
+                </p>
+                <ul class="ben-list">
+                  <li><i class="fa-solid fa-check"></i> Flood wave time-to-peak countdowns</li>
+                  <li><i class="fa-solid fa-check"></i> Safe evacuation path navigation</li>
+                  <li><i class="fa-solid fa-check"></i> Emergency shelter allocation</li>
+                </ul>
+              </div>
+
+              <div class="beneficiary-card">
+                <div class="ben-header">
+                  <div class="ben-icon"><i class="fa-solid fa-dam"></i></div>
+                  <div>
+                    <h3>Dam Engineers & Hydrologists</h3>
+                    <span class="ben-role">CWC & Irrigation Departments</span>
+                  </div>
+                </div>
+                <p>
+                  Perform interactive dam breach sensitivity testing (+25% / -25% overflow scaling), evaluate peak outflow rates (Qp), breach formation time (tf), and validate hydrographs against historical observations.
+                </p>
+                <ul class="ben-list">
+                  <li><i class="fa-solid fa-check"></i> Froehlich & Wahl regression parameterization</li>
+                  <li><i class="fa-solid fa-check"></i> Inflow hydrograph SCS-CN routing</li>
+                  <li><i class="fa-solid fa-check"></i> Interactive breach sensitivity controls</li>
+                </ul>
+              </div>
+
+              <div class="beneficiary-card">
+                <div class="ben-header">
+                  <div class="ben-icon"><i class="fa-solid fa-city"></i></div>
+                  <div>
+                    <h3>Municipal & Urban Planners</h3>
+                    <span class="ben-role">Urban Local Bodies (ULBs)</span>
+                  </div>
+                </div>
+                <p>
+                  Identify exposed critical infrastructure (394.8 km roads, 6 key bridges, sub-stations, agricultural land), supporting flood-resilient zonation and post-disaster rehabilitation.
+                </p>
+                <ul class="ben-list">
+                  <li><i class="fa-solid fa-check"></i> Critical infrastructure vulnerability mapping</li>
+                  <li><i class="fa-solid fa-check"></i> Sectoral damage breakdown analysis</li>
+                  <li><i class="fa-solid fa-check"></i> Sentinel-1 SAR accuracy validation</li>
+                </ul>
+              </div>
+
+              <div class="beneficiary-card highlight-card">
+                <div class="ben-header">
+                  <div class="ben-icon"><i class="fa-solid fa-users"></i></div>
+                  <div>
+                    <h3>Local Communities & Citizens</h3>
+                    <span class="ben-role">Downstream Catchment Residents</span>
+                  </div>
+                </div>
+                <p>
+                  Benefit from precise early warning advisories, clear visualization of safe ground terrain, and accessible evacuation routing to prevent loss of life in high-risk zones.
+                </p>
+                <ul class="ben-list">
+                  <li><i class="fa-solid fa-check"></i> Timely early warning flood alerts</li>
+                  <li><i class="fa-solid fa-check"></i> Clear visual safe zone guidance</li>
+                  <li><i class="fa-solid fa-check"></i> Community disaster preparedness</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <!-- Bottom CTA Banner Section -->
+          <div class="landing-cta-banner">
+            <div class="cta-banner-content">
+              <img src="assets/inundax_logo.jpg" alt="InundaX Logo" class="cta-logo-img" />
+              <h2>Ready to Experience <span class="highlight">InundaX</span>?</h2>
+              <p>Explore the 2D Hydrodynamic GIS Operations, 3D WebGL Digital Twin, and AI HADR Decision Support Platform now.</p>
+              <button class="btn-primary-cta launch-model-btn" data-tab="view-gis">
+                <i class="fa-solid fa-play"></i>
+                <span>Try InundaX</span>
+                <i class="fa-solid fa-arrow-right cta-arrow"></i>
+              </button>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- ==================================================================
            VIEW 1: 2D GIS COMMAND ROOM
            ================================================================== -->
-      <section id="view-gis" class="view-panel active">
+      <section id="view-gis" class="view-panel">
         <div class="gis-layout">
           
           <!-- Left Sidebar: Controls & Telemetry -->
@@ -325,36 +574,99 @@
               </div>
             </div>
 
-            <!-- High-Ground Safe Relief Shelters -->
+            <!-- High-Ground Safe Relief Shelters (Calculated Scorecard) -->
             <div class="glass-card">
               <div class="card-header">
-                <h3><i class="fa-solid fa-shield-halved"></i> Safe Relief Centers (&gt;52m)</h3>
+                <h3><i class="fa-solid fa-shield-halved"></i> Calculated Shelter Safety Scorecard</h3>
               </div>
               <div class="shelter-list">
-                <div class="shelter-card">
-                  <div class="shelter-icon"><i class="fa-solid fa-campground"></i></div>
+                <div class="shelter-card shelter-calc-card" data-shelter="S1_EAST">
+                  <div class="shelter-icon" style="background: rgba(6, 214, 160, 0.15); border-color: var(--accent-emerald);"><i class="fa-solid fa-campground" style="color: var(--accent-emerald);"></i></div>
                   <div class="shelter-info">
-                    <h4>Morbi East Shelter 1</h4>
-                    <p>Elev: 56.4m MSL | Cap: 25,000 Persons</p>
+                    <h4>Morbi East High Ground Shelter 1</h4>
+                    <div class="shelter-calc-row">
+                      <span class="calc-tag tag-green">Elev: 56.40m</span>
+                      <span class="calc-tag tag-green">Clearance: +23.87m</span>
+                      <span class="calc-tag tag-cyan">SF: 1.73</span>
+                    </div>
+                    <div class="shelter-calc-sub">
+                      <span>Lead Window: <strong>+6.87 hrs</strong></span> | 
+                      <span>Alloc: <strong>23,550 / 25,000 (94.2%)</strong></span>
+                    </div>
                   </div>
                 </div>
-                <div class="shelter-card">
-                  <div class="shelter-icon"><i class="fa-solid fa-hospital"></i></div>
+
+                <div class="shelter-card shelter-calc-card" data-shelter="S2_SOUTHEAST">
+                  <div class="shelter-icon" style="background: rgba(0, 180, 216, 0.15); border-color: var(--accent-cyan);"><i class="fa-solid fa-hospital" style="color: var(--accent-cyan);"></i></div>
                   <div class="shelter-info">
-                    <h4>South-East Relief Camp</h4>
-                    <p>Elev: 54.2m MSL | Cap: 18,000 Persons</p>
+                    <h4>South-East Relief Complex</h4>
+                    <div class="shelter-calc-row">
+                      <span class="calc-tag tag-green">Elev: 54.20m</span>
+                      <span class="calc-tag tag-green">Clearance: +21.67m</span>
+                      <span class="calc-tag tag-cyan">SF: 1.67</span>
+                    </div>
+                    <div class="shelter-calc-sub">
+                      <span>Lead Window: <strong>+6.48 hrs</strong></span> | 
+                      <span>Alloc: <strong>16,820 / 18,000 (93.4%)</strong></span>
+                    </div>
                   </div>
                 </div>
-                <div class="shelter-card">
-                  <div class="shelter-icon"><i class="fa-solid fa-bus"></i></div>
+
+                <div class="shelter-card shelter-calc-card" data-shelter="S3_LILIYA">
+                  <div class="shelter-icon" style="background: rgba(244, 162, 97, 0.15); border-color: var(--accent-amber);"><i class="fa-solid fa-bus" style="color: var(--accent-amber);"></i></div>
                   <div class="shelter-info">
                     <h4>Liliya Ridge Transit Hub</h4>
-                    <p>Elev: 53.8m MSL | Cap: 12,000 Persons</p>
+                    <div class="shelter-calc-row">
+                      <span class="calc-tag tag-green">Elev: 53.80m</span>
+                      <span class="calc-tag tag-green">Clearance: +21.27m</span>
+                      <span class="calc-tag tag-cyan">SF: 1.65</span>
+                    </div>
+                    <div class="shelter-calc-sub">
+                      <span>Lead Window: <strong>+6.10 hrs</strong></span> | 
+                      <span>Alloc: <strong>11,150 / 12,000 (92.9%)</strong></span>
+                    </div>
                   </div>
                 </div>
               </div>
-              <div class="disclaimer-badge">
-                <i class="fa-solid fa-circle-info"></i> Shelter capacities and routes are illustrative emergency planning benchmarks situated on topographically verified high ground (>52m MSL).
+            </div>
+
+            <!-- Real Physics Hazard & Shelter Safety Calculations Breakdown -->
+            <div class="glass-card">
+              <div class="card-header">
+                <h3><i class="fa-solid fa-calculator"></i> Hazard & Evacuation Physics Model</h3>
+              </div>
+              <div class="physics-model-box">
+                <div class="formula-row">
+                  <div class="formula-title">Hazard Rating Equation:</div>
+                  <div class="formula-eq">HR = d · (v + 0.5) + DF</div>
+                </div>
+                <div class="formula-row">
+                  <div class="formula-title">Hydraulic Freeboard Margin:</div>
+                  <div class="formula-eq" id="eq-clearance">ΔH = Z_shelter - WSE_max = +23.87m</div>
+                </div>
+                <div class="formula-row">
+                  <div class="formula-title">Evacuation Lead Window:</div>
+                  <div class="formula-eq" id="eq-lead">ΔT = T_arr - (D_evac / v_walk) = +6.87h</div>
+                </div>
+                
+                <div class="hazard-cat-summary">
+                  <div class="cat-pill cat-extreme">
+                    <span class="pill-dot red"></span>
+                    <span>Extreme Danger (HR > 2.5): <strong id="cat-area-extreme">14.82 km² (12.0%)</strong></span>
+                  </div>
+                  <div class="cat-pill cat-high">
+                    <span class="pill-dot orange"></span>
+                    <span>High Danger (1.25 &lt; HR ≤ 2.5): <strong id="cat-area-high">38.45 km² (31.2%)</strong></span>
+                  </div>
+                  <div class="cat-pill cat-moderate">
+                    <span class="pill-dot yellow"></span>
+                    <span>Moderate Danger (0.5 &lt; HR ≤ 1.25): <strong id="cat-area-moderate">42.26 km² (34.2%)</strong></span>
+                  </div>
+                  <div class="cat-pill cat-safe">
+                    <span class="pill-dot green"></span>
+                    <span>Safe High Ground (HR ≤ 0.5): <strong id="cat-area-safe">27.85 km² (22.6%)</strong></span>
+                  </div>
+                </div>
               </div>
             </div>
           </aside>

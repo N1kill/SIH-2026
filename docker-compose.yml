@@ -21,7 +21,7 @@ services:
     image: nginx:alpine
     container_name: sih_machhu_dashboard
     ports:
-      - "8080:80"
+      - "8081:80"
     volumes:
       - ./outputs/3d/dashboard:/usr/share/nginx/html:ro
     depends_on:

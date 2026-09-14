@@ -101,11 +101,59 @@ document.addEventListener("DOMContentLoaded", () => {
       malia:   { name: "Malia Miyana (25 km)", lat: 22.9802, lon: 70.7675, peak_depth: 0.85, arrival: 22.00, peak_time: 24.00 }
     },
 
-    // High Ground Evacuation Centers
+    // High Ground Evacuation Centers (With Real Hydrodynamic Safety Calculations)
     shelters: [
-      { name: "Morbi East High Ground Shelter 1", lat: 22.875, lon: 70.852, elev: 56.4, capacity: 25000, type: "Elevation Ridge (>55m)" },
-      { name: "Morbi South-East Relief Complex", lat: 22.842, lon: 70.848, elev: 54.2, capacity: 18000, type: "Government Complex" },
-      { name: "Liliya Ridge Transit Hub", lat: 22.905, lon: 70.825, elev: 53.8, capacity: 12000, type: "Elevated Transit Interchange" }
+      {
+        id: "S1_EAST",
+        shortName: "SHELTER 1 (EAST)",
+        name: "Morbi East High Ground Shelter 1",
+        lat: 22.875,
+        lon: 70.852,
+        elev: 56.40,
+        capacity: 25000,
+        type: "Topographic Elevation Ridge",
+        distance_km: 2.10,
+        walk_time_hrs: 0.60,
+        allocation: 23550,
+        safe_clearance_m: 23.87,
+        safety_factor: 1.73,
+        lead_buffer_hrs: 6.87,
+        hazard_rating_site: 0.00
+      },
+      {
+        id: "S2_SOUTHEAST",
+        shortName: "SHELTER 2 (SE)",
+        name: "South-East Relief Complex",
+        lat: 22.842,
+        lon: 70.848,
+        elev: 54.20,
+        capacity: 18000,
+        type: "Reinforced Government Complex",
+        distance_km: 3.45,
+        walk_time_hrs: 0.99,
+        allocation: 16820,
+        safe_clearance_m: 21.67,
+        safety_factor: 1.67,
+        lead_buffer_hrs: 6.48,
+        hazard_rating_site: 0.00
+      },
+      {
+        id: "S3_LILIYA",
+        shortName: "SHELTER 3 (LILIYA)",
+        name: "Liliya Ridge Transit Hub",
+        lat: 22.905,
+        lon: 70.825,
+        elev: 53.80,
+        capacity: 12000,
+        type: "Elevated Transit Interchange",
+        distance_km: 4.80,
+        walk_time_hrs: 1.37,
+        allocation: 11150,
+        safe_clearance_m: 21.27,
+        safety_factor: 1.65,
+        lead_buffer_hrs: 6.10,
+        hazard_rating_site: 0.00
+      }
     ],
 
     // Evacuation Routes
@@ -141,32 +189,57 @@ document.addEventListener("DOMContentLoaded", () => {
   let popChart = null;
 
   // ------------------------------------------------------------------------
-  // 2. TAB VIEW SWITCHER
+  // 2. TAB VIEW SWITCHER & LANDING PAGE NAVIGATION
   // ------------------------------------------------------------------------
   const tabButtons = document.querySelectorAll(".tab-btn");
   const viewPanels = document.querySelectorAll(".view-panel");
 
+  function switchTab(targetViewId) {
+    if (targetViewId === "view-landing") {
+      document.body.classList.add("is-landing-mode");
+    } else {
+      document.body.classList.remove("is-landing-mode");
+    }
+
+    tabButtons.forEach(b => {
+      if (b.getAttribute("data-tab") === targetViewId) {
+        b.classList.add("active");
+      } else {
+        b.classList.remove("active");
+      }
+    });
+
+    viewPanels.forEach(p => p.classList.remove("active"));
+    const targetPanel = document.getElementById(targetViewId);
+    if (targetPanel) {
+      targetPanel.classList.add("active");
+    }
+
+    // View-specific initialization triggers
+    if (targetViewId === "view-gis" && leafletMap) {
+      setTimeout(() => { leafletMap.invalidateSize(); }, 200);
+    } else if (targetViewId === "view-3d") {
+      initThreeJsDigitalTwin();
+      setTimeout(() => { onThreeWindowResize(); }, 200);
+    } else if (targetViewId === "view-analytics") {
+      initAnalyticsCharts();
+    }
+  }
+
   tabButtons.forEach(btn => {
     btn.addEventListener("click", () => {
       const targetViewId = btn.getAttribute("data-tab");
-      tabButtons.forEach(b => b.classList.remove("active"));
-      viewPanels.forEach(p => p.classList.remove("active"));
+      if (targetViewId) switchTab(targetViewId);
+    });
+  });
 
-      btn.classList.add("active");
-      const targetPanel = document.getElementById(targetViewId);
-      if (targetPanel) {
-        targetPanel.classList.add("active");
-      }
-
-      // View-specific initialization triggers
-      if (targetViewId === "view-gis" && leafletMap) {
-        setTimeout(() => { leafletMap.invalidateSize(); }, 200);
-      } else if (targetViewId === "view-3d") {
-        initThreeJsDigitalTwin();
-        setTimeout(() => { onThreeWindowResize(); }, 200);
-      } else if (targetViewId === "view-analytics") {
-        initAnalyticsCharts();
-      }
+  // Attach listener to all "Launch / Try Model" CTA buttons across landing page
+  document.querySelectorAll(".launch-model-btn").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      e.preventDefault();
+      const targetView = btn.getAttribute("data-tab") || "view-gis";
+      switchTab(targetView);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     });
   });
 
@@ -305,28 +378,56 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // Add Shelters
+  // Add Shelters with Real Mathematical Safety Calculations
   function addShelterMarkers() {
-    const shelterIcon = L.divIcon({
-      className: "shelter-marker",
-      html: `<div style="background:#06d6a0; border:2px solid white; border-radius:4px; padding:2px 5px; font-size:10px; font-weight:700; color:#040812; display:flex; align-items:center; gap:3px; box-shadow:0 0 10px rgba(6,214,160,0.5);">
-               <i class="fa-solid fa-shield-heart"></i> SHELTER
-             </div>`,
-      iconAnchor: [30, 10]
+    shelterMarkers = [];
+    PIPELINE_DATA.shelters.forEach(sh => {
+      const shelterIcon = L.divIcon({
+        className: "shelter-marker",
+        html: `<div style="background:#06d6a0; border:2px solid white; border-radius:4px; padding:3px 7px; font-size:10px; font-weight:800; color:#040812; display:flex; align-items:center; gap:4px; box-shadow:0 0 14px rgba(6,214,160,0.7); cursor:pointer;">
+                 <i class="fa-solid fa-shield-heart"></i> ${sh.shortName || 'SHELTER'}
+               </div>`,
+        iconAnchor: [35, 12]
+      });
+
+      const m = L.marker([sh.lat, sh.lon], { icon: shelterIcon }).addTo(leafletMap);
+
+      const popupHtml = `
+        <div style="font-family: var(--font-main); font-size: 11px; width: 250px; color: #f8fafc;">
+          <div style="font-family: var(--font-heading); font-size: 13px; font-weight: 700; color: var(--accent-emerald); margin-bottom: 4px; display:flex; align-items:center; gap:6px;">
+            <i class="fa-solid fa-shield-halved"></i> ${sh.name}
+          </div>
+          <div style="background: rgba(6,214,160,0.12); border: 1px solid rgba(6,214,160,0.3); border-radius:4px; padding:4px 8px; margin-bottom:6px; font-size:10px; font-weight:700; color:var(--accent-emerald);">
+            STATUS: VERIFIED TOPOGRAPHIC HIGH GROUND
+          </div>
+          <div style="display:flex; flex-direction:column; gap:3px;">
+            <div><strong>Ground Elevation (Z_ground):</strong> ${sh.elev.toFixed(2)} m MSL</div>
+            <div><strong>Max Flood WSE (WSE_max):</strong> 32.53 m MSL</div>
+            <div><strong>Hydraulic Freeboard (ΔH):</strong> <span style="color:var(--accent-emerald); font-weight:700;">+${sh.safe_clearance_m.toFixed(2)} m clearance</span></div>
+            <div><strong>Hydro Safety Factor (SF):</strong> <span style="color:var(--accent-cyan); font-weight:700;">${sh.safety_factor.toFixed(2)} (Safe ≥ 1.25)</span></div>
+            <div style="border-top:1px solid rgba(255,255,255,0.1); margin-top:4px; padding-top:4px;"></div>
+            <div><strong>Evac Distance (D_evac):</strong> ${sh.distance_km.toFixed(2)} km</div>
+            <div><strong>Walking Travel Time:</strong> ${(sh.walk_time_hrs * 60).toFixed(0)} mins (${sh.walk_time_hrs.toFixed(2)} hrs)</div>
+            <div><strong>Flood Arrival Lead Time:</strong> <span style="color:var(--accent-emerald); font-weight:700;">+${sh.lead_buffer_hrs.toFixed(2)} hrs buffer</span></div>
+            <div><strong>Capacity Allocation:</strong> ${sh.allocation.toLocaleString()} / ${sh.capacity.toLocaleString()} (${((sh.allocation/sh.capacity)*100).toFixed(1)}%)</div>
+          </div>
+        </div>
+      `;
+      m.bindPopup(popupHtml);
+      m.shelterId = sh.id;
+      shelterMarkers.push(m);
     });
 
-    PIPELINE_DATA.shelters.forEach(sh => {
-      const m = L.marker([sh.lat, sh.lon], { icon: shelterIcon }).addTo(leafletMap);
-      m.bindPopup(`
-        <div style="font-family: var(--font-main); font-size: 11px;">
-          <strong style="color: var(--accent-emerald); font-size: 12px;">${sh.name}</strong><br>
-          <strong>Type:</strong> ${sh.type}<br>
-          <strong>Elevation:</strong> ${sh.elev} m MSL (&gt;52m Safe Ridge)<br>
-          <strong>Capacity:</strong> ${sh.capacity.toLocaleString()} Persons<br>
-          <span style="color: #06d6a0; font-weight:600;">Status: Verified Topographic High Ground</span>
-        </div>
-      `);
-      shelterMarkers.push(m);
+    // Attach click listeners to right sidebar shelter cards to focus map and open popup
+    document.querySelectorAll(".shelter-calc-card").forEach(card => {
+      card.addEventListener("click", () => {
+        const id = card.getAttribute("data-shelter");
+        const found = shelterMarkers.find(m => m.shelterId === id);
+        if (found && leafletMap) {
+          leafletMap.flyTo(found.getLatLng(), 14, { duration: 1.2 });
+          setTimeout(() => { found.openPopup(); }, 1300);
+        }
+      });
     });
   }
 
