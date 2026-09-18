@@ -35,6 +35,7 @@ import json
 import logging
 import math
 import os
+import argparse
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -151,16 +152,7 @@ def generate_unsteady_breach_hydrograph(breach_params, duration_hours=24.0, dt_s
 # 3. 2D HYDRODYNAMIC FLOOD ROUTING SOLVER
 # ---------------------------------------------------------------------------
 
-# Real geographic coordinates for monitoring stations along downstream Machhu channel (WGS84)
-STATION_COORDS_WGS84 = {
-    "dam_toe": {"name": "Machhu-II Dam Toe (0 km)", "lat": 22.8212, "lon": 70.8414},
-    "morbi":   {"name": "Morbi City Center (5.2 km)", "lat": 22.8684, "lon": 70.8117},
-    "lilapar": {"name": "Lilapar / Dhuva (12 km)", "lat": 22.9161, "lon": 70.7853},
-    "malia":   {"name": "Malia Miyana (25 km)", "lat": 22.9802, "lon": 70.7675},
-}
-
-
-def run_2d_hydrodynamic_simulation(dem_path, breach_hydrograph_tuple, breach_params):
+def run_2d_hydrodynamic_simulation(dem_path, breach_hydrograph_tuple, breach_params, dam_config):
     """
     2D Raster Hydrodynamic Flood Inundation Model.
     Vectorized diffusive-wave solver for downstream propagation from Machhu-II Dam.
@@ -210,18 +202,16 @@ def run_2d_hydrodynamic_simulation(dem_path, breach_hydrograph_tuple, breach_par
         min_idx = np.unravel_index(np.argmin(sub_elev), sub_elev.shape)
         return r_low + min_idx[0], c_low + min_idx[1]
 
-    # Use real dam toe coordinates (immediately downstream of dam axis)
-    dam_station = STATION_COORDS_WGS84["dam_toe"]
-    r_dam, c_dam = geo_to_grid(dam_station["lat"], dam_station["lon"], snap_radius=5)
+    # Use real dam coordinates from config
+    r_dam, c_dam = geo_to_grid(dam_config["lat"], dam_config["lon"], snap_radius=5)
     logging.info(f"Dam toe source cell in grid: row={r_dam}, col={c_dam}, elev={dem[r_dam, c_dam]:.2f}m")
 
-    # Build monitoring stations from real coordinates
+    # Build monitoring stations from config
     stations = {}
-    for key, info in STATION_COORDS_WGS84.items():
-        if key == "dam_toe":
-            sr, sc = geo_to_grid(info["lat"], info["lon"], snap_radius=5)
-        else:
-            sr, sc = geo_to_grid(info["lat"], info["lon"], snap_radius=15)
+    for info in dam_config["downstream_stations"]:
+        key = info["key"]
+        snap = 5 if key == "dam_toe" else 15
+        sr, sc = geo_to_grid(info["lat"], info["lon"], snap_radius=snap)
         stations[key] = {"name": info["name"], "r": sr, "c": sc, "depth": []}
 
     logging.info("Monitoring stations (real geographic coordinates → grid):")
@@ -288,8 +278,16 @@ def run_2d_hydrodynamic_simulation(dem_path, breach_hydrograph_tuple, breach_par
         t_hr = time_hours[step]
         q_in = q_total[step]
 
-        # 1. Exact Physical Breach Mass Injection: V_in = Q_in * dt_sim
-        v_in = q_in * dt_sim
+        # 1. Exact Physical Breach Mass Injection (with PySPH fallback)
+        import os
+        pysph_file = OUTPUTS_SIM / f"pysph_hydrograph_{step}.txt"
+        if pysph_file.is_file():
+            # Ingest PySPH boundary condition
+            with open(pysph_file, "r") as pf:
+                val = float(pf.read().strip())
+                v_in = val * dt_sim
+        else:
+            v_in = q_in * dt_sim
         d_h_in = (v_in / float(n_src)) / cell_area
         for (sr, sc) in src_cells:
             sub_depth[sr, sc] += d_h_in
@@ -413,7 +411,7 @@ def run_2d_hydrodynamic_simulation(dem_path, breach_hydrograph_tuple, breach_par
         if step % report_interval == 0 or step == n_steps - 1:
             peak_curr = np.max(depth_grid)
             inund_area_km2 = np.sum(depth_grid > 0.10) * (cell_area / 1e6)
-            morbi_depth = stations["morbi"]["depth"][-1]
+            morbi_depth = stations.get("morbi", list(stations.values())[-1])["depth"][-1]
             logging.info(f"  t = {t_hr:5.2f}h | Max Depth = {peak_curr:5.2f}m | Inundated Area = {inund_area_km2:6.1f} km² | Morbi Depth = {morbi_depth:4.2f}m")
 
     # Post-processing
@@ -539,7 +537,7 @@ def generate_simulation_plots(sim_results, breach_hydrograph_tuple, breach_param
 
     # Plot station markers
     for key, st in stations.items():
-        ax.plot(st["c"], st["r"], marker="o", markersize=6, color="blue" if key != "morbi" else "black", markeredgecolor="white")
+        ax.plot(st["c"], st["r"], marker="o", markersize=6, color="black" if key == "morbi" else "blue", markeredgecolor="white")
         ax.text(st["c"] + 15, st["r"], st["name"], color="black", fontsize=8, fontweight="bold",
                 bbox=dict(boxstyle="round,pad=0.2", facecolor="white", alpha=0.8, edgecolor="none"))
 
@@ -595,9 +593,9 @@ def export_summary_json(sim_results, breach_params, breach_hydrograph_tuple):
     inund_area_km2 = float(np.sum(max_depth >= 0.10) * (cell_area / 1e6))
     deep_area_km2 = float(np.sum(max_depth >= 2.0) * (cell_area / 1e6))
 
-    morbi_peak = float(max(stations["morbi"]["depth"]))
+    morbi_peak = float(max(stations.get("morbi", list(stations.values())[-1])["depth"]))
     morbi_arr = None
-    morbi_depths = np.array(stations["morbi"]["depth"])
+    morbi_depths = np.array(stations.get("morbi", list(stations.values())[-1])["depth"])
     if np.any(morbi_depths >= 0.10):
         morbi_arr = round(float(time_hours[np.argmax(morbi_depths >= 0.10)]), 2)
 
@@ -653,13 +651,29 @@ def export_summary_json(sim_results, breach_params, breach_hydrograph_tuple):
 # MAIN EXECUTION
 # ---------------------------------------------------------------------------
 def main():
+    parser = argparse.ArgumentParser(description="Run 2D Hydrodynamic Dam Breach Flood Simulation")
+    parser.add_argument("--dam_config", type=str, default="machhu-ii", help="Key of the dam configuration in config.json")
+    args = parser.parse_args()
+
+    config_path = PROJECT_ROOT / "config.json"
+    if config_path.is_file():
+        with open(config_path, "r") as f:
+            all_configs = json.load(f)
+            dam_config = all_configs.get(args.dam_config, all_configs["machhu-ii"])
+    else:
+        dam_config = None
+        
     print("=" * 70)
     print("  Directive 5A: 2D Hydrodynamic Dam Breach Flood Simulation")
-    print("  Machhu-II Dam Failure, Morbi Floodplain, Gujarat")
+    print(f"  {dam_config['dam_name']} Failure, {dam_config['state']}")
     print("=" * 70)
 
     # 1. Load breach parameters
     breach_params = load_breach_parameters()
+    if dam_config and dam_config.get("reservoir_volume_m3"):
+        breach_params["V_reservoir_m3"] = dam_config["reservoir_volume_m3"]
+    if dam_config and dam_config.get("dam_height_m"):
+        breach_params["H_dam_m"] = dam_config["dam_height_m"]
     print(f"\n[1] Breach Parameters:")
     print(f"    Average Width B_avg = {breach_params['B_avg_m']:.1f} m")
     print(f"    Side Slope Z        = {breach_params['Z_HV']:.1f} (H:V)")
@@ -673,7 +687,7 @@ def main():
     print(f"\n[2] Hydrograph Synthesized: 24h duration, peak outflow = {np.max(q_tot):,.0f} m³/s at t = {time_h[np.argmax(q_tot)]:.2f} h")
 
     # 3. Run 2D Hydrodynamic Simulation
-    sim_results = run_2d_hydrodynamic_simulation(DEM_FILE, hydrograph_tuple, breach_params)
+    sim_results = run_2d_hydrodynamic_simulation(DEM_FILE, hydrograph_tuple, breach_params, dam_config)
 
     # 4. Export GeoTIFFs
     print(f"\n[3] Exporting GeoTIFF Rasters to outputs/simulation/...")
@@ -691,8 +705,8 @@ def main():
     print(f"  Sanity Check         : {'PASSED ✓' if sim_results.get('sanity_passed') else 'FAILED ✗'}")
     print(f"  Total Inundated Area : {summary['total_inundation_area_km2']} km²")
     print(f"  Max Inundation Depth : {summary['max_simulated_depth_m']} m")
-    print(f"  Morbi Peak Depth     : {summary['monitoring_gauges']['morbi']['peak_depth_m']} m (Historical ~3.0 m)")
-    print(f"  Morbi Arrival Time   : {summary['monitoring_gauges']['morbi']['arrival_time_hours']} hours post-breach")
+    print(f"  Morbi Peak Depth     : {summary['monitoring_gauges'].get('morbi', list(summary['monitoring_gauges'].values())[-1])['peak_depth_m']} m (Historical ~3.0 m)")
+    print(f"  Morbi Arrival Time   : {summary['monitoring_gauges'].get('morbi', list(summary['monitoring_gauges'].values())[-1])['arrival_time_hours']} hours post-breach")
     print("=" * 70)
 
     return 0 if sim_results.get("sanity_passed", False) else 1

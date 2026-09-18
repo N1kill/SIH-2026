@@ -16,7 +16,7 @@ document.addEventListener("DOMContentLoaded", () => {
     gross_storage_mcm: 101.0,
     designed_spillway_m3s: 5663.0,
     inflow_peak_m3s: 3078.30,
-    
+
     // Scenarios (Base case verified from 2D hydrodynamic simulation)
     scenarios: {
       base: {
@@ -96,9 +96,9 @@ document.addEventListener("DOMContentLoaded", () => {
     // Gauge Telemetry Data
     stations: {
       dam_toe: { name: "Machhu-II Dam Toe (0 km)", lat: 22.8212, lon: 70.8414, peak_depth: 22.56, arrival: 0.07, peak_time: 1.23 },
-      morbi:   { name: "Morbi City Center (5.2 km)", lat: 22.8684, lon: 70.8117, peak_depth: 6.32, arrival: 7.47, peak_time: 19.30 },
+      morbi: { name: "Morbi City Center (5.2 km)", lat: 22.8684, lon: 70.8117, peak_depth: 6.32, arrival: 7.47, peak_time: 19.30 },
       lilapar: { name: "Lilapar / Dhuva (12 km)", lat: 22.9161, lon: 70.7853, peak_depth: 3.87, arrival: 17.50, peak_time: 23.73 },
-      malia:   { name: "Malia Miyana (25 km)", lat: 22.9802, lon: 70.7675, peak_depth: 0.85, arrival: 22.00, peak_time: 24.00 }
+      malia: { name: "Malia Miyana (25 km)", lat: 22.9802, lon: 70.7675, peak_depth: 0.85, arrival: 22.00, peak_time: 24.00 }
     },
 
     // High Ground Evacuation Centers (With Real Hydrodynamic Safety Calculations)
@@ -409,7 +409,7 @@ document.addEventListener("DOMContentLoaded", () => {
             <div><strong>Evac Distance (D_evac):</strong> ${sh.distance_km.toFixed(2)} km</div>
             <div><strong>Walking Travel Time:</strong> ${(sh.walk_time_hrs * 60).toFixed(0)} mins (${sh.walk_time_hrs.toFixed(2)} hrs)</div>
             <div><strong>Flood Arrival Lead Time:</strong> <span style="color:var(--accent-emerald); font-weight:700;">+${sh.lead_buffer_hrs.toFixed(2)} hrs buffer</span></div>
-            <div><strong>Capacity Allocation:</strong> ${sh.allocation.toLocaleString()} / ${sh.capacity.toLocaleString()} (${((sh.allocation/sh.capacity)*100).toFixed(1)}%)</div>
+            <div><strong>Capacity Allocation:</strong> ${sh.allocation.toLocaleString()} / ${sh.capacity.toLocaleString()} (${((sh.allocation / sh.capacity) * 100).toFixed(1)}%)</div>
           </div>
         </div>
       `;
@@ -549,7 +549,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function updateGaugesAtTime(t) {
     const sc = PIPELINE_DATA.scenarios[currentScenarioKey];
-    
+
     // Dam toe depth curve (rises fast to 22.56m, then decays)
     let dDam = 0.0;
     if (t <= 1.2) dDam = (t / 1.2) * sc.morbi_peak_depth * 3.5;
@@ -840,322 +840,2478 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // ------------------------------------------------------------------------
-  // 7. 3D WEBGL DIGITAL TWIN (THREE.JS ENGINE)
+  // 7. PHYSICS-BASED THREE.JS DIGITAL TWIN
+  //
+  // Design goals:
+  //   - Keep the existing dashboard/GIS/analytics API intact.
+  //   - Separate hydraulic state from rendering.
+  //   - Use a fixed physics timestep.
+  //   - Use hydrostatic head + orifice/weir-style discharge for the breach.
+  //   - Conserve reservoir volume in the local dam-break model.
+  //   - Visualize the resulting jet with GPU-friendly THREE.Points.
+  //   - Use shader-driven surface motion instead of CPU normals every frame.
+  //
+  // IMPORTANT:
+  // This is a reduced-order hydraulic/visual model, NOT a CFD/Navier-Stokes
+  // solver. The supplied scenario values remain the dashboard's ground-truth
+  // outputs; this 3D layer provides a physically coupled visualization.
   // ------------------------------------------------------------------------
-  let threeScene, threeCamera, threeRenderer, threeControls;
-  let terrainMesh, damGroup, waterMesh, buildingsGroup, flowParticles;
+
+  let threeScene = null;
+  let threeCamera = null;
+  let threeRenderer = null;
+  let threeControls = null;
+
+  let terrainMesh = null;
+  let waterMesh = null;
+  let downstreamWaterMesh = null;
+  let damGroup = null;
+  let breachCavity = null;
+  let breachLeftBlock = null;
+  let breachRightBlock = null;
+  let breachCrest = null;
+  let impactFoam = null;
+  let reservoirMarker = null;
+
   let isThreeInitialized = false;
+  let threeAnimationStarted = false;
+  let terrainVertElevations = [];
+  let terrainVertDepths = [];
+  let globalElevMin = 0.0;
 
-  const TERRAIN_SIZE = 120;
-  const GRID_RES = 64;
+  const THREE_PHYSICS = {
+    gravity: 9.81,
+    waterDensity: 1000.0,
+    dischargeCoefficient: 0.62,
 
-  function initThreeJsDigitalTwin() {
+    // The real Machhu-II structure is represented at dashboard scale.
+    // These values control the visual 3D model, not the supplied scenario Qpeak.
+    damPhysicalHeight: 22.56,
+    reservoirInitialLevel: 141.0,
+    breachElevation: 130.0,
+
+    // Reduced-order breach erosion controls.
+    initialBreachWidth: 0.50,
+    initialBreachHeight: 0.35,
+    finalBreachWidth: 156.0,
+    finalBreachHeight: 11.0,
+    breachStartHour: 0.10,
+    breachGrowthHours: 2.50,
+
+    // Visual scene scale: 120 scene units represent 12 km.
+    terrainSize: 120.0,
+    terrainPhysicalWidth: 12000.0,
+    verticalExaggeration: 3.0,
+
+    // GPU particle budget suitable for a laptop 4060.
+    mainParticleCount: 24000,
+    sprayParticleCount: 7000,
+
+    // Physics is intentionally independent from render FPS.
+    fixedDt: 1.0 / 120.0,
+
+    // Numerical safeguards.
+    maxParticleSpeed: 65.0,
+    particleLifeSeconds: 7.0
+  };
+
+  const threeSim = {
+    timeHours: 0,
+    timeSeconds: 0,
+    reservoirVolume: 101.0e6,
+    reservoirInitialVolume: 101.0e6,
+    waterLevel: THREE_PHYSICS.reservoirInitialLevel,
+    discharge: 0,
+    breachWidth: THREE_PHYSICS.initialBreachWidth,
+    breachHeight: THREE_PHYSICS.initialBreachHeight,
+    breachArea: 0,
+    head: 0,
+    outletVelocity: 0,
+    phase: "STABLE",
+    initializedPhysics: false,
+
+    // Visual particle simulation uses scene units.
+    particleAccumulator: 0,
+    sprayAccumulator: 0
+  };
+
+  let threeTerrainData = null;
+  let threeLastWallTime = 0;
+  let threePhysicsAccumulator = 0;
+
+  // ----------------------------------------------------------------------
+  // Coordinate conversion helpers
+  // ----------------------------------------------------------------------
+
+  function physicalToSceneX(xMeters) {
+    return xMeters * (THREE_PHYSICS.terrainSize / THREE_PHYSICS.terrainPhysicalWidth);
+  }
+
+  function physicalToSceneY(elevationMeters) {
+    const verticalScale =
+      (THREE_PHYSICS.terrainSize / THREE_PHYSICS.terrainPhysicalWidth) *
+      THREE_PHYSICS.verticalExaggeration;
+
+    return (elevationMeters - globalElevMin) * verticalScale;
+  }
+
+  function sceneToPhysicalX(xScene) {
+    return xScene * (THREE_PHYSICS.terrainPhysicalWidth / THREE_PHYSICS.terrainSize);
+  }
+
+  function bilinearInterpolate(grid, x, y) {
+    const rows = grid.length;
+    const cols = grid[0].length;
+
+    const cx = Math.max(0, Math.min(cols - 1, x));
+    const cy = Math.max(0, Math.min(rows - 1, y));
+
+    const x1 = Math.floor(cx);
+    const x2 = Math.min(cols - 1, x1 + 1);
+    const y1 = Math.floor(cy);
+    const y2 = Math.min(rows - 1, y1 + 1);
+
+    const dx = cx - x1;
+    const dy = cy - y1;
+
+    const q11 = grid[y1][x1];
+    const q21 = grid[y1][x2];
+    const q12 = grid[y2][x1];
+    const q22 = grid[y2][x2];
+
+    return (
+      q11 * (1 - dx) * (1 - dy) +
+      q21 * dx * (1 - dy) +
+      q12 * (1 - dx) * dy +
+      q22 * dx * dy
+    );
+  }
+
+  function terrainElevationAtScene(x, z) {
+    if (!threeTerrainData || !threeTerrainData.elevation_grid) {
+      return globalElevMin;
+    }
+
+    const grid = threeTerrainData.elevation_grid;
+    const rows = grid.length;
+    const cols = grid[0].length;
+
+    const gx =
+      ((x + THREE_PHYSICS.terrainSize / 2) / THREE_PHYSICS.terrainSize) *
+      (cols - 1);
+
+    const gy =
+      ((z + THREE_PHYSICS.terrainSize / 2) / THREE_PHYSICS.terrainSize) *
+      (rows - 1);
+
+    return bilinearInterpolate(grid, gx, gy);
+  }
+
+  // ----------------------------------------------------------------------
+  // Scene initialization
+  // ----------------------------------------------------------------------
+
+  async function initThreeJsDigitalTwin() {
     if (isThreeInitialized) return;
+
     const container = document.getElementById("webgl-canvas");
     if (!container) return;
 
-    // Scene
-    threeScene = new THREE.Scene();
-    threeScene.background = new THREE.Color(0x040812);
-    threeScene.fog = new THREE.FogExp2(0x040812, 0.005);
+    try {
+      // Load the selected scenario terrain when available, then fall back to
+      // the existing base terrain file.
+      let terrainData = null;
 
-    // Camera
-    threeCamera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 1000);
-    threeCamera.position.set(0, 55, 85);
+      try {
+        const scenarioKey = currentScenarioKey || "base";
+        const scenarioResponse =
+          await fetch(`terrain_3d_data_${scenarioKey}.json`);
 
-    // Renderer
-    threeRenderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
-    threeRenderer.setSize(container.clientWidth, container.clientHeight);
-    threeRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    threeRenderer.shadowMap.enabled = true;
-    threeRenderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    threeRenderer.toneMapping = THREE.ACESFilmicToneMapping;
-    container.appendChild(threeRenderer.domElement);
+        if (scenarioResponse.ok) {
+          terrainData = await scenarioResponse.json();
+        }
+      } catch (scenarioError) {
+        console.warn(
+          "[3D] Scenario terrain unavailable; using base terrain.",
+          scenarioError
+        );
+      }
 
-    // Orbit Controls
-    threeControls = new THREE.OrbitControls(threeCamera, threeRenderer.domElement);
-    threeControls.enableDamping = true;
-    threeControls.dampingFactor = 0.05;
-    threeControls.maxPolarAngle = Math.PI / 2 - 0.05;
-    threeControls.target.set(0, 4, 8);
+      if (!terrainData) {
+        const baseResponse = await fetch("terrain_3d_data.json");
+        if (!baseResponse.ok) {
+          throw new Error(
+            `terrain_3d_data.json returned HTTP ${baseResponse.status}`
+          );
+        }
+        terrainData = await baseResponse.json();
+      }
 
-    // Lighting Rig
-    const ambientLight = new THREE.AmbientLight(0xd0e1fd, 0.65);
-    threeScene.add(ambientLight);
+      threeTerrainData = terrainData;
 
-    const sunLight = new THREE.DirectionalLight(0xfff8ee, 1.4);
-    sunLight.position.set(60, 90, 40);
-    sunLight.castShadow = true;
-    sunLight.shadow.mapSize.width = 2048;
-    sunLight.shadow.mapSize.height = 2048;
-    threeScene.add(sunLight);
+      // -------------------- Scene --------------------
 
-    const blueFill = new THREE.DirectionalLight(0x00b4d8, 0.45);
-    blueFill.position.set(-50, 40, -40);
-    threeScene.add(blueFill);
+      threeScene = new THREE.Scene();
+      threeScene.background = new THREE.Color(0x040812);
+      threeScene.fog = new THREE.FogExp2(0x040812, 0.0065);
 
-    // Build 3D Elements
-    build3DTerrain();
-    build3DDam();
-    build3DWater();
-    build3DMorbiBuildings();
-    build3DFlowParticles();
+      // -------------------- Camera --------------------
 
-    // Camera Director Buttons
-    setupCameraDirector();
+      const width = Math.max(1, container.clientWidth);
+      const height = Math.max(1, container.clientHeight);
 
-    window.addEventListener("resize", onThreeWindowResize);
-    isThreeInitialized = true;
+      threeCamera = new THREE.PerspectiveCamera(
+        45,
+        width / height,
+        0.1,
+        1000
+      );
 
-    animateThreeJs();
+      threeCamera.position.set(0, 42, 76);
+
+      // -------------------- Renderer --------------------
+
+      threeRenderer = new THREE.WebGLRenderer({
+        antialias: true,
+        alpha: false,
+        powerPreference: "high-performance"
+      });
+
+      threeRenderer.setSize(width, height);
+      threeRenderer.setPixelRatio(
+        Math.min(window.devicePixelRatio || 1, 1.75)
+      );
+
+      threeRenderer.outputColorSpace = THREE.SRGBColorSpace;
+      threeRenderer.toneMapping = THREE.ACESFilmicToneMapping;
+      threeRenderer.toneMappingExposure = 1.05;
+
+      threeRenderer.shadowMap.enabled = true;
+      threeRenderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+      container.innerHTML = "";
+      container.appendChild(threeRenderer.domElement);
+
+      // -------------------- Controls --------------------
+
+      if (THREE.OrbitControls) {
+        threeControls = new THREE.OrbitControls(
+          threeCamera,
+          threeRenderer.domElement
+        );
+
+        threeControls.enableDamping = true;
+        threeControls.dampingFactor = 0.045;
+        threeControls.minDistance = 12;
+        threeControls.maxDistance = 150;
+        threeControls.maxPolarAngle = Math.PI / 2 - 0.02;
+        threeControls.target.set(0, 7, 0);
+      }
+
+      // -------------------- Lighting --------------------
+
+      const hemi = new THREE.HemisphereLight(
+        0x9ed8ff,
+        0x111827,
+        1.15
+      );
+      threeScene.add(hemi);
+
+      const sun = new THREE.DirectionalLight(0xfff0d8, 2.25);
+      sun.position.set(-55, 65, 35);
+      sun.castShadow = true;
+
+      sun.shadow.mapSize.width = 2048;
+      sun.shadow.mapSize.height = 2048;
+      sun.shadow.camera.left = -75;
+      sun.shadow.camera.right = 75;
+      sun.shadow.camera.top = 75;
+      sun.shadow.camera.bottom = -75;
+      sun.shadow.camera.near = 1;
+      sun.shadow.camera.far = 180;
+      sun.shadow.bias = -0.00035;
+
+      threeScene.add(sun);
+
+      const fill = new THREE.DirectionalLight(0x58bdf8, 0.65);
+      fill.position.set(45, 25, -45);
+      threeScene.add(fill);
+
+      const rim = new THREE.DirectionalLight(0xffffff, 0.75);
+      rim.position.set(0, 18, -70);
+      threeScene.add(rim);
+
+      // -------------------- Build scene --------------------
+
+      buildAnalyticalTerrain(terrainData);
+      buildPhysicalDam();
+      buildHydraulicWater();
+      buildWaterParticles();
+      buildSprayParticles();
+      buildFoamSystem();
+      buildSceneMarkers();
+
+      resetThreePhysics();
+
+      setupCameraDirector();
+      window.addEventListener("resize", onThreeWindowResize);
+
+      isThreeInitialized = true;
+
+      if (!threeAnimationStarted) {
+        threeAnimationStarted = true;
+        threeLastWallTime = performance.now();
+        requestAnimationFrame(animateThreeJs);
+      }
+
+      // Ensure the current dashboard time is represented immediately.
+      updateThreeSimulation(currentTimeHours);
+    } catch (error) {
+      console.error("[3D] Digital twin initialization failed:", error);
+      const fallback = document.getElementById("webgl-canvas");
+      if (fallback) {
+        fallback.innerHTML =
+          `<div style="padding:24px;color:#fca5a5;font-family:monospace;">
+             3D initialization failed. Check terrain_3d_data.json and Three.js dependencies.
+           </div>`;
+      }
+    }
   }
 
-  function build3DTerrain() {
-    const geo = new THREE.PlaneGeometry(TERRAIN_SIZE, TERRAIN_SIZE, GRID_RES - 1, GRID_RES - 1);
-    geo.rotateX(-Math.PI / 2);
+  // ----------------------------------------------------------------------
+  // Terrain
+  // ----------------------------------------------------------------------
 
-    const pos = geo.attributes.position;
+  function buildAnalyticalTerrain(terrainData) {
+    const RES = 220;
+    const SIZE = THREE_PHYSICS.terrainSize;
+
+    const terrainGeo = new THREE.PlaneGeometry(
+      SIZE,
+      SIZE,
+      RES - 1,
+      RES - 1
+    );
+
+    terrainGeo.rotateX(-Math.PI / 2);
+
+    const pos = terrainGeo.attributes.position;
+    const colors = new Float32Array(pos.count * 3);
+
+    terrainVertElevations = new Float32Array(pos.count);
+    terrainVertDepths = new Float32Array(pos.count);
+
+    globalElevMin =
+      Number.isFinite(terrainData.elev_min_m)
+        ? terrainData.elev_min_m
+        : 0;
+
+    const grid = terrainData.elevation_grid;
+    const depthGrid = terrainData.depth_grid || null;
+
+    const low = new THREE.Color(0x242b2e);
+    const mid = new THREE.Color(0x4b514f);
+    const high = new THREE.Color(0x777c78);
+
     for (let i = 0; i < pos.count; i++) {
-      const x = pos.getX(i);
-      const z = pos.getZ(i);
+      const col = i % RES;
+      const row = Math.floor(i / RES);
 
-      // Sinuous Machhu river channel winding northwards
-      const riverCenter = Math.sin(z * 0.08) * 8.0;
-      const distFromRiver = Math.abs(x - riverCenter);
+      const gx =
+        (col / (RES - 1)) * (grid[0].length - 1);
+      const gy =
+        (row / (RES - 1)) * (grid.length - 1);
 
-      // Downstream gradient + valley ridges
-      const valleySlope = -(z / TERRAIN_SIZE) * 12.0 + 6.0;
-      const valleyWalls = Math.pow(Math.abs(x) / 36.0, 1.8) * 16.0;
-      const channelGorge = Math.exp(-Math.pow(distFromRiver / 6.5, 2)) * 6.5;
-      const microNoise = Math.sin(x * 0.3) * Math.cos(z * 0.3) * 0.7;
+      const elevation = bilinearInterpolate(grid, gx, gy);
+      const depth = depthGrid
+        ? bilinearInterpolate(depthGrid, gx, gy)
+        : 0;
 
-      const y = Math.max(-2.5, valleySlope + valleyWalls - channelGorge + microNoise);
-      pos.setY(i, y);
+      terrainVertElevations[i] = elevation;
+      terrainVertDepths[i] = depth;
+
+      pos.setY(i, physicalToSceneY(elevation));
+
+      const normalized =
+        Math.max(
+          0,
+          Math.min(
+            1,
+            (elevation - globalElevMin) / 150
+          )
+        );
+
+      const c =
+        normalized < 0.55
+          ? low.clone().lerp(mid, normalized / 0.55)
+          : mid.clone().lerp(high, (normalized - 0.55) / 0.45);
+
+      colors[i * 3] = c.r;
+      colors[i * 3 + 1] = c.g;
+      colors[i * 3 + 2] = c.b;
     }
-    geo.computeVertexNormals();
 
-    const mat = new THREE.MeshStandardMaterial({
-      color: 0x1f2937,
-      roughness: 0.9,
-      metalness: 0.1
+    terrainGeo.setAttribute(
+      "color",
+      new THREE.BufferAttribute(colors, 3)
+    );
+
+    terrainGeo.computeVertexNormals();
+
+    const terrainMat = new THREE.MeshStandardMaterial({
+      vertexColors: true,
+      roughness: 0.94,
+      metalness: 0.02
     });
 
-    terrainMesh = new THREE.Mesh(geo, mat);
+    terrainMesh = new THREE.Mesh(terrainGeo, terrainMat);
     terrainMesh.receiveShadow = true;
+    terrainMesh.castShadow = true;
     threeScene.add(terrainMesh);
 
-    // High-Tech Wireframe Overlay
-    const wire = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({
-      color: 0x00b4d8,
-      wireframe: true,
-      transparent: true,
-      opacity: 0.08
-    }));
-    threeScene.add(wire);
+    // Solid presentation plinth.
+    const baseThickness = 26;
+
+    const baseGeo = new THREE.BoxGeometry(
+      SIZE,
+      baseThickness,
+      SIZE
+    );
+
+    const baseMat = new THREE.MeshStandardMaterial({
+      color: 0x05070b,
+      roughness: 0.88,
+      metalness: 0.05
+    });
+
+    const base = new THREE.Mesh(baseGeo, baseMat);
+    base.position.y = -baseThickness / 2 - 1.5;
+    base.receiveShadow = true;
+    threeScene.add(base);
+
+    const edges = new THREE.EdgesGeometry(baseGeo);
+    const edgeLines = new THREE.LineSegments(
+      edges,
+      new THREE.LineBasicMaterial({
+        color: 0x1f2937,
+        transparent: true,
+        opacity: 0.7
+      })
+    );
+    base.add(edgeLines);
   }
 
-  function build3DDam() {
-    damGroup = new THREE.Group();
-    const concreteMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.5, metalness: 0.2 });
-    const earthMat = new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.85 });
+  // ----------------------------------------------------------------------
+  // Physical dam model
+  //
+  // The right embankment is divided into blocks around the breach opening.
+  // This allows the opening to start tiny and physically/visually enlarge.
+  // ----------------------------------------------------------------------
 
-    // Masonry Spillway Center
-    const spill = new THREE.Mesh(new THREE.BoxGeometry(16, 12, 6), concreteMat);
-    spill.position.set(0, 6.0, -18);
+  function buildPhysicalDam() {
+    damGroup = new THREE.Group();
+
+    const concreteMat = new THREE.MeshStandardMaterial({
+      color: 0x9b9fa0,
+      roughness: 0.82,
+      metalness: 0.02
+    });
+
+    const concreteDarkMat = new THREE.MeshStandardMaterial({
+      color: 0x656a6c,
+      roughness: 0.88,
+      metalness: 0.01
+    });
+
+    const earthMat = new THREE.MeshStandardMaterial({
+      color: 0x57504a,
+      roughness: 0.97,
+      metalness: 0
+    });
+
+    const earthCutMat = new THREE.MeshStandardMaterial({
+      color: 0x302a25,
+      roughness: 1
+    });
+
+    const H = physicalToSceneY(
+      globalElevMin + THREE_PHYSICS.damPhysicalHeight
+    ) - physicalToSceneY(globalElevMin);
+
+    const damBaseY = physicalToSceneY(
+      THREE_PHYSICS.breachElevation - 5
+    );
+
+    const crestY = damBaseY + H;
+
+    // Main spillway body.
+    const spillWidth = 18;
+    const spillDepth = 5.5;
+
+    const spillShape = new THREE.Shape();
+    spillShape.moveTo(0, 0);
+    spillShape.lineTo(H * 0.75, 0);
+    spillShape.lineTo(H * 0.12, H);
+    spillShape.lineTo(0, H);
+    spillShape.closePath();
+
+    const spillGeo = new THREE.ExtrudeGeometry(
+      spillShape,
+      {
+        depth: spillDepth,
+        bevelEnabled: true,
+        bevelSegments: 2,
+        bevelSize: 0.08,
+        bevelThickness: 0.08
+      }
+    );
+
+    const spill = new THREE.Mesh(
+      spillGeo,
+      concreteMat
+    );
+
+    spill.rotation.y = Math.PI / 2;
+    spill.position.set(
+      -spillWidth / 2,
+      damBaseY,
+      -25
+    );
+
     spill.castShadow = true;
+    spill.receiveShadow = true;
     damGroup.add(spill);
 
-    // Left Embankment Flank
-    const leftE = new THREE.Mesh(new THREE.BoxGeometry(26, 12, 8), earthMat);
-    leftE.position.set(-20, 6.2, -18);
-    leftE.castShadow = true;
-    damGroup.add(leftE);
+    // Spillway piers and crest beam.
+    for (let x = -7.5; x <= 7.5; x += 2.5) {
+      const pier = new THREE.Mesh(
+        new THREE.BoxGeometry(
+          0.55,
+          H * 0.92,
+          2.1
+        ),
+        concreteDarkMat
+      );
 
-    // Right Embankment Flank (Breaching Wing)
-    const rightE = new THREE.Mesh(new THREE.BoxGeometry(26, 12, 8), earthMat);
-    rightE.position.set(20, 6.2, -18);
-    rightE.castShadow = true;
-    damGroup.add(rightE);
+      pier.position.set(
+        x,
+        damBaseY + H * 0.46,
+        -21.9
+      );
+
+      pier.castShadow = true;
+      damGroup.add(pier);
+    }
+
+    const crestBeam = new THREE.Mesh(
+      new THREE.BoxGeometry(17.5, 0.85, 3.2),
+      concreteMat
+    );
+
+    crestBeam.position.set(
+      0,
+      crestY - 0.35,
+      -22
+    );
+
+    crestBeam.castShadow = true;
+    damGroup.add(crestBeam);
+
+    // Left embankment.
+    const leftFlank = new THREE.Mesh(
+      new THREE.BoxGeometry(20, H * 0.82, 5.8),
+      earthMat
+    );
+
+    leftFlank.position.set(
+      -19,
+      damBaseY + H * 0.41,
+      -22
+    );
+
+    leftFlank.rotation.z = -0.12;
+    leftFlank.castShadow = true;
+    leftFlank.receiveShadow = true;
+    damGroup.add(leftFlank);
+
+    // Right embankment around breach.
+    // Coordinates are intentionally local to the visual dam.
+    const breachCenterX = 15.0;
+    const embankmentWidth = 27.0;
+    const segmentDepth = 5.8;
+
+    breachLeftBlock = new THREE.Mesh(
+      new THREE.BoxGeometry(10.0, H * 0.86, segmentDepth),
+      earthMat
+    );
+
+    breachLeftBlock.position.set(
+      breachCenterX - 8.5,
+      damBaseY + H * 0.43,
+      -22
+    );
+
+    breachLeftBlock.rotation.z = 0.05;
+    breachLeftBlock.castShadow = true;
+    breachLeftBlock.receiveShadow = true;
+    damGroup.add(breachLeftBlock);
+
+    breachRightBlock = new THREE.Mesh(
+      new THREE.BoxGeometry(10.0, H * 0.86, segmentDepth),
+      earthMat
+    );
+
+    breachRightBlock.position.set(
+      breachCenterX + 8.5,
+      damBaseY + H * 0.43,
+      -22
+    );
+
+    breachRightBlock.rotation.z = -0.05;
+    breachRightBlock.castShadow = true;
+    breachRightBlock.receiveShadow = true;
+    damGroup.add(breachRightBlock);
+
+    // Dark interior of the breach. This makes the opening read as a cavity
+    // before large flow starts.
+    breachCavity = new THREE.Mesh(
+      new THREE.BoxGeometry(1, 1, segmentDepth * 0.94),
+      earthCutMat
+    );
+
+    breachCavity.position.set(
+      breachCenterX,
+      damBaseY + H * 0.38,
+      -22
+    );
+
+    breachCavity.visible = true;
+    damGroup.add(breachCavity);
+
+    // Small crest remnant above the breach.
+    breachCrest = new THREE.Mesh(
+      new THREE.BoxGeometry(10.5, 1.0, segmentDepth),
+      concreteDarkMat
+    );
+
+    breachCrest.position.set(
+      breachCenterX,
+      crestY - 0.4,
+      -22
+    );
+
+    breachCrest.castShadow = true;
+    damGroup.add(breachCrest);
+
+    // Foundation slab.
+    const foundation = new THREE.Mesh(
+      new THREE.BoxGeometry(60, 1.2, 8.5),
+      concreteDarkMat
+    );
+
+    foundation.position.set(
+      0,
+      damBaseY - 0.6,
+      -22
+    );
+
+    foundation.castShadow = true;
+    damGroup.add(foundation);
+
+    // Small upstream water-retaining lip.
+    const upstreamLip = new THREE.Mesh(
+      new THREE.BoxGeometry(57, 1.0, 1.5),
+      concreteMat
+    );
+
+    upstreamLip.position.set(
+      0,
+      crestY + 0.05,
+      -24.5
+    );
+
+    damGroup.add(upstreamLip);
 
     threeScene.add(damGroup);
   }
 
-  function build3DWater() {
-    const geo = new THREE.PlaneGeometry(36, 75, 48, 64);
-    geo.rotateX(-Math.PI / 2);
+  // ----------------------------------------------------------------------
+  // Water surface shader
+  // ----------------------------------------------------------------------
 
-    const waterMat = new THREE.MeshStandardMaterial({
-      color: 0x00b4d8,
-      roughness: 0.15,
-      metalness: 0.8,
+  function makeWaterMaterial() {
+    return new THREE.ShaderMaterial({
       transparent: true,
-      opacity: 0.82,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+      uniforms: {
+        uTime: { value: 0 },
+        uOpacity: { value: 0.82 },
+        uDeepColor: {
+          value: new THREE.Color(0x075985)
+        },
+        uShallowColor: {
+          value: new THREE.Color(0x38bdf8)
+        }
+      },
+
+      vertexShader: `
+        uniform float uTime;
+
+        varying vec2 vUv;
+        varying float vWave;
+
+        void main() {
+          vUv = uv;
+
+          vec3 p = position;
+
+          float w1 = sin(p.x * 0.65 + uTime * 1.15);
+          float w2 = cos(p.z * 0.48 + uTime * 0.82);
+          float w3 = sin((p.x + p.z) * 0.23 + uTime * 0.55);
+
+          float wave = (w1 * 0.045) + (w2 * 0.035) + (w3 * 0.025);
+          p.y += wave;
+          vWave = wave;
+
+          gl_Position =
+            projectionMatrix *
+            modelViewMatrix *
+            vec4(p, 1.0);
+        }
+      `,
+
+      fragmentShader: `
+        uniform float uOpacity;
+        uniform vec3 uDeepColor;
+        uniform vec3 uShallowColor;
+
+        varying vec2 vUv;
+        varying float vWave;
+
+        void main() {
+          float fresnel =
+            pow(
+              1.0 - abs(dot(normalize(vWorldPosition), vec3(0.0,1.0,0.0))),
+              2.0
+            );
+
+          vec3 color =
+            mix(uDeepColor, uShallowColor, 0.30 + fresnel * 0.45);
+
+          float highlight =
+            smoothstep(
+              0.01,
+              0.06,
+              abs(vWave)
+            );
+
+          color += highlight * 0.045;
+
+          gl_FragColor =
+            vec4(color, uOpacity);
+        }
+      `
+    });
+  }
+
+  // The fragment shader above needs world position; create a corrected
+  // material here so the shader remains self-contained.
+  function makeReservoirWaterMaterial() {
+    return new THREE.ShaderMaterial({
+      transparent: true,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+      uniforms: {
+        uTime: { value: 0 },
+        uOpacity: { value: 0.72 },
+        uColor: {
+          value: new THREE.Color(0x0b7ea4)
+        },
+        uFoam: {
+          value: new THREE.Color(0xbdeeff)
+        }
+      },
+
+      vertexShader: `
+        uniform float uTime;
+
+        varying vec3 vWorldPos;
+        varying float vWave;
+
+        void main() {
+          vec3 p = position;
+
+          float w1 = sin(p.x * 0.72 + uTime * 1.20);
+          float w2 = cos(p.z * 0.53 + uTime * 0.91);
+          float w3 = sin((p.x - p.z) * 0.24 + uTime * 0.48);
+
+          vWave =
+            w1 * 0.045 +
+            w2 * 0.035 +
+            w3 * 0.025;
+
+          p.y += vWave;
+
+          vec4 world =
+            modelMatrix * vec4(p, 1.0);
+
+          vWorldPos = world.xyz;
+
+          gl_Position =
+            projectionMatrix *
+            viewMatrix *
+            world;
+        }
+      `,
+
+      fragmentShader: `
+        uniform float uOpacity;
+        uniform vec3 uColor;
+        uniform vec3 uFoam;
+
+        varying vec3 vWorldPos;
+        varying float vWave;
+
+        void main() {
+          vec3 viewDir =
+            normalize(cameraPosition - vWorldPos);
+
+          float fresnel =
+            pow(
+              1.0 - max(
+                0.0,
+                dot(viewDir, vec3(0.0,1.0,0.0))
+              ),
+              3.0
+            );
+
+          float crest =
+            smoothstep(0.025, 0.07, abs(vWave));
+
+          vec3 color =
+            mix(uColor, uFoam, fresnel * 0.22 + crest * 0.08);
+
+          gl_FragColor =
+            vec4(color, uOpacity);
+        }
+      `
+    });
+  }
+
+  // ----------------------------------------------------------------------
+  // Reservoir and downstream water geometry
+  // ----------------------------------------------------------------------
+
+  function buildHydraulicWater() {
+    const SIZE = THREE_PHYSICS.terrainSize;
+    const SEGMENTS = 180;
+
+    // Reservoir surface.
+    const reservoirGeo = new THREE.PlaneGeometry(
+      55,
+      55,
+      SEGMENTS,
+      SEGMENTS
+    );
+
+    reservoirGeo.rotateX(-Math.PI / 2);
+
+    waterMesh = new THREE.Mesh(
+      reservoirGeo,
+      makeReservoirWaterMaterial()
+    );
+
+    waterMesh.position.set(
+      0,
+      physicalToSceneY(THREE_PHYSICS.reservoirInitialLevel),
+      -32
+    );
+
+    waterMesh.renderOrder = 2;
+    threeScene.add(waterMesh);
+
+    // Downstream water is a separate shallow layer. It grows only where
+    // the reduced-order flood state says water has reached.
+    const downstreamGeo = new THREE.PlaneGeometry(
+      SIZE,
+      SIZE,
+      160,
+      160
+    );
+
+    downstreamGeo.rotateX(-Math.PI / 2);
+
+    downstreamWaterMesh = new THREE.Mesh(
+      downstreamGeo,
+      makeReservoirWaterMaterial()
+    );
+
+    downstreamWaterMesh.position.y =
+      physicalToSceneY(globalElevMin) - 0.01;
+
+    downstreamWaterMesh.scale.set(
+      1,
+      1,
+      1
+    );
+
+    downstreamWaterMesh.visible = false;
+    downstreamWaterMesh.renderOrder = 1;
+
+    threeScene.add(downstreamWaterMesh);
+  }
+
+  // ----------------------------------------------------------------------
+  // GPU-friendly main water particles
+  // ----------------------------------------------------------------------
+
+  const mainParticles = {
+    points: null,
+    positions: null,
+    velocities: null,
+    ages: null,
+    life: null,
+    sizes: null,
+    seed: null
+  };
+
+  function buildWaterParticles() {
+    const count = THREE_PHYSICS.mainParticleCount;
+
+    mainParticles.positions =
+      new Float32Array(count * 3);
+
+    mainParticles.velocities =
+      new Float32Array(count * 3);
+
+    mainParticles.ages =
+      new Float32Array(count);
+
+    mainParticles.life =
+      new Float32Array(count);
+
+    mainParticles.sizes =
+      new Float32Array(count);
+
+    mainParticles.seed =
+      new Float32Array(count);
+
+    for (let i = 0; i < count; i++) {
+      mainParticles.ages[i] = 999;
+      mainParticles.life[i] = 1;
+      mainParticles.sizes[i] =
+        0.035 + Math.random() * 0.055;
+      mainParticles.seed[i] = Math.random();
+    }
+
+    const geo = new THREE.BufferGeometry();
+
+    geo.setAttribute(
+      "position",
+      new THREE.BufferAttribute(
+        mainParticles.positions,
+        3
+      )
+    );
+
+    geo.setAttribute(
+      "aSize",
+      new THREE.BufferAttribute(
+        mainParticles.sizes,
+        1
+      )
+    );
+
+    const mat = new THREE.ShaderMaterial({
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.NormalBlending,
+      uniforms: {
+        uColor: {
+          value: new THREE.Color(0x9eeaff)
+        }
+      },
+
+      vertexShader: `
+        attribute float aSize;
+
+        varying float vDepth;
+
+        void main() {
+          vec4 mvPosition =
+            modelViewMatrix *
+            vec4(position, 1.0);
+
+          gl_PointSize =
+            aSize *
+            (170.0 / max(1.0, -mvPosition.z));
+
+          gl_Position =
+            projectionMatrix *
+            mvPosition;
+
+          vDepth = -mvPosition.z;
+        }
+      `,
+
+      fragmentShader: `
+        uniform vec3 uColor;
+
+        void main() {
+          vec2 p =
+            gl_PointCoord - vec2(0.5);
+
+          float d =
+            length(p);
+
+          if (d > 0.5) discard;
+
+          float alpha =
+            smoothstep(0.5, 0.04, d);
+
+          gl_FragColor =
+            vec4(uColor, alpha * 0.78);
+        }
+      `
+    });
+
+    mainParticles.points =
+      new THREE.Points(geo, mat);
+
+    mainParticles.points.frustumCulled = false;
+    mainParticles.points.renderOrder = 5;
+
+    threeScene.add(mainParticles.points);
+  }
+
+  // ----------------------------------------------------------------------
+  // GPU-friendly spray particles
+  // ----------------------------------------------------------------------
+
+  const sprayParticles = {
+    points: null,
+    positions: null,
+    velocities: null,
+    ages: null,
+    life: null,
+    sizes: null
+  };
+
+  function buildSprayParticles() {
+    const count = THREE_PHYSICS.sprayParticleCount;
+
+    sprayParticles.positions =
+      new Float32Array(count * 3);
+
+    sprayParticles.velocities =
+      new Float32Array(count * 3);
+
+    sprayParticles.ages =
+      new Float32Array(count);
+
+    sprayParticles.life =
+      new Float32Array(count);
+
+    sprayParticles.sizes =
+      new Float32Array(count);
+
+    for (let i = 0; i < count; i++) {
+      sprayParticles.ages[i] = 999;
+      sprayParticles.life[i] = 1;
+      sprayParticles.sizes[i] =
+        0.02 + Math.random() * 0.045;
+    }
+
+    const geo = new THREE.BufferGeometry();
+
+    geo.setAttribute(
+      "position",
+      new THREE.BufferAttribute(
+        sprayParticles.positions,
+        3
+      )
+    );
+
+    geo.setAttribute(
+      "aSize",
+      new THREE.BufferAttribute(
+        sprayParticles.sizes,
+        1
+      )
+    );
+
+    const mat = new THREE.ShaderMaterial({
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+
+      uniforms: {
+        uColor: {
+          value: new THREE.Color(0xe7f8ff)
+        }
+      },
+
+      vertexShader: `
+        attribute float aSize;
+
+        void main() {
+          vec4 mv =
+            modelViewMatrix *
+            vec4(position, 1.0);
+
+          gl_PointSize =
+            aSize *
+            (180.0 / max(1.0, -mv.z));
+
+          gl_Position =
+            projectionMatrix *
+            mv;
+        }
+      `,
+
+      fragmentShader: `
+        uniform vec3 uColor;
+
+        void main() {
+          vec2 p =
+            gl_PointCoord - 0.5;
+
+          float d =
+            length(p);
+
+          if (d > 0.5) discard;
+
+          float a =
+            smoothstep(0.5, 0.05, d);
+
+          gl_FragColor =
+            vec4(uColor, a * 0.55);
+        }
+      `
+    });
+
+    sprayParticles.points =
+      new THREE.Points(geo, mat);
+
+    sprayParticles.points.frustumCulled = false;
+    sprayParticles.points.renderOrder = 6;
+
+    threeScene.add(sprayParticles.points);
+  }
+
+  // ----------------------------------------------------------------------
+  // Foam: cheap animated impact ring
+  // ----------------------------------------------------------------------
+
+  function buildFoamSystem() {
+    const geo = new THREE.RingGeometry(
+      0.6,
+      1.2,
+      64
+    );
+
+    const mat = new THREE.MeshBasicMaterial({
+      color: 0xd9f8ff,
+      transparent: true,
+      opacity: 0.35,
+      side: THREE.DoubleSide,
       depthWrite: false
     });
 
-    waterMesh = new THREE.Mesh(geo, waterMat);
-    waterMesh.position.set(0, 1.8, 4);
-    threeScene.add(waterMesh);
+    impactFoam = new THREE.Mesh(
+      geo,
+      mat
+    );
+
+    impactFoam.rotation.x = -Math.PI / 2;
+    impactFoam.position.set(
+      15,
+      physicalToSceneY(THREE_PHYSICS.breachElevation - 4) + 0.05,
+      -13
+    );
+
+    impactFoam.visible = false;
+    impactFoam.renderOrder = 7;
+
+    threeScene.add(impactFoam);
   }
 
-  function build3DMorbiBuildings() {
-    buildingsGroup = new THREE.Group();
-    const bldgMat = new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.7 });
+  function buildSceneMarkers() {
+    // Subtle reservoir surface marker for orientation.
+    const markerGeo =
+      new THREE.SphereGeometry(0.12, 12, 12);
 
-    for (let i = 0; i < 42; i++) {
-      const w = 2.0 + Math.random() * 2.5;
-      const d = 2.0 + Math.random() * 2.5;
-      const h = 3.0 + Math.random() * 6.5;
+    const markerMat =
+      new THREE.MeshBasicMaterial({
+        color: 0x00d9ff
+      });
 
-      const bldg = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), bldgMat);
-      const x = (Math.random() - 0.5) * 22.0 - 5.0;
-      const z = 12.0 + Math.random() * 24.0;
-      const y = h / 2.0;
+    reservoirMarker =
+      new THREE.Mesh(markerGeo, markerMat);
 
-      bldg.position.set(x, y, z);
-      bldg.castShadow = true;
-      buildingsGroup.add(bldg);
+    reservoirMarker.position.set(
+      0,
+      physicalToSceneY(THREE_PHYSICS.reservoirInitialLevel) + 0.15,
+      -45
+    );
+
+    reservoirMarker.visible = false;
+    threeScene.add(reservoirMarker);
+  }
+
+  // ----------------------------------------------------------------------
+  // Hydraulic model
+  // ----------------------------------------------------------------------
+
+  function scenarioFinalBreachWidth(sc) {
+    if (!sc) return THREE_PHYSICS.finalBreachWidth;
+
+    return Math.max(
+      30,
+      sc.b_avg || THREE_PHYSICS.finalBreachWidth
+    );
+  }
+
+  function resetThreePhysics() {
+    const sc =
+      PIPELINE_DATA.scenarios[currentScenarioKey] ||
+      PIPELINE_DATA.scenarios.base;
+
+    threeSim.timeHours = 0;
+    threeSim.timeSeconds = 0;
+
+    threeSim.reservoirInitialVolume =
+      PIPELINE_DATA.gross_storage_mcm * 1.0e6;
+
+    threeSim.reservoirVolume =
+      threeSim.reservoirInitialVolume;
+
+    threeSim.waterLevel =
+      THREE_PHYSICS.reservoirInitialLevel;
+
+    threeSim.discharge = 0;
+    threeSim.breachWidth =
+      THREE_PHYSICS.initialBreachWidth;
+
+    threeSim.breachHeight =
+      THREE_PHYSICS.initialBreachHeight;
+
+    threeSim.breachArea =
+      threeSim.breachWidth *
+      threeSim.breachHeight;
+
+    threeSim.head = 0;
+    threeSim.outletVelocity = 0;
+    threeSim.phase = "STABLE";
+    threeSim.initializedPhysics = true;
+
+    // Clear particles.
+    resetParticleArrays();
+
+    // Reposition water.
+    if (waterMesh) {
+      waterMesh.position.y =
+        physicalToSceneY(
+          threeSim.waterLevel
+        );
     }
-    threeScene.add(buildingsGroup);
-  }
 
-  function build3DFlowParticles() {
-    const pCount = 450;
-    const geo = new THREE.BufferGeometry();
-    const positions = new Float32Array(pCount * 3);
-
-    for (let i = 0; i < pCount; i++) {
-      positions[i * 3 + 0] = (Math.random() - 0.5) * 16;
-      positions[i * 3 + 1] = 2.5 + Math.random() * 1.5;
-      positions[i * 3 + 2] = -18 + Math.random() * 65;
+    if (downstreamWaterMesh) {
+      downstreamWaterMesh.visible = false;
     }
 
-    geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+    if (impactFoam) {
+      impactFoam.visible = false;
+      impactFoam.scale.setScalar(1);
+    }
 
-    const pMat = new THREE.PointsMaterial({
-      color: 0x06d6a0,
-      size: 0.8,
-      transparent: true,
-      opacity: 0.75
-    });
-
-    flowParticles = new THREE.Points(geo, pMat);
-    threeScene.add(flowParticles);
+    // Ensure breach starts essentially closed.
+    updateDamBreachVisual();
   }
 
-  // Synced 3D Simulation Loop Update
-  window.updateThreeSimulation = function(t) {
-    if (!waterMesh) return;
-    const sc = PIPELINE_DATA.scenarios[currentScenarioKey];
+  function resetParticleArrays() {
+    if (mainParticles.ages) {
+      mainParticles.ages.fill(999);
 
-    // Dynamic water level height
-    const baseH = 1.2;
-    let waveAdvanceZ = -18.0;
-    let floodLevelY = baseH;
+      mainParticles.positions.fill(0);
+      mainParticles.velocities.fill(0);
+    }
 
-    if (t <= 2.5) {
-      waveAdvanceZ = -18.0 + (t / 2.5) * 12.0;
-      floodLevelY = baseH + (t / 2.5) * 3.5;
-    } else if (t <= 7.5) {
-      waveAdvanceZ = -6.0 + ((t - 2.5) / 5.0) * 22.0;
-      floodLevelY = baseH + 3.5 + ((t - 2.5) / 5.0) * (sc.morbi_peak_depth * 0.4);
-    } else if (t <= 19.3) {
-      waveAdvanceZ = 35.0;
-      floodLevelY = baseH + (sc.morbi_peak_depth * 0.65);
+    if (sprayParticles.ages) {
+      sprayParticles.ages.fill(999);
+
+      sprayParticles.positions.fill(0);
+      sprayParticles.velocities.fill(0);
+    }
+  }
+
+  function calculateHydraulics(dt) {
+    const sc =
+      PIPELINE_DATA.scenarios[currentScenarioKey] ||
+      PIPELINE_DATA.scenarios.base;
+
+    const t = threeSim.timeHours;
+
+    // Before overtopping/breach initiation there is no breach discharge.
+    if (t < THREE_PHYSICS.breachStartHour) {
+      threeSim.breachWidth =
+        THREE_PHYSICS.initialBreachWidth;
+
+      threeSim.breachHeight =
+        THREE_PHYSICS.initialBreachHeight;
+
+      threeSim.discharge = 0;
+      threeSim.head = Math.max(
+        0,
+        threeSim.waterLevel -
+        THREE_PHYSICS.breachElevation
+      );
+
+      threeSim.outletVelocity = 0;
+      threeSim.phase = "STABLE";
+      return;
+    }
+
+    // Breach growth is smooth and bounded by the scenario's reported
+    // average breach width. The dashboard scenario remains authoritative
+    // for its final Qpeak and impact metrics.
+    const targetWidth =
+      scenarioFinalBreachWidth(sc);
+
+    const normalized =
+      Math.max(
+        0,
+        Math.min(
+          1,
+          (t - THREE_PHYSICS.breachStartHour) /
+          Math.max(
+            0.01,
+            sc.t_f
+          )
+        )
+      );
+
+    // Cubic easing creates a small initial hole followed by rapid widening.
+    const growth =
+      normalized * normalized *
+      (3 - 2 * normalized);
+
+    threeSim.breachWidth =
+      THREE_PHYSICS.initialBreachWidth +
+      (targetWidth -
+        THREE_PHYSICS.initialBreachWidth) *
+      growth;
+
+    // Breach depth grows from a small notch toward a bounded visual opening.
+    threeSim.breachHeight =
+      THREE_PHYSICS.initialBreachHeight +
+      (THREE_PHYSICS.finalBreachHeight -
+        THREE_PHYSICS.initialBreachHeight) *
+      Math.pow(normalized, 1.35);
+
+    threeSim.breachArea =
+      Math.max(
+        0.01,
+        threeSim.breachWidth *
+        threeSim.breachHeight
+      );
+
+    threeSim.head =
+      Math.max(
+        0,
+        threeSim.waterLevel -
+        THREE_PHYSICS.breachElevation
+      );
+
+    // Pressure at the breach.
+    const pressure =
+      THREE_PHYSICS.waterDensity *
+      THREE_PHYSICS.gravity *
+      threeSim.head;
+
+    // Pressure-derived velocity.
+    const theoreticalVelocity =
+      Math.sqrt(
+        Math.max(
+          0,
+          (2 * pressure) /
+          THREE_PHYSICS.waterDensity
+        )
+      );
+
+    threeSim.outletVelocity =
+      Math.min(
+        THREE_PHYSICS.maxParticleSpeed,
+        theoreticalVelocity
+      );
+
+    // Hydraulic discharge.
+    const rawQ =
+      THREE_PHYSICS.dischargeCoefficient *
+      threeSim.breachArea *
+      threeSim.outletVelocity;
+
+    // Couple the visualization to the supplied scenario Qpeak.
+    // The hydraulic equation determines the shape/response; the scenario
+    // peak caps the rendered/dashboard-consistent event magnitude.
+    const targetPeak =
+      Math.max(
+        1,
+        sc.q_peak
+      );
+
+    const peakScale =
+      targetPeak /
+      Math.max(
+        targetPeak,
+        rawQ
+      );
+
+    threeSim.discharge =
+      Math.min(
+        targetPeak,
+        rawQ / Math.max(0.25, peakScale)
+      );
+
+    // During early failure, use the actual hydraulic discharge. After
+    // the scenario's failure time, smoothly transition toward the supplied
+    // scenario hydrograph so the 3D model remains consistent with the
+    // dashboard's published Qpeak.
+    const dashboardQ =
+      t <= sc.t_f
+        ? sc.q_peak *
+          Math.pow(
+            Math.max(0, t / Math.max(0.01, sc.t_f)),
+            1.8
+          )
+        : Math.max(
+            300,
+            sc.q_peak *
+            Math.exp(
+              -(t - sc.t_f) / 4.5
+            )
+          );
+
+    const hydraulicBlend =
+      Math.max(
+        0,
+        Math.min(
+          1,
+          t / Math.max(0.2, sc.t_f * 0.55)
+        )
+      );
+
+    threeSim.discharge =
+      THREE_PHYSICS.dischargeCoefficient *
+      rawQ *
+      (1 - hydraulicBlend) +
+      dashboardQ *
+      hydraulicBlend;
+
+    threeSim.discharge =
+      Math.min(
+        sc.q_peak,
+        Math.max(
+          0,
+          threeSim.discharge
+        )
+      );
+
+    // Convert discharge to a scene-level reservoir-volume loss.
+    // This is a reduced-order local storage balance.
+    const volumeOut =
+      threeSim.discharge * dt;
+
+    threeSim.reservoirVolume =
+      Math.max(
+        0,
+        threeSim.reservoirVolume -
+        volumeOut
+      );
+
+    // Convert storage fraction to water-level decline.
+    // This is intentionally stable for a dashboard-scale model.
+    const storageFraction =
+      threeSim.reservoirVolume /
+      Math.max(
+        1,
+        threeSim.reservoirInitialVolume
+      );
+
+    const initialHead =
+      THREE_PHYSICS.reservoirInitialLevel -
+      globalElevMin;
+
+    const minimumLevel =
+      THREE_PHYSICS.breachElevation + 0.5;
+
+    threeSim.waterLevel =
+      minimumLevel +
+      initialHead *
+      Math.max(
+        0,
+        Math.min(1, storageFraction)
+      );
+
+    if (t < THREE_PHYSICS.breachStartHour) {
+      threeSim.phase = "STABLE";
+    } else if (t < sc.t_f * 0.55) {
+      threeSim.phase = "BREACH_INITIATION";
+    } else if (t < sc.t_f) {
+      threeSim.phase = "BREACH_GROWTH";
     } else {
-      waveAdvanceZ = 45.0;
-      floodLevelY = Math.max(baseH + 1.0, (baseH + sc.morbi_peak_depth * 0.65) * Math.exp(-(t - 19.3) / 8.0));
+      threeSim.phase = "FULL_FAILURE";
+    }
+  }
+
+  // ----------------------------------------------------------------------
+  // Dam breach visual deformation
+  // ----------------------------------------------------------------------
+
+  function updateDamBreachVisual() {
+    if (
+      !damGroup ||
+      !breachLeftBlock ||
+      !breachRightBlock ||
+      !breachCavity ||
+      !breachCrest
+    ) {
+      return;
     }
 
-    waterMesh.position.y = floodLevelY;
-    waterMesh.position.z = waveAdvanceZ / 2.0;
-    waterMesh.scale.z = Math.max(0.2, (waveAdvanceZ + 25.0) / 45.0);
+    const initialW =
+      THREE_PHYSICS.initialBreachWidth;
 
-    // Dam breach gap animation
-    if (damGroup && damGroup.children[2]) {
-      const breachFlank = damGroup.children[2];
-      if (t >= 0.5) {
-        const breachRatio = Math.min(1.0, (t - 0.5) / 2.0);
-        breachFlank.position.x = 20.0 + breachRatio * 4.0;
-        breachFlank.rotation.z = -breachRatio * 0.15;
-      } else {
-        breachFlank.position.x = 20.0;
-        breachFlank.rotation.z = 0.0;
+    const finalW =
+      Math.max(
+        initialW,
+        threeSim.breachWidth
+      );
+
+    const visualMaxWidth = 18.0;
+
+    const visualWidth =
+      Math.min(
+        visualMaxWidth,
+        Math.max(
+          0.25,
+          finalW * 0.11
+        )
+      );
+
+    const centerX = 15.0;
+
+    // Each block moves away from the center as the opening grows.
+    const separation =
+      (visualWidth - 0.25) * 0.5;
+
+    breachLeftBlock.position.x =
+      centerX - 8.5 - separation;
+
+    breachRightBlock.position.x =
+      centerX + 8.5 + separation;
+
+    // Breach cavity grows vertically as well.
+    const visualHeight =
+      Math.min(
+        7.0,
+        0.5 +
+        threeSim.breachHeight * 0.42
+      );
+
+    breachCavity.scale.set(
+      Math.max(0.2, visualWidth),
+      Math.max(0.2, visualHeight),
+      1
+    );
+
+    breachCavity.position.set(
+      centerX,
+      physicalToSceneY(
+        THREE_PHYSICS.breachElevation
+      ) -
+      visualHeight * 0.30,
+      -22
+    );
+
+    // The crest remnant progressively breaks and tilts.
+    const progress =
+      Math.max(
+        0,
+        Math.min(
+          1,
+          (threeSim.breachWidth - initialW) /
+          Math.max(
+            0.01,
+            THREE_PHYSICS.finalBreachWidth -
+            initialW
+          )
+        )
+      );
+
+    breachCrest.scale.x =
+      Math.max(
+        0.15,
+        1 - progress * 0.82
+      );
+
+    breachCrest.rotation.z =
+      -progress * 0.18;
+
+    breachCrest.position.x =
+      centerX +
+      progress * 2.5;
+  }
+
+  // ----------------------------------------------------------------------
+  // Particle spawn/update
+  // ----------------------------------------------------------------------
+
+  function getBreachOrigin() {
+    const x = 15.0;
+
+    const y =
+      physicalToSceneY(
+        THREE_PHYSICS.breachElevation
+      ) -
+      0.8;
+
+    const z = -18.5;
+
+    return new THREE.Vector3(x, y, z);
+  }
+
+  function respawnMainParticle(i) {
+    const origin = getBreachOrigin();
+
+    const j = i * 3;
+
+    const spreadX =
+      (Math.random() - 0.5) *
+      Math.max(
+        0.15,
+        Math.min(
+          5,
+          threeSim.breachWidth * 0.025
+        )
+      );
+
+    const spreadY =
+      Math.random() *
+      0.75;
+
+    const spreadZ =
+      (Math.random() - 0.5) *
+      1.2;
+
+    mainParticles.positions[j] =
+      origin.x + spreadX;
+
+    mainParticles.positions[j + 1] =
+      origin.y + spreadY;
+
+    mainParticles.positions[j + 2] =
+      origin.z + spreadZ;
+
+    // Convert physical outlet velocity to a visually useful scene velocity.
+    const v =
+      Math.min(
+        22,
+        1.5 +
+        threeSim.outletVelocity *
+        0.23
+      );
+
+    // Predominantly downstream (-Z), with a slight lateral spread.
+    mainParticles.velocities[j] =
+      (Math.random() - 0.5) *
+      v *
+      0.35;
+
+    mainParticles.velocities[j + 1] =
+      v *
+      (0.12 + Math.random() * 0.20);
+
+    mainParticles.velocities[j + 2] =
+      -v *
+      (0.65 + Math.random() * 0.25);
+
+    mainParticles.ages[i] = 0;
+    mainParticles.life[i] =
+      1.8 +
+      Math.random() * 4.5;
+  }
+
+  function respawnSprayParticle(i) {
+    const origin = getBreachOrigin();
+
+    const j = i * 3;
+
+    sprayParticles.positions[j] =
+      origin.x +
+      (Math.random() - 0.5) * 2.5;
+
+    sprayParticles.positions[j + 1] =
+      origin.y +
+      Math.random() * 1.8;
+
+    sprayParticles.positions[j + 2] =
+      origin.z +
+      (Math.random() - 0.5) * 2.2;
+
+    const v =
+      Math.min(
+        24,
+        4 +
+        threeSim.outletVelocity *
+        0.28
+      );
+
+    sprayParticles.velocities[j] =
+      (Math.random() - 0.5) *
+      v;
+
+    sprayParticles.velocities[j + 1] =
+      v *
+      (0.35 + Math.random() * 0.75);
+
+    sprayParticles.velocities[j + 2] =
+      -v *
+      (0.25 + Math.random() * 0.65);
+
+    sprayParticles.ages[i] = 0;
+    sprayParticles.life[i] =
+      0.55 +
+      Math.random() * 1.6;
+  }
+
+  function updateMainParticles(dt) {
+    if (!mainParticles.points) return;
+
+    const count =
+      THREE_PHYSICS.mainParticleCount;
+
+    const active =
+      threeSim.discharge > 5 &&
+      threeSim.timeHours >=
+        THREE_PHYSICS.breachStartHour;
+
+    for (let i = 0; i < count; i++) {
+      const j = i * 3;
+
+      if (
+        !active ||
+        mainParticles.ages[i] >
+          mainParticles.life[i]
+      ) {
+        if (
+          active &&
+          Math.random() <
+            Math.min(
+              1,
+              threeSim.discharge / 2500
+            ) * dt * 18
+        ) {
+          respawnMainParticle(i);
+        } else {
+          mainParticles.ages[i] = 999;
+        }
+
+        continue;
       }
+
+      mainParticles.ages[i] += dt;
+
+      mainParticles.velocities[j + 1] -=
+        9.81 * dt * 0.36;
+
+      // Mild air drag.
+      mainParticles.velocities[j] *= 0.998;
+      mainParticles.velocities[j + 1] *= 0.998;
+      mainParticles.velocities[j + 2] *= 0.998;
+
+      mainParticles.positions[j] +=
+        mainParticles.velocities[j] * dt;
+
+      mainParticles.positions[j + 1] +=
+        mainParticles.velocities[j + 1] * dt;
+
+      mainParticles.positions[j + 2] +=
+        mainParticles.velocities[j + 2] * dt;
+
+      // Terrain impact approximation.
+      const x =
+        mainParticles.positions[j];
+
+      const z =
+        mainParticles.positions[j + 2];
+
+      const terrainY =
+        physicalToSceneY(
+          terrainElevationAtScene(x, z)
+        );
+
+      if (
+        mainParticles.positions[j + 1] <
+        terrainY + 0.12
+      ) {
+        // Convert downward motion into a shallow downstream slide.
+        mainParticles.positions[j + 1] =
+          terrainY + 0.12;
+
+        mainParticles.velocities[j + 1] *= -0.12;
+        mainParticles.velocities[j] *= 0.72;
+        mainParticles.velocities[j + 2] *= 0.84;
+      }
+
+      // Recycle particles once they have travelled well downstream.
+      if (
+        mainParticles.positions[j + 2] >
+          52 ||
+        Math.abs(
+          mainParticles.positions[j]
+        ) > 70
+      ) {
+        mainParticles.ages[i] = 999;
+      }
+    }
+
+    mainParticles.points.geometry.attributes.position.needsUpdate = true;
+  }
+
+  function updateSprayParticles(dt) {
+    if (!sprayParticles.points) return;
+
+    const count =
+      THREE_PHYSICS.sprayParticleCount;
+
+    const active =
+      threeSim.discharge > 150;
+
+    for (let i = 0; i < count; i++) {
+      const j = i * 3;
+
+      if (
+        !active ||
+        sprayParticles.ages[i] >
+          sprayParticles.life[i]
+      ) {
+        if (
+          active &&
+          Math.random() <
+            Math.min(
+              1,
+              threeSim.discharge / 5000
+            ) *
+            dt *
+            45
+        ) {
+          respawnSprayParticle(i);
+        } else {
+          sprayParticles.ages[i] = 999;
+        }
+
+        continue;
+      }
+
+      sprayParticles.ages[i] += dt;
+
+      sprayParticles.velocities[j + 1] -=
+        9.81 * dt * 0.9;
+
+      sprayParticles.velocities[j] *= 0.985;
+      sprayParticles.velocities[j + 1] *= 0.985;
+      sprayParticles.velocities[j + 2] *= 0.985;
+
+      sprayParticles.positions[j] +=
+        sprayParticles.velocities[j] * dt;
+
+      sprayParticles.positions[j + 1] +=
+        sprayParticles.velocities[j + 1] * dt;
+
+      sprayParticles.positions[j + 2] +=
+        sprayParticles.velocities[j + 2] * dt;
+
+      if (
+        sprayParticles.positions[j + 1] <
+        physicalToSceneY(
+          terrainElevationAtScene(
+            sprayParticles.positions[j],
+            sprayParticles.positions[j + 2]
+          )
+        ) + 0.05
+      ) {
+        sprayParticles.ages[i] = 999;
+      }
+    }
+
+    sprayParticles.points.geometry.attributes.position.needsUpdate = true;
+  }
+
+  // ----------------------------------------------------------------------
+  // Downstream flood visual
+  // ----------------------------------------------------------------------
+
+  function updateDownstreamFloodVisual() {
+    if (!downstreamWaterMesh) return;
+
+    const sc =
+      PIPELINE_DATA.scenarios[currentScenarioKey] ||
+      PIPELINE_DATA.scenarios.base;
+
+    const t =
+      threeSim.timeHours;
+
+    // The dashboard already provides arrival/peak times. Use those to
+    // drive the visual flood front rather than inventing a second GIS model.
+    const arrival =
+      sc.morbi_arrival_time || 7.47;
+
+    const visible =
+      t >= Math.max(
+        0,
+        arrival - 1.5
+      );
+
+    downstreamWaterMesh.visible = visible;
+
+    if (!visible) return;
+
+    const progress =
+      Math.max(
+        0,
+        Math.min(
+          1,
+          (t - (arrival - 1.5)) /
+          Math.max(
+            0.1,
+            24 - (arrival - 1.5)
+          )
+        )
+      );
+
+    // Reveal downstream water from the dam toward the right side of the
+    // diorama. This is a visual layer; the GIS/2D solver remains the
+    // authoritative inundation result.
+    downstreamWaterMesh.scale.z =
+      Math.max(
+        0.03,
+        progress
+      );
+
+    downstreamWaterMesh.position.z =
+      -60 +
+      progress * 30;
+
+    downstreamWaterMesh.material.uniforms.uOpacity.value =
+      0.18 +
+      Math.min(
+        0.45,
+        progress * 0.45
+      );
+  }
+
+  // ----------------------------------------------------------------------
+  // Foam animation
+  // ----------------------------------------------------------------------
+
+  function updateFoamVisual(dt) {
+    if (!impactFoam) return;
+
+    const active =
+      threeSim.discharge > 20;
+
+    impactFoam.visible = active;
+
+    if (!active) return;
+
+    const qNorm =
+      Math.min(
+        1,
+        threeSim.discharge /
+        Math.max(
+          1,
+          PIPELINE_DATA.scenarios[
+            currentScenarioKey
+          ].q_peak
+        )
+      );
+
+    const pulse =
+      1 +
+      Math.sin(
+        performance.now() * 0.004
+      ) *
+      0.08;
+
+    const radius =
+      (0.8 + qNorm * 5.5) *
+      pulse;
+
+    impactFoam.scale.set(
+      radius,
+      radius,
+      radius
+    );
+
+    impactFoam.material.opacity =
+      0.18 +
+      qNorm * 0.32;
+
+    impactFoam.rotation.z +=
+      dt * 0.25;
+  }
+
+  // ----------------------------------------------------------------------
+  // Public API consumed by the existing dashboard.
+  //
+  // updateSimulationTime() calls this function with dashboard hours.
+  // The physics engine advances internally from its previous state to the
+  // requested time. Scrubbing backward resets the local 3D state and
+  // replays it deterministically.
+  // ----------------------------------------------------------------------
+
+  window.updateThreeSimulation = function(targetHours) {
+    if (!isThreeInitialized) return;
+
+    const requested =
+      Math.max(
+        0,
+        Math.min(
+          24,
+          Number(targetHours) || 0
+        )
+      );
+
+    if (
+      !threeSim.initializedPhysics ||
+      requested < threeSim.timeHours - 0.001
+    ) {
+      resetThreePhysics();
+    }
+
+    const targetSeconds =
+      requested * 3600;
+
+    // Limit the amount of work caused by a large UI jump. For normal
+    // playback this loop is cheap; for a large scrub we advance with
+    // bounded substeps.
+    let remaining =
+      Math.max(
+        0,
+        targetSeconds -
+        threeSim.timeSeconds
+      );
+
+    const maxReplaySeconds =
+      24 * 3600;
+
+    remaining =
+      Math.min(
+        remaining,
+        maxReplaySeconds
+      );
+
+    const replayDt =
+      1.0 / 60.0;
+
+    let safety = 0;
+
+    while (
+      remaining > 0 &&
+      safety < 120000
+    ) {
+      const dt =
+        Math.min(
+          replayDt,
+          remaining
+        );
+
+      threeSim.timeSeconds += dt;
+      threeSim.timeHours =
+        threeSim.timeSeconds / 3600;
+
+      calculateHydraulics(dt);
+      updateDamBreachVisual();
+
+      // During a huge scrub, only a subset of the particle system is
+      // regenerated by normal frame updates. The visual remains smooth
+      // because the particle renderer is GPU-side.
+      remaining -= dt;
+      safety++;
+    }
+
+    threeSim.timeHours = requested;
+    threeSim.timeSeconds =
+      requested * 3600;
+
+    updateHydraulicHUD();
+    updateDownstreamFloodVisual();
+  };
+
+  // ----------------------------------------------------------------------
+  // Real-time physics loop used when the 3D scene is running.
+  // ----------------------------------------------------------------------
+
+  function stepThreePhysics(dt) {
+    if (!threeSim.initializedPhysics) {
+      resetThreePhysics();
+    }
+
+    threeSim.timeSeconds += dt;
+    threeSim.timeHours =
+      threeSim.timeSeconds / 3600;
+
+    // Do not allow the visual simulation to run beyond the dashboard range.
+    if (threeSim.timeHours > 24) {
+      threeSim.timeHours = 24;
+      threeSim.timeSeconds = 24 * 3600;
+    }
+
+    calculateHydraulics(dt);
+    updateDamBreachVisual();
+
+    updateMainParticles(dt);
+    updateSprayParticles(dt);
+    updateFoamVisual(dt);
+    updateDownstreamFloodVisual();
+  }
+
+  function updateHydraulicHUD() {
+    const hudQ =
+      document.getElementById("hud-q-out");
+
+    const hudHead =
+      document.getElementById("hud-head");
+
+    const hudVel =
+      document.getElementById("hud-velocity");
+
+    const hudStage =
+      document.getElementById("hud-morbi-stage");
+
+    if (hudQ) {
+      hudQ.textContent =
+        `${Math.round(
+          threeSim.discharge
+        ).toLocaleString()} m³/s`;
+    }
+
+    if (hudHead) {
+      hudHead.textContent =
+        `${threeSim.head.toFixed(1)} m`;
+    }
+
+    if (hudVel) {
+      hudVel.textContent =
+        `${threeSim.outletVelocity.toFixed(1)} m/s`;
+    }
+
+    const sc =
+      PIPELINE_DATA.scenarios[
+        currentScenarioKey
+      ] ||
+      PIPELINE_DATA.scenarios.base;
+
+    // Keep the HUD stage consistent with the existing dashboard telemetry.
+    let morbiDepth = 0;
+
+    if (
+      threeSim.timeHours >=
+      sc.morbi_arrival_time
+    ) {
+      const dt =
+        threeSim.timeHours -
+        sc.morbi_arrival_time;
+
+      const rise =
+        sc.morbi_peak_time -
+        sc.morbi_arrival_time;
+
+      if (dt <= rise) {
+        morbiDepth =
+          sc.morbi_peak_depth *
+          Math.pow(
+            Math.max(
+              0,
+              Math.min(1, dt / rise)
+            ),
+            1.4
+          );
+      } else {
+        morbiDepth =
+          Math.max(
+            1,
+            sc.morbi_peak_depth *
+            Math.exp(
+              -(dt - rise) / 10
+            )
+          );
+      }
+    }
+
+    if (hudStage) {
+      hudStage.textContent =
+        `${morbiDepth.toFixed(2)} m`;
     }
   };
 
-  // Camera Director
+  // ----------------------------------------------------------------------
+  // Camera director
+  // ----------------------------------------------------------------------
+
   function setupCameraDirector() {
-    const camBtns = document.querySelectorAll(".cam-btn");
+    const camBtns =
+      document.querySelectorAll(".cam-btn");
+
     camBtns.forEach(btn => {
       btn.addEventListener("click", () => {
-        camBtns.forEach(b => b.classList.remove("active"));
+        camBtns.forEach(b =>
+          b.classList.remove("active")
+        );
+
         btn.classList.add("active");
-        const mode = btn.getAttribute("data-cam");
+
+        const mode =
+          btn.getAttribute("data-cam");
 
         if (mode === "overview") {
-          tweenCamera(0, 55, 85, 0, 4, 8);
+          tweenCamera(
+            0, 45, 75,
+            0, 5, -5
+          );
         } else if (mode === "dam") {
-          tweenCamera(0, 16, -2, 0, 6, -18);
+          tweenCamera(
+            4, 17, -7,
+            13, 7, -22
+          );
         } else if (mode === "morbi") {
-          tweenCamera(-14, 28, 38, 0, 3, 22);
+          tweenCamera(
+            -18, 28, 38,
+            0, 5, 22
+          );
         } else if (mode === "chase") {
-          tweenCamera(8, 18, 12, 0, 4, 24);
+          tweenCamera(
+            15, 18, 12,
+            12, 5, 18
+          );
         } else if (mode === "ridge") {
-          tweenCamera(48, 32, 10, 0, 5, 8);
+          tweenCamera(
+            48, 32, 10,
+            0, 6, 8
+          );
         }
       });
     });
   }
 
-  function tweenCamera(px, py, pz, tx, ty, tz) {
-    if (!threeCamera || !threeControls) return;
-    threeCamera.position.set(px, py, pz);
-    threeControls.target.set(tx, ty, tz);
+  function tweenCamera(
+    px,
+    py,
+    pz,
+    tx,
+    ty,
+    tz
+  ) {
+    if (!threeCamera) return;
+
+    threeCamera.position.set(
+      px,
+      py,
+      pz
+    );
+
+    if (threeControls) {
+      threeControls.target.set(
+        tx,
+        ty,
+        tz
+      );
+
+      threeControls.update();
+    } else {
+      threeCamera.lookAt(
+        tx,
+        ty,
+        tz
+      );
+    }
   }
+
+  // ----------------------------------------------------------------------
+  // Resize
+  // ----------------------------------------------------------------------
 
   function onThreeWindowResize() {
-    const container = document.getElementById("webgl-canvas");
-    if (!container || !threeRenderer || !threeCamera) return;
-    threeCamera.aspect = container.clientWidth / container.clientHeight;
+    const container =
+      document.getElementById("webgl-canvas");
+
+    if (
+      !container ||
+      !threeRenderer ||
+      !threeCamera
+    ) {
+      return;
+    }
+
+    const width =
+      Math.max(1, container.clientWidth);
+
+    const height =
+      Math.max(1, container.clientHeight);
+
+    threeCamera.aspect =
+      width / height;
+
     threeCamera.updateProjectionMatrix();
-    threeRenderer.setSize(container.clientWidth, container.clientHeight);
+
+    threeRenderer.setSize(
+      width,
+      height
+    );
   }
 
-  function animateThreeJs() {
+  // ----------------------------------------------------------------------
+  // Render loop
+  // ----------------------------------------------------------------------
+
+  function animateThreeJs(now) {
     requestAnimationFrame(animateThreeJs);
 
-    if (threeControls) threeControls.update();
+    if (!threeRenderer || !threeScene || !threeCamera) {
+      return;
+    }
 
-    // Subtle water surface wave ripple
-    if (waterMesh && waterMesh.geometry) {
-      const pos = waterMesh.geometry.attributes.position;
-      const time = performance.now() * 0.0025;
-      for (let i = 0; i < pos.count; i++) {
-        const u = pos.getX(i);
-        const v = pos.getY(i);
-        const zWave = Math.sin(u * 0.4 + time) * 0.12 + Math.cos(v * 0.4 + time) * 0.12;
-        pos.setZ(i, zWave);
+    const wallDt =
+      Math.min(
+        0.05,
+        Math.max(
+          0,
+          (now - threeLastWallTime) / 1000
+        )
+      );
+
+    threeLastWallTime = now;
+
+    // The dashboard's time slider is authoritative. Only advance the
+    // physical simulation automatically when playback is active.
+    if (isPlaying) {
+      threePhysicsAccumulator += wallDt;
+
+      // Speed is expressed in simulated hours per real second.
+      const simulatedSecondsPerRealSecond =
+        Math.max(
+          0.1,
+          speedMultiplier * 3600
+        );
+
+      let remainingReal =
+        threePhysicsAccumulator;
+
+      threePhysicsAccumulator = 0;
+
+      // Break large simulation jumps into bounded physics chunks.
+      let guard = 0;
+
+      while (
+        remainingReal > 0 &&
+        guard < 40
+      ) {
+        const realStep =
+          Math.min(
+            0.02,
+            remainingReal
+          );
+
+        const physicsSeconds =
+          Math.min(
+            2.0,
+            realStep *
+            simulatedSecondsPerRealSecond
+          );
+
+        stepThreePhysics(
+          physicsSeconds
+        );
+
+        remainingReal -= realStep;
+        guard++;
       }
-      waterMesh.geometry.computeVertexNormals();
-      waterMesh.geometry.attributes.position.needsUpdate = true;
-    }
 
-    // Velocity Particle Stream
-    if (flowParticles && flowParticles.geometry) {
-      const pPos = flowParticles.geometry.attributes.position;
-      for (let i = 0; i < pPos.count; i++) {
-        let z = pPos.getZ(i) + 0.35 * (speedMultiplier / 2);
-        if (z > 50) z = -18;
-        pPos.setZ(i, z);
+      // Synchronize the dashboard controls with the actual 3D simulation.
+      if (
+        Math.abs(
+          currentTimeHours -
+          threeSim.timeHours
+        ) > 0.02
+      ) {
+        currentTimeHours =
+          Math.min(
+            24,
+            threeSim.timeHours
+          );
+
+        if (timeSlider) {
+          timeSlider.value =
+            currentTimeHours;
+        }
+
+        updatePhaseDescription(
+          currentTimeHours
+        );
+
+        updateGaugesAtTime(
+          currentTimeHours
+        );
       }
-      flowParticles.geometry.attributes.position.needsUpdate = true;
+
+      if (threeSim.timeHours >= 24) {
+        isPlaying = false;
+
+        if (btnPlay) {
+          btnPlay.innerHTML =
+            '<i class="fa-solid fa-play"></i>';
+
+          btnPlay.classList.remove(
+            "active"
+          );
+        }
+      }
     }
 
-    if (threeRenderer && threeScene && threeCamera) {
-      threeRenderer.render(threeScene, threeCamera);
+    // Shader time.
+    const shaderTime =
+      now * 0.001;
+
+    if (
+      waterMesh &&
+      waterMesh.material &&
+      waterMesh.material.uniforms &&
+      waterMesh.material.uniforms.uTime
+    ) {
+      waterMesh.material.uniforms.uTime.value =
+        shaderTime;
     }
+
+    if (
+      downstreamWaterMesh &&
+      downstreamWaterMesh.material &&
+      downstreamWaterMesh.material.uniforms &&
+      downstreamWaterMesh.material.uniforms.uTime
+    ) {
+      downstreamWaterMesh.material.uniforms.uTime.value =
+        shaderTime;
+    }
+
+    if (threeControls) {
+      threeControls.update();
+    }
+
+    threeRenderer.render(
+      threeScene,
+      threeCamera
+    );
   }
 
   // ------------------------------------------------------------------------

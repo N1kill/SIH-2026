@@ -35,6 +35,15 @@ import matplotlib.pyplot as plt
 import numpy as np
 import rasterio
 from rasterio.crs import CRS
+import importlib.util
+sys.path.append(str(PROJECT_ROOT / "scripts"))
+import importlib
+mod10 = importlib.import_module("10_hydrodynamic_simulation")
+generate_unsteady_breach_hydrograph = mod10.generate_unsteady_breach_hydrograph
+run_2d_hydrodynamic_simulation = mod10.run_2d_hydrodynamic_simulation
+DEM_FILE = PROJECT_ROOT / "data" / "processed" / "dem_conditioned.tif"
+if not DEM_FILE.is_file():
+    DEM_FILE = PROJECT_ROOT / "data" / "processed" / "dem_utm42.tif"
 
 logging.basicConfig(level=logging.INFO, format="[%(asctime)s] %(levelname)s: %(message)s")
 
@@ -143,25 +152,47 @@ def compute_contingency_metrics(sim_depth_file, sat_extent_file):
 # 2. SENSITIVITY ANALYSIS
 # ---------------------------------------------------------------------------
 def compute_sensitivity_scenarios():
-    """Run parametric sensitivity variations on breach width and formation time."""
+    """Run genuine physics-based simulation for each scenario."""
     base_morbi_peak = 3.85
     base_inund_area = 71.49
-    if SUMMARY_JSON.is_file():
-        try:
-            with open(SUMMARY_JSON, "r") as f:
-                s_data = json.load(f)
-            base_inund_area = float(s_data.get("total_inundation_area_km2", 71.49))
-            base_morbi_peak = float(s_data.get("monitoring_gauges", {}).get("morbi", {}).get("peak_depth_m", 3.85))
-        except Exception:
-            pass
+    
+    with open(PROJECT_ROOT / "config.json", "r") as f:
+        config = json.load(f)["machhu-ii"]
 
+    # Base parameters
     scenarios = [
-        {"id": "base", "name": "Base Case (Froehlich 2008)", "B_avg": 156.0, "t_f": 2.50, "Q_p": 6647.0, "peak_depth_morbi": round(base_morbi_peak, 2), "inund_area_km2": round(base_inund_area, 1)},
-        {"id": "width_plus25", "name": "+25% Breach Width", "B_avg": 195.0, "t_f": 2.00, "Q_p": 8309.0, "peak_depth_morbi": round(base_morbi_peak * 1.20, 2), "inund_area_km2": round(base_inund_area * 1.18, 1)},
-        {"id": "width_minus25", "name": "-25% Breach Width", "B_avg": 117.0, "t_f": 3.12, "Q_p": 4985.0, "peak_depth_morbi": round(base_morbi_peak * 0.78, 2), "inund_area_km2": round(base_inund_area * 0.82, 1)},
-        {"id": "extreme_plus50", "name": "+50% Extreme Overtopping", "B_avg": 234.0, "t_f": 1.50, "Q_p": 10500.0, "peak_depth_morbi": round(base_morbi_peak * 1.45, 2), "inund_area_km2": round(base_inund_area * 1.40, 1)},
-        {"id": "conservative_minus50", "name": "-50% Conservative Breach", "B_avg": 78.0, "t_f": 4.00, "Q_p": 3324.0, "peak_depth_morbi": round(base_morbi_peak * 0.58, 2), "inund_area_km2": round(base_inund_area * 0.60, 1)},
+        {"id": "base", "name": "Base Case", "B_avg": 156.0, "t_f": 2.50, "Q_p": 6647.0},
+        {"id": "width_plus25", "name": "+25% Width", "B_avg": 195.0, "t_f": 2.00, "Q_p": 8309.0},
+        {"id": "width_minus25", "name": "-25% Width", "B_avg": 117.0, "t_f": 3.12, "Q_p": 4985.0},
+        {"id": "extreme_plus50", "name": "+50% Extreme", "B_avg": 234.0, "t_f": 1.50, "Q_p": 10500.0},
+        {"id": "conservative_minus50", "name": "-50% Conservative", "B_avg": 78.0, "t_f": 4.00, "Q_p": 3324.0},
     ]
+
+    for sc in scenarios:
+        breach_params = {
+            "B_avg_m": sc["B_avg"],
+            "Z_HV": 1.4,
+            "t_f_hours": sc["t_f"],
+            "Q_peak_m3s": sc["Q_p"],
+            "V_reservoir_m3": config["reservoir_volume_m3"],
+            "H_dam_m": config["dam_height_m"],
+        }
+        
+        logging.info(f"Running physics scenario: {sc['name']}")
+        hydro_tuple = generate_unsteady_breach_hydrograph(breach_params, duration_hours=24.0, dt_seconds=120.0)
+        
+        # Simulate (shortened loop in test environment if we want, but we do the full run here as per requirement)
+        # We can pass a shorter time if we wanted to save time, but physics requires it.
+        # Run the full 2D solver
+        res = run_2d_hydrodynamic_simulation(DEM_FILE, hydro_tuple, breach_params, config)
+        
+        # Calculate real area and depth
+        morbi_st = res["stations"].get("morbi", list(res["stations"].values())[-1])
+        sc["peak_depth_morbi"] = round(float(np.max(morbi_st["depth"])), 2)
+        cell_area = res["cell_size"] ** 2
+        sc["inund_area_km2"] = round(float(np.sum(res["max_depth"] >= 0.1) * (cell_area / 1e6)), 1)
+        logging.info(f"Scenario {sc['name']} completed: Peak={sc['peak_depth_morbi']}m, Area={sc['inund_area_km2']}km2")
+        
     return scenarios
 
 
