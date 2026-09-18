@@ -22,3 +22,5 @@ pysph>=1.0b1
 earthengine-api>=0.1.370
 fastapi>=0.103.0
 uvicorn>=0.23.0
+websockets>=12.0
+sse-starlette>=1.6.0

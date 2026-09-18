@@ -865,19 +865,36 @@ document.addEventListener("DOMContentLoaded", () => {
   let terrainMesh = null;
   let waterMesh = null;
   let downstreamWaterMesh = null;
+  let dflowFmWaterMesh = null;
+  let dflowFmWaterLoaded = false;
+  let dflowFmResult = null;
+  let dflowFmFrameIndex = -1;
+  let dflowFmReplaySeconds = 0;
+  let dflowFmFlowPoints = null;
+  let dflowFmFlowState = [];
+  const dflowFmStream = { ws: null, connected: false, frameDriven: false, pendingTime: null };
   let damGroup = null;
   let breachCavity = null;
   let breachLeftBlock = null;
   let breachRightBlock = null;
   let breachCrest = null;
+  let spillwayGateLeaves = [];
+  let spillwayFlowMeshes = [];
   let impactFoam = null;
   let reservoirMarker = null;
 
   let isThreeInitialized = false;
   let threeAnimationStarted = false;
+  let threeKeyboardBound = false;
   let terrainVertElevations = [];
   let terrainVertDepths = [];
   let globalElevMin = 0.0;
+  const threeMovementKeys = new Set();
+  // The dam model's breach/gate centre.  Projected DEM and D-Flow FM
+  // coordinates are transformed around this same point.
+  // The FM source, DEM origin, and rendered dam centreline share this exact
+  // anchor. The SPH jet begins just downstream of it.
+  const FM_SCENE_ANCHOR = { x: 15, z: -22 };
 
   const THREE_PHYSICS = {
     gravity: 9.81,
@@ -901,7 +918,9 @@ document.addEventListener("DOMContentLoaded", () => {
     // Visual scene scale: 120 scene units represent 12 km.
     terrainSize: 120.0,
     terrainPhysicalWidth: 12000.0,
-    verticalExaggeration: 3.0,
+    // A terrain-scale scene needs vertical emphasis for the dam's profile
+    // and the reservoir level to remain legible at overview distance.
+    verticalExaggeration: 8.0,
 
     // GPU particle budget suitable for a laptop 4060.
     mainParticleCount: 24000,
@@ -924,6 +943,8 @@ document.addEventListener("DOMContentLoaded", () => {
     discharge: 0,
     breachWidth: THREE_PHYSICS.initialBreachWidth,
     breachHeight: THREE_PHYSICS.initialBreachHeight,
+    breachBottomElevation: THREE_PHYSICS.breachElevation,
+    spillwayDischarge: 0,
     breachArea: 0,
     head: 0,
     outletVelocity: 0,
@@ -938,6 +959,195 @@ document.addEventListener("DOMContentLoaded", () => {
   let threeTerrainData = null;
   let threeLastWallTime = 0;
   let threePhysicsAccumulator = 0;
+
+  // ── Backend Physics Stream (WebSocket) ──────────────────────────────
+  //
+  //  LIVE:      100% particle positions ← backend
+  //  FALLBACK:  100% procedural particles (existing calculateHydraulics)
+  //
+  //  The backend is AUTHORITATIVE. The frontend NEVER recalculates
+  //  physics from backend values. It only renders.
+
+  const physicsStream = {
+    ws: null,
+    connected: false,
+    latestFrame: null,
+    latestParticles: [],   // fluid-only, deterministic-sampled by backend
+    frameBuffer: [],       // ring buffer for interpolation
+    maxBuffer: 8,
+    config: null,
+    status: "disconnected"  // disconnected | connecting | live | error
+  };
+
+  function connectPhysicsStream() {
+    if (window.location.protocol === "file:") {
+      physicsStream.status = "disconnected";
+      updatePhysicsBadge();
+      return;
+    }
+
+    const wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const wsUrl = `${wsProtocol}//${window.location.host}/ws/physics`;
+
+    physicsStream.status = "connecting";
+    updatePhysicsBadge();
+
+    try {
+      physicsStream.ws = new WebSocket(wsUrl);
+    } catch (e) {
+      physicsStream.status = "disconnected";
+      updatePhysicsBadge();
+      return;
+    }
+
+    physicsStream.ws.onopen = function () {
+      console.log("[PhysicsStream] WebSocket connected");
+      // Send default config (no custom config for now)
+    };
+
+    physicsStream.ws.onmessage = function (evt) {
+      try {
+        const msg = JSON.parse(evt.data);
+
+        if (msg.type === "simulation_start") {
+          physicsStream.config = msg.config;
+          physicsStream.connected = true;
+          physicsStream.status = "live";
+          updatePhysicsBadge();
+          return;
+        }
+
+        if (msg.type === "simulation_complete") {
+          physicsStream.status = "live";
+          console.log("[PhysicsStream] Simulation complete:",
+                      msg.simulation);
+          return;
+        }
+
+        if (msg.type === "physics_frame") {
+          physicsStream.latestFrame = msg;
+          physicsStream.connected = true;
+          physicsStream.status = "live";
+
+          // Buffer frames for smooth interpolation
+          physicsStream.frameBuffer.push(msg);
+          if (physicsStream.frameBuffer.length > physicsStream.maxBuffer) {
+            physicsStream.frameBuffer.shift();
+          }
+
+          // Extract SPH particles if present
+          if (msg.sph && Array.isArray(msg.sph.particles)) {
+            physicsStream.latestParticles = msg.sph.particles;
+          }
+
+          // Apply backend-authoritative state to threeSim
+          applyBackendFrame(msg);
+          updatePhysicsBadge();
+        }
+      } catch (e) {
+        console.warn("[PhysicsStream] Parse error:", e);
+      }
+    };
+
+    physicsStream.ws.onclose = function () {
+      physicsStream.connected = false;
+      physicsStream.status = "disconnected";
+      updatePhysicsBadge();
+      console.log("[PhysicsStream] WebSocket closed");
+    };
+
+    physicsStream.ws.onerror = function (err) {
+      physicsStream.connected = false;
+      physicsStream.status = "error";
+      updatePhysicsBadge();
+      console.warn("[PhysicsStream] WebSocket error:", err);
+    };
+  }
+
+  function connectDflowFmStream() {
+    if (window.location.protocol === "file:") return;
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    try {
+      dflowFmStream.ws = new WebSocket(`${protocol}//${window.location.host}/ws/dflowfm`);
+      dflowFmStream.ws.onmessage = function (event) {
+        const message = JSON.parse(event.data);
+        if (message.type === "dflow_start") {
+          dflowFmStream.connected = true;
+          dflowFmStream.frameDriven = true;
+        } else if (message.type === "dflow_frame" && message.frame) {
+          dflowFmStream.pendingTime = message.frame.time_s;
+          if (dflowFmResult) updateDflowFmWaterFrame(message.frame.time_s);
+        } else if (message.type === "dflow_complete") {
+          dflowFmStream.connected = false;
+        }
+      };
+      dflowFmStream.ws.onclose = function () { dflowFmStream.connected = false; };
+      dflowFmStream.ws.onerror = function () { dflowFmStream.connected = false; };
+    } catch (error) {
+      console.warn("[D-Flow FM] stream unavailable:", error);
+    }
+  }
+
+  function applyBackendFrame(frame) {
+    // Backend is authoritative. No recalculation.
+    if (frame.breach) {
+      threeSim.discharge = frame.breach.outflow_m3s || 0;
+      threeSim.breachWidth = frame.breach.bottom_width_m || THREE_PHYSICS.initialBreachWidth;
+
+      if (frame.breach.bottom_elevation_m !== undefined) {
+        threeSim.breachBottomElevation = frame.breach.bottom_elevation_m;
+        // Calculate breach height dynamically from bottom elevation
+        threeSim.breachHeight = Math.max(
+          THREE_PHYSICS.initialBreachHeight,
+          THREE_PHYSICS.reservoirInitialLevel - frame.breach.bottom_elevation_m
+        );
+      }
+    }
+    if (frame.reservoir) {
+      threeSim.waterLevel = frame.reservoir.elevation_m || THREE_PHYSICS.reservoirInitialLevel;
+      threeSim.spillwayDischarge = frame.reservoir.spillway_outflow_m3s || 0;
+    }
+    if (frame.sph) {
+      threeSim.outletVelocity = frame.sph.mean_velocity_ms || 0;
+    }
+    if (frame.simulation) {
+      threeSim.timeSeconds = frame.simulation.time_s || 0;
+      threeSim.timeHours = frame.simulation.time_hours || 0;
+    }
+    if (frame.breach) {
+      const status = frame.breach.status;
+      if (status === "not_initiated") threeSim.phase = "STABLE";
+      else if (status === "eroding") threeSim.phase = "BREACH_GROWTH";
+      else if (status === "collapsed_slice") threeSim.phase = "FULL_FAILURE";
+      else threeSim.phase = status || "STABLE";
+    }
+    threeSim.head = Math.max(0, threeSim.waterLevel -
+      THREE_PHYSICS.breachElevation);
+  }
+
+  function isLiveMode() {
+    return physicsStream.connected && physicsStream.latestFrame !== null;
+  }
+
+  function updatePhysicsBadge() {
+    const badge = document.getElementById("physics-mode-badge");
+    if (!badge) return;
+
+    if (physicsStream.status === "live") {
+      badge.className = "hud-badge hud-badge-live";
+      badge.innerHTML = '<span class="badge-pulse-dot"></span> LIVE PHYSICS';
+    } else if (physicsStream.status === "connecting") {
+      badge.className = "hud-badge hud-badge-connecting";
+      badge.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> CONNECTING';
+    } else {
+      badge.className = "hud-badge hud-badge-offline";
+      badge.innerHTML = '<i class="fa-solid fa-plug-circle-xmark"></i> OFFLINE DEMO';
+    }
+  }
+
+  // Connect on page load (non-blocking)
+  setTimeout(connectPhysicsStream, 500);
+  setTimeout(connectDflowFmStream, 550);
 
   // ----------------------------------------------------------------------
   // Coordinate conversion helpers
@@ -997,11 +1207,11 @@ document.addEventListener("DOMContentLoaded", () => {
     const cols = grid[0].length;
 
     const gx =
-      ((x + THREE_PHYSICS.terrainSize / 2) / THREE_PHYSICS.terrainSize) *
+      ((x - FM_SCENE_ANCHOR.x + THREE_PHYSICS.terrainSize / 2) / THREE_PHYSICS.terrainSize) *
       (cols - 1);
 
     const gy =
-      ((z + THREE_PHYSICS.terrainSize / 2) / THREE_PHYSICS.terrainSize) *
+      ((z - FM_SCENE_ANCHOR.z + THREE_PHYSICS.terrainSize / 2) / THREE_PHYSICS.terrainSize) *
       (rows - 1);
 
     return bilinearInterpolate(grid, gx, gy);
@@ -1019,7 +1229,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     try {
       // Load the selected scenario terrain when available, then fall back to
-      // the existing base terrain file.
+      // the explicitly named base terrain file.
       let terrainData = null;
 
       try {
@@ -1038,10 +1248,10 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       if (!terrainData) {
-        const baseResponse = await fetch("terrain_3d_data.json");
+        const baseResponse = await fetch("terrain_3d_data_base.json");
         if (!baseResponse.ok) {
           throw new Error(
-            `terrain_3d_data.json returned HTTP ${baseResponse.status}`
+            `terrain_3d_data_base.json returned HTTP ${baseResponse.status}`
           );
         }
         terrainData = await baseResponse.json();
@@ -1150,6 +1360,7 @@ document.addEventListener("DOMContentLoaded", () => {
       buildSprayParticles();
       buildFoamSystem();
       buildSceneMarkers();
+      loadDflowFmWaterMesh();
 
       resetThreePhysics();
 
@@ -1157,6 +1368,7 @@ document.addEventListener("DOMContentLoaded", () => {
       window.addEventListener("resize", onThreeWindowResize);
 
       isThreeInitialized = true;
+      setupThreeKeyboardControls();
 
       if (!threeAnimationStarted) {
         threeAnimationStarted = true;
@@ -1172,7 +1384,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (fallback) {
         fallback.innerHTML =
           `<div style="padding:24px;color:#fca5a5;font-family:monospace;">
-             3D initialization failed. Check terrain_3d_data.json and Three.js dependencies.
+             3D initialization failed. Check terrain_3d_data_base.json and Three.js dependencies.
            </div>`;
       }
     }
@@ -1181,6 +1393,44 @@ document.addEventListener("DOMContentLoaded", () => {
   // ----------------------------------------------------------------------
   // Terrain
   // ----------------------------------------------------------------------
+
+  function smoothStep(edge0, edge1, value) {
+    const t = Math.max(
+      0,
+      Math.min(1, (value - edge0) / (edge1 - edge0))
+    );
+    return t * t * (3 - 2 * t);
+  }
+
+  function engineeredDamSiteElevation(x, z) {
+    const damZ = -22;
+    const damBase = THREE_PHYSICS.breachElevation - 5;
+    let elevation;
+
+    if (z < damZ) {
+      // Upstream: a quiet reservoir basin that rises smoothly into its
+      // valley shoulders instead of exposing high-frequency DEM noise.
+      const upstreamDistance = damZ - z;
+      elevation =
+        damBase - 3.7 +
+        0.012 * x * x +
+        0.018 * upstreamDistance;
+    } else {
+      // Downstream: a graded valley with a defined channel issuing from the
+      // breach. The channel bends gently toward the right bank.
+      const downstreamDistance = z - damZ;
+      const channelX = 15 + downstreamDistance * 0.045;
+      const channelOffset = x - channelX;
+      elevation =
+        damBase - 0.075 * downstreamDistance +
+        0.009 * channelOffset * channelOffset;
+    }
+
+    // The apron and abutment platform are deliberately level so the dam is
+    // seated in a constructed site rather than on a lumpy raster surface.
+    const damZone = 1 - smoothStep(3, 11, Math.abs(z - damZ));
+    return elevation * (1 - damZone) + damBase * damZone;
+  }
 
   function buildAnalyticalTerrain(terrainData) {
     const RES = 220;
@@ -1201,13 +1451,34 @@ document.addEventListener("DOMContentLoaded", () => {
     terrainVertElevations = new Float32Array(pos.count);
     terrainVertDepths = new Float32Array(pos.count);
 
-    globalElevMin =
-      Number.isFinite(terrainData.elev_min_m)
-        ? terrainData.elev_min_m
-        : 0;
-
-    const grid = terrainData.elevation_grid;
+    const sourceGrid = terrainData.elevation_grid;
     const depthGrid = terrainData.depth_grid || null;
+
+    // Terrain is the same conditioned DEM used to generate the FM mesh.
+    // A renderer-only "engineered" surface would put water and ground in
+    // different coordinate/elevation systems.
+    const rows = sourceGrid.length;
+    const cols = sourceGrid[0].length;
+    const damRow = Math.round((rows - 1) * 0.5);
+    const damCol = Math.round((cols - 1) * 0.5);
+    const damFoundationElevation = sourceGrid[damRow][damCol];
+    const grid = sourceGrid.map((row, rowIndex) => row.map((elevation, colIndex) => {
+      const x = FM_SCENE_ANCHOR.x - SIZE / 2 + (colIndex / (cols - 1)) * SIZE;
+      const z = FM_SCENE_ANCHOR.z - SIZE / 2 + (rowIndex / (rows - 1)) * SIZE;
+      // The constructed footprint cuts into, rather than being occluded by,
+      // the sampled terrain.  This is the display counterpart of the dam
+      // foundation and eliminates terrain triangles through the dam body.
+      const withinDamFootprint = x >= -55 && x <= 75 && Math.abs(z - FM_SCENE_ANCHOR.z) <= 11;
+      return withinDamFootprint ? Math.min(elevation, damFoundationElevation) : elevation;
+    }));
+
+    threeTerrainData.elevation_grid = grid;
+    globalElevMin = Math.min(
+      ...grid.map(row => Math.min(...row))
+    );
+    const damGroundElevation = terrainElevationAtScene(15, -22);
+    THREE_PHYSICS.breachElevation = damGroundElevation;
+    THREE_PHYSICS.reservoirInitialLevel = damGroundElevation + 2.5;
 
     const low = new THREE.Color(0x242b2e);
     const mid = new THREE.Color(0x4b514f);
@@ -1236,8 +1507,8 @@ document.addEventListener("DOMContentLoaded", () => {
         Math.max(
           0,
           Math.min(
-            1,
-            (elevation - globalElevMin) / 150
+          1,
+          (elevation - globalElevMin) / 32
           )
         );
 
@@ -1265,6 +1536,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     terrainMesh = new THREE.Mesh(terrainGeo, terrainMat);
+    terrainMesh.position.set(FM_SCENE_ANCHOR.x, 0, FM_SCENE_ANCHOR.z);
     terrainMesh.receiveShadow = true;
     terrainMesh.castShadow = true;
     threeScene.add(terrainMesh);
@@ -1310,6 +1582,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function buildPhysicalDam() {
     damGroup = new THREE.Group();
+    spillwayGateLeaves = [];
+    spillwayFlowMeshes = [];
 
     const concreteMat = new THREE.MeshStandardMaterial({
       color: 0x9b9fa0,
@@ -1318,13 +1592,13 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     const concreteDarkMat = new THREE.MeshStandardMaterial({
-      color: 0x656a6c,
+      color: 0x596166,
       roughness: 0.88,
       metalness: 0.01
     });
 
     const earthMat = new THREE.MeshStandardMaterial({
-      color: 0x57504a,
+      color: 0x746a5d,
       roughness: 0.97,
       metalness: 0
     });
@@ -1339,198 +1613,244 @@ document.addEventListener("DOMContentLoaded", () => {
     ) - physicalToSceneY(globalElevMin);
 
     const damBaseY = physicalToSceneY(
-      THREE_PHYSICS.breachElevation - 5
+      terrainElevationAtScene(15, -22)
     );
 
     const crestY = damBaseY + H;
 
-    // Main spillway body.
-    const spillWidth = 18;
-    const spillDepth = 5.5;
+    const damZ = -22;
+    const breachCenterX = 15;
 
-    const spillShape = new THREE.Shape();
-    spillShape.moveTo(0, 0);
-    spillShape.lineTo(H * 0.75, 0);
-    spillShape.lineTo(H * 0.12, H);
-    spillShape.lineTo(0, H);
-    spillShape.closePath();
+    // Each section is a real embankment cross-section extruded along the
+    // dam axis. This replaces the disconnected rectangular slabs.
+    function addDamSection(xStart, length, material, isSpillway = false) {
+      const profile = new THREE.Shape();
+      const downstreamToe = isSpillway ? -3.6 : -4.8;
+      const upstreamToe = isSpillway ? 3.8 : 4.8;
+      const downstreamCrest = isSpillway ? -0.9 : -1.3;
+      const upstreamCrest = isSpillway ? 1.15 : 1.3;
+      profile.moveTo(downstreamToe, 0);
+      profile.lineTo(upstreamToe, 0);
+      profile.lineTo(upstreamCrest, H);
+      profile.lineTo(downstreamCrest, H);
+      profile.closePath();
 
-    const spillGeo = new THREE.ExtrudeGeometry(
-      spillShape,
-      {
-        depth: spillDepth,
-        bevelEnabled: true,
-        bevelSegments: 2,
-        bevelSize: 0.08,
-        bevelThickness: 0.08
-      }
-    );
+      const geometry = new THREE.ExtrudeGeometry(profile, {
+        depth: length,
+        bevelEnabled: false
+      });
+      geometry.rotateY(Math.PI / 2);
 
-    const spill = new THREE.Mesh(
-      spillGeo,
-      concreteMat
-    );
-
-    spill.rotation.y = Math.PI / 2;
-    spill.position.set(
-      -spillWidth / 2,
-      damBaseY,
-      -25
-    );
-
-    spill.castShadow = true;
-    spill.receiveShadow = true;
-    damGroup.add(spill);
-
-    // Spillway piers and crest beam.
-    for (let x = -7.5; x <= 7.5; x += 2.5) {
-      const pier = new THREE.Mesh(
-        new THREE.BoxGeometry(
-          0.55,
-          H * 0.92,
-          2.1
-        ),
-        concreteDarkMat
-      );
-
-      pier.position.set(
-        x,
-        damBaseY + H * 0.46,
-        -21.9
-      );
-
-      pier.castShadow = true;
-      damGroup.add(pier);
+      const section = new THREE.Mesh(geometry, material);
+      section.position.set(xStart, damBaseY, damZ);
+      section.castShadow = true;
+      section.receiveShadow = true;
+      damGroup.add(section);
+      return section;
     }
 
-    const crestBeam = new THREE.Mesh(
-      new THREE.BoxGeometry(17.5, 0.85, 3.2),
+    // Continuous earth embankments. The centre is a real open spillway,
+    // assembled from piers, sill, and crest beam rather than a solid block.
+    addDamSection(-30, 20, earthMat);
+    addDamSection(8, 2, earthMat);
+    breachLeftBlock = addDamSection(10, 5, earthMat);
+    breachRightBlock = addDamSection(15, 5, earthMat);
+    addDamSection(20, 10, earthMat);
+
+    // Five actual through-bays extend from the reservoir face to the
+    // downstream apron. Three gate leaves are raised clear of their openings.
+    const gateMat = new THREE.MeshStandardMaterial({
+      color: 0x34424a,
+      roughness: 0.62,
+      metalness: 0.55
+    });
+    const openingMat = new THREE.MeshStandardMaterial({
+      color: 0x10191d,
+      roughness: 0.95,
+      metalness: 0
+    });
+    const openGateIndices = new Set([1, 2, 3]);
+    const gateWidth = 2.42;
+    const gateHeight = H * 0.48;
+    const openingCenterY = damBaseY + H * 0.34;
+    const openingTopY = openingCenterY + gateHeight * 0.5;
+
+    const spillwaySill = new THREE.Mesh(
+      new THREE.BoxGeometry(18.0, 0.22, 9.0),
       concreteMat
     );
+    spillwaySill.position.set(-1, damBaseY + 0.11, damZ);
+    spillwaySill.receiveShadow = true;
+    damGroup.add(spillwaySill);
 
-    crestBeam.position.set(
-      0,
-      crestY - 0.35,
-      -22
+    const spillwayCrestBeam = new THREE.Mesh(
+      new THREE.BoxGeometry(18.0, 0.35, 9.0),
+      concreteMat
     );
+    spillwayCrestBeam.position.set(-1, damBaseY + H * 0.77, damZ);
+    spillwayCrestBeam.castShadow = true;
+    damGroup.add(spillwayCrestBeam);
 
-    crestBeam.castShadow = true;
-    damGroup.add(crestBeam);
+    for (let index = 0; index < 5; index++) {
+      const x = -8 + index * 3.2;
+      // Two inner side walls define a genuine unobstructed passage through
+      // the dam; there is deliberately no back-face panel in this bay.
+      for (const side of [-1, 1]) {
+        const innerWall = new THREE.Mesh(
+          new THREE.BoxGeometry(0.10, gateHeight, 8.6),
+          openingMat
+        );
+        innerWall.position.set(
+          x + side * (gateWidth * 0.5 - 0.05),
+          openingCenterY,
+          damZ
+        );
+        damGroup.add(innerWall);
+      }
 
-    // Left embankment.
-    const leftFlank = new THREE.Mesh(
-      new THREE.BoxGeometry(20, H * 0.82, 5.8),
-      earthMat
+      const channelFloor = new THREE.Mesh(
+        new THREE.BoxGeometry(gateWidth, 0.08, 8.6),
+        concreteDarkMat
+      );
+      channelFloor.position.set(x, damBaseY + 0.27, damZ);
+      damGroup.add(channelFloor);
+
+      const gate = new THREE.Mesh(
+        new THREE.BoxGeometry(gateWidth * 0.88, gateHeight, 0.22),
+        gateMat
+      );
+      const isOpen = openGateIndices.has(index);
+      gate.position.set(
+        x,
+        isOpen ? openingTopY + gateHeight * 0.5 + 0.08 : openingCenterY,
+        damZ - 4.36
+      );
+      gate.castShadow = true;
+      gate.userData.openFraction = isOpen ? 1 : 0;
+      spillwayGateLeaves.push(gate);
+      damGroup.add(gate);
+
+      const pier = new THREE.Mesh(
+        new THREE.BoxGeometry(0.30, H * 0.82, 9.0),
+        concreteMat
+      );
+      pier.position.set(x - 1.36, damBaseY + H * 0.41, damZ);
+      pier.castShadow = true;
+      damGroup.add(pier);
+
+      // Hoist housing identifies each bay as a working sluice gate.
+      const hoist = new THREE.Mesh(
+        new THREE.BoxGeometry(0.72, 0.34, 0.58),
+        concreteDarkMat
+      );
+      hoist.position.set(x, crestY + 0.38, damZ + 1.35);
+      hoist.castShadow = true;
+      damGroup.add(hoist);
+
+      if (isOpen) {
+        // Renderer-only representation of water released by the backend's
+        // sluice-gate equation. It has no local velocity or discharge logic.
+        const flowMaterial = makeReservoirWaterMaterial();
+        flowMaterial.uniforms.uOpacity.value = 0.78;
+
+        const channelFlow = new THREE.Mesh(
+          new THREE.PlaneGeometry(gateWidth * 0.78, 8.35),
+          flowMaterial
+        );
+        channelFlow.rotation.x = -Math.PI / 2;
+        // Gate leaves are on the negative-Z face; route the visible ribbon
+        // away from that downstream face, never back into the reservoir.
+        channelFlow.position.set(x, damBaseY + 0.34, damZ - 8.5);
+        channelFlow.visible = false;
+        channelFlow.renderOrder = 4;
+        channelFlow.userData.flowKind = "channel";
+        channelFlow.userData.baseWidth = gateWidth * 0.78;
+        damGroup.add(channelFlow);
+        spillwayFlowMeshes.push(channelFlow);
+
+        const outletFlow = new THREE.Mesh(
+          new THREE.PlaneGeometry(gateWidth * 0.78, H * 0.52),
+          flowMaterial
+        );
+        outletFlow.position.set(
+          x,
+          damBaseY + H * 0.34,
+          damZ - 4.34
+        );
+        outletFlow.visible = false;
+        outletFlow.renderOrder = 4;
+        outletFlow.userData.flowKind = "outlet";
+        outletFlow.userData.baseWidth = gateWidth * 0.78;
+        damGroup.add(outletFlow);
+        spillwayFlowMeshes.push(outletFlow);
+      }
+    }
+
+    const endPier = new THREE.Mesh(
+      new THREE.BoxGeometry(0.30, H * 0.82, 9.0),
+      concreteMat
     );
+    endPier.position.set(6.96, damBaseY + H * 0.41, damZ);
+    endPier.castShadow = true;
+    damGroup.add(endPier);
 
-    leftFlank.position.set(
-      -19,
-      damBaseY + H * 0.41,
-      -22
-    );
+    // A visible, continuous crest road is broken only across the active
+    // breach sector. Its parapets make the structure read as a dam at range.
+    function addCrestSegment(xStart, length) {
+      const road = new THREE.Mesh(
+        new THREE.BoxGeometry(length, 0.16, 2.6),
+        concreteMat
+      );
+      road.position.set(xStart + length / 2, crestY + 0.08, damZ);
+      road.castShadow = true;
+      road.receiveShadow = true;
+      damGroup.add(road);
 
-    leftFlank.rotation.z = -0.12;
-    leftFlank.castShadow = true;
-    leftFlank.receiveShadow = true;
-    damGroup.add(leftFlank);
+      for (const zOffset of [-1.05, 1.05]) {
+        const parapet = new THREE.Mesh(
+          new THREE.BoxGeometry(length, 0.24, 0.14),
+          concreteDarkMat
+        );
+        parapet.position.set(xStart + length / 2, crestY + 0.25, damZ + zOffset);
+        damGroup.add(parapet);
+      }
+    }
 
-    // Right embankment around breach.
-    // Coordinates are intentionally local to the visual dam.
-    const breachCenterX = 15.0;
-    const embankmentWidth = 27.0;
-    const segmentDepth = 5.8;
+    addCrestSegment(-30, 40);
+    addCrestSegment(20, 10);
 
-    breachLeftBlock = new THREE.Mesh(
-      new THREE.BoxGeometry(10.0, H * 0.86, segmentDepth),
-      earthMat
-    );
-
-    breachLeftBlock.position.set(
-      breachCenterX - 8.5,
-      damBaseY + H * 0.43,
-      -22
-    );
-
-    breachLeftBlock.rotation.z = 0.05;
-    breachLeftBlock.castShadow = true;
-    breachLeftBlock.receiveShadow = true;
-    damGroup.add(breachLeftBlock);
-
-    breachRightBlock = new THREE.Mesh(
-      new THREE.BoxGeometry(10.0, H * 0.86, segmentDepth),
-      earthMat
-    );
-
-    breachRightBlock.position.set(
-      breachCenterX + 8.5,
-      damBaseY + H * 0.43,
-      -22
-    );
-
-    breachRightBlock.rotation.z = -0.05;
-    breachRightBlock.castShadow = true;
-    breachRightBlock.receiveShadow = true;
-    damGroup.add(breachRightBlock);
-
-    // Dark interior of the breach. This makes the opening read as a cavity
-    // before large flow starts.
     breachCavity = new THREE.Mesh(
-      new THREE.BoxGeometry(1, 1, segmentDepth * 0.94),
+      new THREE.BoxGeometry(1, 1, 8.8),
       earthCutMat
     );
-
-    breachCavity.position.set(
-      breachCenterX,
-      damBaseY + H * 0.38,
-      -22
-    );
-
+    breachCavity.position.set(breachCenterX, damBaseY + H * 0.34, damZ);
     breachCavity.visible = true;
     damGroup.add(breachCavity);
 
-    // Small crest remnant above the breach.
     breachCrest = new THREE.Mesh(
-      new THREE.BoxGeometry(10.5, 1.0, segmentDepth),
-      concreteDarkMat
+      new THREE.BoxGeometry(10, 0.16, 2.6),
+      concreteMat
     );
-
-    breachCrest.position.set(
-      breachCenterX,
-      crestY - 0.4,
-      -22
-    );
-
+    breachCrest.position.set(breachCenterX, crestY + 0.08, damZ);
     breachCrest.castShadow = true;
     damGroup.add(breachCrest);
 
-    // Foundation slab.
     const foundation = new THREE.Mesh(
-      new THREE.BoxGeometry(60, 1.2, 8.5),
+      new THREE.BoxGeometry(62, 0.32, 10.2),
       concreteDarkMat
     );
-
-    foundation.position.set(
-      0,
-      damBaseY - 0.6,
-      -22
-    );
-
+    foundation.position.set(0, damBaseY - 0.16, damZ);
     foundation.castShadow = true;
+    foundation.receiveShadow = true;
     damGroup.add(foundation);
 
-    // Small upstream water-retaining lip.
-    const upstreamLip = new THREE.Mesh(
-      new THREE.BoxGeometry(57, 1.0, 1.5),
-      concreteMat
+    const downstreamApron = new THREE.Mesh(
+      new THREE.BoxGeometry(22, 0.12, 5.5),
+      concreteDarkMat
     );
-
-    upstreamLip.position.set(
-      0,
-      crestY + 0.05,
-      -24.5
-    );
-
-    damGroup.add(upstreamLip);
+    downstreamApron.position.set(-1, damBaseY + 0.02, damZ + 6.4);
+    downstreamApron.receiveShadow = true;
+    damGroup.add(downstreamApron);
 
     threeScene.add(damGroup);
   }
@@ -1705,16 +2025,22 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function buildHydraulicWater() {
     const SIZE = THREE_PHYSICS.terrainSize;
-    const SEGMENTS = 180;
 
-    // Reservoir surface.
-    const reservoirGeo = new THREE.PlaneGeometry(
-      55,
-      55,
-      SEGMENTS,
-      SEGMENTS
-    );
+    // This is deliberately a bounded upstream reservoir footprint, not a
+    // terrain-sized flood plane.  Live water outside this polygon must come
+    // from a real downstream depth grid, which the current backend does not
+    // provide yet.
+    const reservoirShape = new THREE.Shape();
+    reservoirShape.moveTo(-28, 56);
+    reservoirShape.lineTo(28, 56);
+    reservoirShape.lineTo(32, 38);
+    // The near edge meets the upstream face of the dam at Z=-25.
+    reservoirShape.lineTo(24, 24.9);
+    reservoirShape.lineTo(-22, 24.9);
+    reservoirShape.lineTo(-32, 38);
+    reservoirShape.closePath();
 
+    const reservoirGeo = new THREE.ShapeGeometry(reservoirShape);
     reservoirGeo.rotateX(-Math.PI / 2);
 
     waterMesh = new THREE.Mesh(
@@ -1725,7 +2051,7 @@ document.addEventListener("DOMContentLoaded", () => {
     waterMesh.position.set(
       0,
       physicalToSceneY(THREE_PHYSICS.reservoirInitialLevel),
-      -32
+      0
     );
 
     waterMesh.renderOrder = 2;
@@ -1760,6 +2086,160 @@ document.addEventListener("DOMContentLoaded", () => {
     downstreamWaterMesh.renderOrder = 1;
 
     threeScene.add(downstreamWaterMesh);
+  }
+
+  async function loadDflowFmWaterMesh() {
+    try {
+      const response = await fetch("delft3d_fm_latest.json", { cache: "no-store" });
+      if (!response.ok) return;
+      const result = await response.json();
+      if (!result.coordinate_bounds || !Array.isArray(result.frames)) return;
+      dflowFmResult = result;
+      dflowFmFrameIndex = -1;
+      // Keep an always-wet visual state.  The zero-time FM state is dry by
+      // definition and looked like the water had vanished between replay
+      // loops rather than like an advancing flood front.
+      const firstWet = result.frames.find(frame =>
+        Array.isArray(frame.wet_cells) && frame.wet_cells.length > 0
+      );
+      dflowFmReplaySeconds = dflowFmStream.pendingTime ?? (firstWet ? firstWet.time_s : 0);
+      updateDflowFmWaterFrame(dflowFmReplaySeconds);
+    } catch (error) {
+      console.warn("[D-Flow FM] wet-cell render unavailable:", error);
+    }
+  }
+
+  function updateDflowFmWaterFrame(timeSeconds) {
+    if (!dflowFmResult || !dflowFmResult.frames) return;
+    const frames = dflowFmResult.frames;
+    let index = 0;
+    for (let i = 1; i < frames.length; i++) {
+      if (frames[i].time_s > timeSeconds) break;
+      index = i;
+    }
+    if (index === dflowFmFrameIndex) return;
+    dflowFmFrameIndex = index;
+    const frame = frames[index];
+    const cells = frame.wet_cells || [];
+    const bounds = dflowFmResult.coordinate_bounds;
+    if (!cells.length) {
+      if (dflowFmWaterMesh) dflowFmWaterMesh.visible = false;
+      if (dflowFmFlowPoints) dflowFmFlowPoints.visible = false;
+      return;
+    }
+
+      const originX = (bounds.min_x + bounds.max_x) * 0.5;
+      const originY = (bounds.min_y + bounds.max_y) * 0.5;
+      const scale = THREE_PHYSICS.terrainSize / THREE_PHYSICS.terrainPhysicalWidth;
+      const positions = [];
+      const colors = [];
+      const flowPositions = [];
+      dflowFmFlowState = [];
+
+      for (const cell of cells) {
+        const corners = cell.corners || [];
+        if (corners.length < 3 || !(cell.depth_m > 0.01)) continue;
+        const speed = Math.min(1, Math.max(0, cell.velocity_ms / 4));
+        const color = new THREE.Color().setHSL(0.55 - speed * 0.07, 0.78, 0.42 + speed * 0.08);
+        const sceneCorners = corners.map(([x, y]) => [
+          FM_SCENE_ANCHOR.x + (x - originX) * scale,
+          0,
+          FM_SCENE_ANCHOR.z - (y - originY) * scale,
+        ]);
+        // FM values are cell-centred (200 m in this run), whereas the
+        // displayed DEM retains finer relief.  Render at the physical FM
+        // level, but never let an intermediate terrain vertex protrude
+        // through a wet solver cell.
+        sceneCorners.forEach(corner => {
+          const displayedGround = terrainElevationAtScene(corner[0], corner[2]);
+          corner[1] = physicalToSceneY(
+            Math.max(cell.surface_elevation_m, displayedGround + Math.min(cell.depth_m, 0.05))
+          ) + 0.02;
+        });
+        for (let i = 1; i < sceneCorners.length - 1; i++) {
+          for (const vertex of [sceneCorners[0], sceneCorners[i], sceneCorners[i + 1]]) {
+            positions.push(...vertex);
+            colors.push(color.r, color.g, color.b);
+          }
+        }
+        const center = sceneCorners.reduce((sum, point) => [sum[0] + point[0], sum[1] + point[1], sum[2] + point[2]], [0, 0, 0]).map(value => value / sceneCorners.length);
+        flowPositions.push(...center);
+        dflowFmFlowState.push({
+          center,
+          vx: (cell.velocity_x_ms || 0) * scale,
+          vz: -(cell.velocity_y_ms || 0) * scale,
+        });
+      }
+
+      if (!positions.length) return;
+      if (dflowFmWaterMesh) {
+        threeScene.remove(dflowFmWaterMesh);
+        dflowFmWaterMesh.geometry.dispose();
+        dflowFmWaterMesh.material.dispose();
+      }
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+      geometry.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
+      geometry.computeVertexNormals();
+      dflowFmWaterMesh = new THREE.Mesh(geometry, new THREE.MeshPhysicalMaterial({
+        vertexColors: true,
+        transparent: true,
+        opacity: 0.78,
+        roughness: 0.16,
+        metalness: 0.04,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+      }));
+      dflowFmWaterMesh.renderOrder = 3;
+      threeScene.add(dflowFmWaterMesh);
+      if (dflowFmFlowPoints) {
+        threeScene.remove(dflowFmFlowPoints);
+        dflowFmFlowPoints.geometry.dispose();
+        dflowFmFlowPoints.material.dispose();
+      }
+      const flowGeometry = new THREE.BufferGeometry();
+      flowGeometry.setAttribute("position", new THREE.Float32BufferAttribute(flowPositions, 3));
+      dflowFmFlowPoints = new THREE.Points(flowGeometry, new THREE.PointsMaterial({
+        color: 0xe0f7ff, size: 0.18, transparent: true, opacity: 0.9,
+        depthWrite: false, sizeAttenuation: true,
+      }));
+      dflowFmFlowPoints.renderOrder = 4;
+      // Velocity vectors are exported for analytics, not rendered as a
+      // cyan lattice in the water scene.
+      dflowFmFlowPoints.visible = false;
+      threeScene.add(dflowFmFlowPoints);
+      dflowFmWaterLoaded = true;
+      // FM begins at the dam outlet in the present domain; its wet cells do
+      // not replace the upstream reservoir surface.
+      if (waterMesh) waterMesh.visible = true;
+      if (downstreamWaterMesh) downstreamWaterMesh.visible = false;
+      console.info(`[D-Flow FM] rendered ${cells.length} wet cells at ${frame.time_s}s`);
+  }
+
+  function advanceDflowFmReplay(wallDt) {
+    if (dflowFmStream.frameDriven) return;
+    if (!dflowFmResult || !dflowFmResult.frames || dflowFmResult.frames.length < 2) return;
+    const firstWet = dflowFmResult.frames.find(frame =>
+      Array.isArray(frame.wet_cells) && frame.wet_cells.length > 0
+    );
+    const firstTime = firstWet ? firstWet.time_s : 0;
+    const lastTime = dflowFmResult.frames[dflowFmResult.frames.length - 1].time_s;
+    // A ten-second loop replays the actual FM output timesteps. It is a
+    // visualization clock only; it never changes the solver fields.
+    dflowFmReplaySeconds += wallDt * 300;
+    if (dflowFmReplaySeconds > lastTime) {
+      dflowFmReplaySeconds = firstTime;
+    }
+    updateDflowFmWaterFrame(dflowFmReplaySeconds);
+    if (!dflowFmFlowPoints) return;
+    const positions = dflowFmFlowPoints.geometry.attributes.position.array;
+    dflowFmFlowState.forEach((flow, index) => {
+      const phase = (dflowFmReplaySeconds * 0.7 + index * 0.37) % 1;
+      positions[index * 3] = flow.center[0] + flow.vx * phase * 3;
+      positions[index * 3 + 1] = flow.center[1] + 0.03;
+      positions[index * 3 + 2] = flow.center[2] + flow.vz * phase * 3;
+    });
+    dflowFmFlowPoints.geometry.attributes.position.needsUpdate = true;
   }
 
   // ----------------------------------------------------------------------
@@ -2091,11 +2571,15 @@ document.addEventListener("DOMContentLoaded", () => {
       THREE_PHYSICS.reservoirInitialLevel;
 
     threeSim.discharge = 0;
+    threeSim.spillwayDischarge = 0;
     threeSim.breachWidth =
       THREE_PHYSICS.initialBreachWidth;
 
     threeSim.breachHeight =
       THREE_PHYSICS.initialBreachHeight;
+
+    threeSim.breachBottomElevation =
+      THREE_PHYSICS.breachElevation;
 
     threeSim.breachArea =
       threeSim.breachWidth *
@@ -2119,6 +2603,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (downstreamWaterMesh) {
       downstreamWaterMesh.visible = false;
+    }
+
+    for (const flow of spillwayFlowMeshes) {
+      flow.visible = false;
     }
 
     if (impactFoam) {
@@ -2389,35 +2877,47 @@ document.addEventListener("DOMContentLoaded", () => {
         threeSim.breachWidth
       );
 
-    const visualMaxWidth = 18.0;
+    const visualMaxWidth = 9.0;
 
     const visualWidth =
       Math.min(
         visualMaxWidth,
         Math.max(
-          0.25,
-          finalW * 0.11
+          0.12,
+          finalW * 0.06
         )
       );
 
     const centerX = 15.0;
 
-    // Each block moves away from the center as the opening grows.
+    // The two tapered embankment sections begin edge-to-edge at X=15 and
+    // separate around the breach without breaking the rest of the dam.
     const separation =
-      (visualWidth - 0.25) * 0.5;
+      (visualWidth - 0.12) * 0.5;
 
     breachLeftBlock.position.x =
-      centerX - 8.5 - separation;
+      10 - separation;
 
     breachRightBlock.position.x =
-      centerX + 8.5 + separation;
+      15 + separation;
 
-    // Breach cavity grows vertically as well.
+    const damBaseY = physicalToSceneY(
+      terrainElevationAtScene(15, -22)
+    );
+    const damHeight = physicalToSceneY(
+      globalElevMin + THREE_PHYSICS.damPhysicalHeight
+    ) - physicalToSceneY(globalElevMin);
+
+    // Breach cavity grows inside the embankment profile, not as a detached
+    // box floating above the foundation.
     const visualHeight =
-      Math.min(
-        7.0,
-        0.5 +
-        threeSim.breachHeight * 0.42
+      damHeight * Math.max(
+        0.15,
+        Math.min(
+          0.88,
+          threeSim.breachHeight /
+          THREE_PHYSICS.damPhysicalHeight
+        )
       );
 
     breachCavity.scale.set(
@@ -2428,10 +2928,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     breachCavity.position.set(
       centerX,
-      physicalToSceneY(
-        THREE_PHYSICS.breachElevation
-      ) -
-      visualHeight * 0.30,
+      damBaseY + visualHeight * 0.5,
       -22
     );
 
@@ -2459,9 +2956,7 @@ document.addEventListener("DOMContentLoaded", () => {
     breachCrest.rotation.z =
       -progress * 0.18;
 
-    breachCrest.position.x =
-      centerX +
-      progress * 2.5;
+    breachCrest.position.x = centerX;
   }
 
   // ----------------------------------------------------------------------
@@ -2680,6 +3175,88 @@ document.addEventListener("DOMContentLoaded", () => {
     mainParticles.points.geometry.attributes.position.needsUpdate = true;
   }
 
+  // LIVE MODE: render backend SPH particles, hide unused slots.
+  function updateMainParticlesFromBackend() {
+    if (!mainParticles.points) return;
+
+    const count = THREE_PHYSICS.mainParticleCount;
+    const backendPts = physicsStream.latestParticles;
+    const nBackend = backendPts.length;
+
+    // SPH coordinates are a vertical slice: x is downstream distance and y
+    // is height above the breach invert.  The Three scene uses X=lateral,
+    // Y=elevation, Z=downstream, so never map SPH x directly to scene X.
+    const breachOrigin = getBreachOrigin();
+    const downstreamScale = 0.8;
+    // SPH y is local to the breach invert.  Its backend datum must not be
+    // confused with the projected DEM elevation used by the FM mesh.
+    const invertElevation = terrainElevationAtScene(breachOrigin.x, breachOrigin.z);
+
+    for (let i = 0; i < count; i++) {
+      const j = i * 3;
+
+      if (i < nBackend) {
+        const p = backendPts[i];
+        const particleId = Number.isFinite(p.id) ? p.id : i;
+
+        // Negative SPH X lies in the upstream inlet/reservoir block.  That
+        // water is represented by the reservoir mesh; only particles that
+        // have crossed the breach become the visible downstream jet.
+        if (p.x < 0) {
+          mainParticles.positions[j] = 0;
+          mainParticles.positions[j + 1] = -500;
+          mainParticles.positions[j + 2] = 0;
+          mainParticles.ages[i] = 999;
+          continue;
+        }
+
+        // Give the 2D slice a stable, narrow visual thickness on scene X.
+        mainParticles.positions[j] =
+          breachOrigin.x + ((particleId % 7) - 3) * 0.16;
+        // Convert invert-relative physical height to scene elevation.
+        const particleY = physicalToSceneY(invertElevation + p.y);
+        // SPH x is downstream distance; scene Z is the downstream axis.
+        mainParticles.positions[j + 2] =
+          breachOrigin.z + p.x * downstreamScale;
+
+        // The backend has a local near-field bed constraint.  This render
+        // clamp additionally conforms that slice to the displayed terrain,
+        // so points cannot visually pass through the environment.
+        const terrainY = physicalToSceneY(
+          terrainElevationAtScene(
+            mainParticles.positions[j],
+            mainParticles.positions[j + 2]
+          )
+        ) + 0.05;
+        mainParticles.positions[j + 1] = Math.max(particleY, terrainY);
+
+        mainParticles.ages[i] = 0;
+      } else {
+        // Hide unused particle slots by parking them far away
+        mainParticles.positions[j] = 0;
+        mainParticles.positions[j + 1] = -500;
+        mainParticles.positions[j + 2] = 0;
+        mainParticles.ages[i] = 999;
+      }
+    }
+
+    mainParticles.points.geometry.attributes.position.needsUpdate = true;
+  }
+
+  // LIVE MODE: hide procedural spray — backend spray_fraction controls.
+  function updateSprayParticlesLive(dt) {
+    if (!sprayParticles.points) return;
+    // In live mode, park all spray particles offscreen.
+    // The backend's spray_fraction is displayed in the HUD as data.
+    const count = THREE_PHYSICS.sprayParticleCount;
+    for (let i = 0; i < count; i++) {
+      const j = i * 3;
+      sprayParticles.positions[j + 1] = -500;
+      sprayParticles.ages[i] = 999;
+    }
+    sprayParticles.points.geometry.attributes.position.needsUpdate = true;
+  }
+
   function updateSprayParticles(dt) {
     if (!sprayParticles.points) return;
 
@@ -2756,6 +3333,14 @@ document.addEventListener("DOMContentLoaded", () => {
   function updateDownstreamFloodVisual() {
     if (!downstreamWaterMesh) return;
 
+    // The live backend currently streams near-field SPH only, not a 2D
+    // depth grid. Do not fabricate a floodplain surface from old timing
+    // heuristics while live physics owns the hydraulic state.
+    if (isLiveMode()) {
+      downstreamWaterMesh.visible = false;
+      return;
+    }
+
     const sc =
       PIPELINE_DATA.scenarios[currentScenarioKey] ||
       PIPELINE_DATA.scenarios.base;
@@ -2819,6 +3404,12 @@ document.addEventListener("DOMContentLoaded", () => {
   function updateFoamVisual(dt) {
     if (!impactFoam) return;
 
+    // The legacy foam ring is part of the offline procedural renderer.
+    if (isLiveMode()) {
+      impactFoam.visible = false;
+      return;
+    }
+
     const active =
       threeSim.discharge > 20;
 
@@ -2875,6 +3466,14 @@ document.addEventListener("DOMContentLoaded", () => {
   window.updateThreeSimulation = function(targetHours) {
     if (!isThreeInitialized) return;
 
+    // Dashboard scrubbing must not restart or advance the offline hydraulic
+    // model while a backend stream is authoritative.
+    if (isLiveMode()) {
+      updateLiveHydraulicWater();
+      updateHydraulicHUD();
+      return;
+    }
+
     const requested =
       Math.max(
         0,
@@ -2894,9 +3493,9 @@ document.addEventListener("DOMContentLoaded", () => {
     const targetSeconds =
       requested * 3600;
 
-    // Limit the amount of work caused by a large UI jump. For normal
-    // playback this loop is cheap; for a large scrub we advance with
-    // bounded substeps.
+    // Scrubbing needs only dashboard-scale state, not a 60 Hz replay.  The
+    // old 1/60 s loop ran 5.18 million iterations for a 24 h jump and could
+    // freeze the dashboard for about a minute.
     let remaining =
       Math.max(
         0,
@@ -2913,14 +3512,13 @@ document.addEventListener("DOMContentLoaded", () => {
         maxReplaySeconds
       );
 
-    const replayDt =
-      1.0 / 60.0;
+    const replayDt = 60.0;
 
     let safety = 0;
 
     while (
       remaining > 0 &&
-      safety < 120000
+      safety < 2000
     ) {
       const dt =
         Math.min(
@@ -2935,9 +3533,6 @@ document.addEventListener("DOMContentLoaded", () => {
       calculateHydraulics(dt);
       updateDamBreachVisual();
 
-      // During a huge scrub, only a subset of the particle system is
-      // regenerated by normal frame updates. The visual remains smooth
-      // because the particle renderer is GPU-side.
       remaining -= dt;
       safety++;
     }
@@ -2950,6 +3545,36 @@ document.addEventListener("DOMContentLoaded", () => {
     updateDownstreamFloodVisual();
   };
 
+  function updateLiveHydraulicWater() {
+    if (waterMesh) {
+      waterMesh.visible = true;
+      waterMesh.position.y = physicalToSceneY(threeSim.waterLevel);
+    }
+
+    if (reservoirMarker) {
+      reservoirMarker.position.y = physicalToSceneY(threeSim.waterLevel) + 0.15;
+    }
+
+    // No backend depth grid is available yet, so the live view intentionally
+    // renders no downstream sheet.
+    if (downstreamWaterMesh) downstreamWaterMesh.visible = false;
+
+    updateSpillwayFlowVisual();
+  }
+
+  function updateSpillwayFlowVisual() {
+    const gateFlowQ = threeSim.spillwayDischarge;
+    // Keep the received physical release visible after the websocket has
+    // completed its fast calculation, rather than tying it to socket state.
+    const visible = gateFlowQ > 0.01;
+    const flowScale = Math.max(0.35, Math.min(1, gateFlowQ / 100));
+
+    for (const flow of spillwayFlowMeshes) {
+      flow.visible = visible;
+      flow.scale.x = flowScale;
+    }
+  }
+
   // ----------------------------------------------------------------------
   // Real-time physics loop used when the 3D scene is running.
   // ----------------------------------------------------------------------
@@ -2959,6 +3584,24 @@ document.addEventListener("DOMContentLoaded", () => {
       resetThreePhysics();
     }
 
+    // In LIVE mode, backend is authoritative — don't advance local time
+    // or recalculate hydraulics. applyBackendFrame() already set threeSim.
+    if (isLiveMode()) {
+      try {
+        updateDamBreachVisual();
+        updateLiveHydraulicWater();
+        updateMainParticlesFromBackend();
+        updateSprayParticlesLive(dt);
+        updateFoamVisual(dt);
+        updateDownstreamFloodVisual();
+        updateHydraulicHUD();
+      } catch (e) {
+        console.error("Error in live mode stepThreePhysics:", e);
+      }
+      return;
+    }
+
+    // OFFLINE DEMO: existing reduced-order visualization model
     threeSim.timeSeconds += dt;
     threeSim.timeHours =
       threeSim.timeSeconds / 3600;
@@ -3006,6 +3649,31 @@ document.addEventListener("DOMContentLoaded", () => {
     if (hudVel) {
       hudVel.textContent =
         `${threeSim.outletVelocity.toFixed(1)} m/s`;
+    }
+
+    // In live mode, show spray fraction from backend
+    if (isLiveMode() && physicsStream.latestFrame) {
+      const spray = physicsStream.latestFrame.sph;
+      const hudSpray = document.getElementById("hud-spray-fraction");
+      if (hudSpray && spray) {
+        hudSpray.textContent =
+          `${(spray.spray_fraction * 100).toFixed(1)}%`;
+      }
+      // Show structural status
+      const structs = physicsStream.latestFrame.structures;
+      if (structs && structs.length > 0) {
+        const hudBridge = document.getElementById("hud-bridge-status");
+        if (hudBridge) {
+          const s = structs[0];
+          const load = s.horizontal_load_kN ?? s.force_kN ?? 0;
+          hudBridge.textContent = s.failed
+            ? `FAILED: ${s.failure_reason || "capacity"} (${load.toFixed(0)} kN)`
+            : `INTACT (${load.toFixed(0)} kN)`;
+          hudBridge.style.color = s.failed
+            ? "var(--accent-red, #e63946)"
+            : "var(--accent-emerald, #06d6a0)";
+        }
+      }
     }
 
     const sc =
@@ -3140,6 +3808,85 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // ----------------------------------------------------------------------
+  // Keyboard camera movement
+  // ----------------------------------------------------------------------
+
+  function setupThreeKeyboardControls() {
+    if (threeKeyboardBound || !threeRenderer) return;
+
+    threeKeyboardBound = true;
+    const canvas = threeRenderer.domElement;
+    canvas.tabIndex = 0;
+    canvas.setAttribute(
+      "aria-label",
+      "3D dam view. Use W, A, S, and D to move the camera."
+    );
+    canvas.addEventListener("pointerdown", () => canvas.focus());
+
+    window.addEventListener("keydown", event => {
+      if (
+        event.ctrlKey || event.metaKey || event.altKey ||
+        isTextEntryTarget(event.target) ||
+        !["KeyW", "KeyA", "KeyS", "KeyD"].includes(event.code)
+      ) {
+        return;
+      }
+
+      threeMovementKeys.add(event.code);
+      event.preventDefault();
+    });
+
+    window.addEventListener("keyup", event => {
+      if (!["KeyW", "KeyA", "KeyS", "KeyD"].includes(event.code)) {
+        return;
+      }
+
+      threeMovementKeys.delete(event.code);
+    });
+
+    window.addEventListener("blur", () => threeMovementKeys.clear());
+  }
+
+  function isTextEntryTarget(target) {
+    return target instanceof HTMLInputElement ||
+      target instanceof HTMLTextAreaElement ||
+      target instanceof HTMLSelectElement ||
+      Boolean(target && target.isContentEditable);
+  }
+
+  function moveThreeCameraWithKeyboard(dt) {
+    if (
+      !threeCamera ||
+      !threeControls ||
+      threeMovementKeys.size === 0
+    ) {
+      return;
+    }
+
+    const forward = new THREE.Vector3();
+    threeCamera.getWorldDirection(forward);
+    forward.y = 0;
+    if (forward.lengthSq() === 0) return;
+    forward.normalize();
+
+    const right = new THREE.Vector3().crossVectors(
+      forward,
+      threeCamera.up
+    ).normalize();
+    const movement = new THREE.Vector3();
+
+    if (threeMovementKeys.has("KeyW")) movement.add(forward);
+    if (threeMovementKeys.has("KeyS")) movement.sub(forward);
+    if (threeMovementKeys.has("KeyD")) movement.add(right);
+    if (threeMovementKeys.has("KeyA")) movement.sub(right);
+    if (movement.lengthSq() === 0) return;
+
+    movement.normalize().multiplyScalar(18 * dt);
+    threeCamera.position.add(movement);
+    threeControls.target.add(movement);
+  }
+
+  // ----------------------------------------------------------------------
   // Resize
   // ----------------------------------------------------------------------
 
@@ -3193,6 +3940,7 @@ document.addEventListener("DOMContentLoaded", () => {
       );
 
     threeLastWallTime = now;
+    advanceDflowFmReplay(wallDt);
 
     // The dashboard's time slider is authoritative. Only advance the
     // physical simulation automatically when playback is active.
@@ -3303,6 +4051,14 @@ document.addEventListener("DOMContentLoaded", () => {
       downstreamWaterMesh.material.uniforms.uTime.value =
         shaderTime;
     }
+
+    for (const flow of spillwayFlowMeshes) {
+      if (flow.material.uniforms && flow.material.uniforms.uTime) {
+        flow.material.uniforms.uTime.value = shaderTime;
+      }
+    }
+
+    moveThreeCameraWithKeyboard(wallDt);
 
     if (threeControls) {
       threeControls.update();

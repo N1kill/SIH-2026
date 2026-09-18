@@ -29,9 +29,16 @@ nul
 
 # Temporary / Log files
 *.log
+*.nc
 *.tmp
 download_log.txt
 powershell.bat
 powershell.cmd
 scratch/
 docs/
+
+# Ignore large simulation output folders and 3D data json
+outputs/simulation/delft3d_fm/DFM_OUTPUT_*/
+*.cache
+outputs/3d/dashboard/*.json
+outputs/3d/*.json

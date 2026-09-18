@@ -843,6 +843,49 @@ body {
   font-size: 12px;
 }
 
+.hud-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  border: 1px solid transparent;
+}
+
+.hud-badge-live {
+  background: rgba(6, 214, 160, 0.15);
+  color: var(--accent-emerald);
+  border-color: rgba(6, 214, 160, 0.3);
+}
+
+.hud-badge-connecting {
+  background: rgba(244, 162, 97, 0.15);
+  color: var(--accent-amber);
+  border-color: rgba(244, 162, 97, 0.3);
+}
+
+.hud-badge-offline {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-dim);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.badge-pulse-dot {
+  width: 8px;
+  height: 8px;
+  background-color: var(--accent-emerald);
+  border-radius: 50%;
+  box-shadow: 0 0 8px var(--accent-emerald);
+  animation: pulse-live 1.5s infinite alternate;
+}
+
+@keyframes pulse-live {
+  0% { opacity: 0.6; transform: scale(0.9); }
+  100% { opacity: 1; transform: scale(1.1); box-shadow: 0 0 12px var(--accent-emerald); }
+}
+
 .hud-left {
   position: absolute;
   top: 70px;

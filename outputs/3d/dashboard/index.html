@@ -685,6 +685,10 @@
           <div class="twin-hud">
             <!-- Top Status Bar -->
             <div class="hud-top-center interactive">
+              <span id="physics-mode-badge" class="hud-badge hud-badge-offline">
+                <i class="fa-solid fa-plug-circle-xmark"></i> OFFLINE DEMO
+              </span>
+              <span style="color: var(--text-dim);">|</span>
               <span id="hud-sim-time"><i class="fa-solid fa-stopwatch"></i> T + 07:30 hrs</span>
               <span style="color: var(--text-dim);">|</span>
               <span id="hud-wave-status" style="color: var(--accent-amber);">
@@ -716,6 +720,14 @@
               <div class="hud-row">
                 <span style="color: var(--text-muted);">Numerical Mesh Grid:</span>
                 <span class="hud-row-val" style="color: var(--text-main);">120 × 120 (30m DEM)</span>
+              </div>
+              <div class="hud-row">
+                <span style="color: var(--text-muted);">SPH Spray Fraction:</span>
+                <span class="hud-row-val num-cyan" id="hud-spray-fraction">—</span>
+              </div>
+              <div class="hud-row">
+                <span style="color: var(--text-muted);">Bridge Status:</span>
+                <span class="hud-row-val num-emerald" id="hud-bridge-status">—</span>
               </div>
             </div>
 
