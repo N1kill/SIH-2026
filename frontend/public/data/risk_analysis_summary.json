@@ -1,0 +1,50 @@
+{
+  "directive": "8",
+  "timestamp": "2026-09-13T07:50:33.197884+00:00",
+  "methodology_disclaimer": "Designated relief shelters, capacities (25k, 18k, 12k), and evacuation routes are illustrative emergency planning benchmarks situated on topographically verified high ground (>52m MSL), not officially gazetted municipal disaster infrastructure.",
+  "risk_and_evacuation_summary": {
+    "risk_zones_km2": {
+      "low_risk": 50.75,
+      "medium_risk": 7.78,
+      "high_risk": 26.49,
+      "critical_priority_evacuation": 6.82,
+      "total_risk_area_km2": 91.85
+    },
+    "evacuation_parameters": {
+      "critical_lead_time_morbi_hours": 2.5,
+      "high_ground_elevation_threshold_m": 52.0,
+      "priority_hadr_centers": [
+        {
+          "name": "Morbi East High Ground Shelter 1 (Illustrative)",
+          "type": "Elevation Ridge (>55m) - Planning Benchmark",
+          "capacity": 25000,
+          "status": "Illustrative Planning Benchmark"
+        },
+        {
+          "name": "Morbi South-East Relief Camp (Illustrative)",
+          "type": "Government Complex - Planning Benchmark",
+          "capacity": 18000,
+          "status": "Illustrative Planning Benchmark"
+        },
+        {
+          "name": "Liliya Ridge Transit Hub (Illustrative)",
+          "type": "High Ground Transport Hub - Planning Benchmark",
+          "capacity": 12000,
+          "status": "Illustrative Planning Benchmark"
+        }
+      ],
+      "evacuation_routes": [
+        {
+          "route_id": "R1_EAST",
+          "name": "Morbi Central to East Bypass Ridge",
+          "status": "Primary Safe Corridor (Above Inundation)"
+        },
+        {
+          "route_id": "R2_SOUTH",
+          "name": "Vankaner Elevated Highway",
+          "status": "Secondary Inflow Cutoff Route"
+        }
+      ]
+    }
+  }
+}
