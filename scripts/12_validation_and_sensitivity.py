@@ -35,19 +35,22 @@ import matplotlib.pyplot as plt
 import numpy as np
 import rasterio
 from rasterio.crs import CRS
-import importlib.util
-sys.path.append(str(PROJECT_ROOT / "scripts"))
+import sys
 import importlib
+from pathlib import Path
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+sys.path.append(str(PROJECT_ROOT / "scripts"))
+
 mod10 = importlib.import_module("10_hydrodynamic_simulation")
 generate_unsteady_breach_hydrograph = mod10.generate_unsteady_breach_hydrograph
 run_2d_hydrodynamic_simulation = mod10.run_2d_hydrodynamic_simulation
+
 DEM_FILE = PROJECT_ROOT / "data" / "processed" / "dem_conditioned.tif"
 if not DEM_FILE.is_file():
     DEM_FILE = PROJECT_ROOT / "data" / "processed" / "dem_utm42.tif"
 
 logging.basicConfig(level=logging.INFO, format="[%(asctime)s] %(levelname)s: %(message)s")
-
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
 OUTPUTS_SIM = PROJECT_ROOT / "outputs" / "simulation"
 OUTPUTS_GIS = PROJECT_ROOT / "outputs" / "gis"
 DOCS_DIR = PROJECT_ROOT / "docs"
@@ -152,43 +155,60 @@ def compute_contingency_metrics(sim_depth_file, sat_extent_file):
 # 2. SENSITIVITY ANALYSIS
 # ---------------------------------------------------------------------------
 def compute_sensitivity_scenarios():
-    """Run genuine physics-based simulation for each scenario."""
-    base_morbi_peak = 3.85
-    base_inund_area = 71.49
-    
+    """Run genuine physics-based simulation for each scenario.
+    All base values are read from breach_params.json (Directive 4 output)
+    and config.json — no hardcoded dam parameters.
+    """
+    # Load the active dam config (default: first key in config.json)
     with open(PROJECT_ROOT / "config.json", "r") as f:
-        config = json.load(f)["machhu-ii"]
+        all_configs = json.load(f)
+    config_key = list(all_configs.keys())[0]  # uses first dam by default
+    config = all_configs[config_key]
 
-    # Base parameters
+    # Load Froehlich base parameters from Directive 4 output
+    breach_params_file = PROJECT_ROOT / "data" / "processed" / "breach_params.json"
+    if breach_params_file.is_file():
+        with open(breach_params_file, "r") as f:
+            bp_data = json.load(f)
+        base_B  = bp_data.get("froehlich_2008_geometry", {}).get("B_avg_m", 156.0)
+        base_tf = bp_data.get("froehlich_2008_geometry", {}).get("t_f_hours", 2.50)
+        base_Qp = bp_data.get("froehlich_1995_peak_flow", {}).get("Q_p_m3s", 6647.0)
+        base_Z  = bp_data.get("froehlich_2008_geometry", {}).get("Z_HV", 1.4)
+    else:
+        logging.warning("breach_params.json not found — using Froehlich defaults.")
+        base_B, base_tf, base_Qp, base_Z = 156.0, 2.50, 6647.0, 1.4
+
+    # Parametric sensitivity scenarios derived from live base values
     scenarios = [
-        {"id": "base", "name": "Base Case", "B_avg": 156.0, "t_f": 2.50, "Q_p": 6647.0},
-        {"id": "width_plus25", "name": "+25% Width", "B_avg": 195.0, "t_f": 2.00, "Q_p": 8309.0},
-        {"id": "width_minus25", "name": "-25% Width", "B_avg": 117.0, "t_f": 3.12, "Q_p": 4985.0},
-        {"id": "extreme_plus50", "name": "+50% Extreme", "B_avg": 234.0, "t_f": 1.50, "Q_p": 10500.0},
-        {"id": "conservative_minus50", "name": "-50% Conservative", "B_avg": 78.0, "t_f": 4.00, "Q_p": 3324.0},
+        {"id": "base",                 "name": "Base Case",         "B_avg": base_B,           "t_f": base_tf,            "Q_p": base_Qp},
+        {"id": "width_plus25",         "name": "+25% Width",        "B_avg": base_B * 1.25,    "t_f": base_tf * 0.80,     "Q_p": base_Qp * 1.25},
+        {"id": "width_minus25",        "name": "-25% Width",        "B_avg": base_B * 0.75,    "t_f": base_tf * 1.25,     "Q_p": base_Qp * 0.75},
+        {"id": "extreme_plus50",       "name": "+50% Extreme",      "B_avg": base_B * 1.50,    "t_f": base_tf * 0.60,     "Q_p": base_Qp * 1.58},
+        {"id": "conservative_minus50", "name": "-50% Conservative", "B_avg": base_B * 0.50,    "t_f": base_tf * 1.60,     "Q_p": base_Qp * 0.50},
     ]
 
     for sc in scenarios:
         breach_params = {
-            "B_avg_m": sc["B_avg"],
-            "Z_HV": 1.4,
-            "t_f_hours": sc["t_f"],
-            "Q_peak_m3s": sc["Q_p"],
+            "B_avg_m":        sc["B_avg"],
+            "Z_HV":           base_Z,
+            "t_f_hours":      sc["t_f"],
+            "Q_peak_m3s":     sc["Q_p"],
             "V_reservoir_m3": config["reservoir_volume_m3"],
-            "H_dam_m": config["dam_height_m"],
+            "H_dam_m":        config["dam_height_m"],
         }
         
         logging.info(f"Running physics scenario: {sc['name']}")
-        hydro_tuple = generate_unsteady_breach_hydrograph(breach_params, duration_hours=24.0, dt_seconds=120.0)
+        hydro_tuple = generate_unsteady_breach_hydrograph(breach_params, duration_hours=8.0, dt_seconds=120.0)
         
-        # Simulate (shortened loop in test environment if we want, but we do the full run here as per requirement)
-        # We can pass a shorter time if we wanted to save time, but physics requires it.
-        # Run the full 2D solver
+        # 8h window captures the full breach peak (t_f ≤ 4h) and hydrodynamically relevant recession.
         res = run_2d_hydrodynamic_simulation(DEM_FILE, hydro_tuple, breach_params, config)
         
-        # Calculate real area and depth
-        morbi_st = res["stations"].get("morbi", list(res["stations"].values())[-1])
-        sc["peak_depth_morbi"] = round(float(np.max(morbi_st["depth"])), 2)
+        # Record gauge at primary downstream station (first non-dam-toe station, or last if no match)
+        downstream_st = res["stations"].get(
+            config["downstream_stations"][1]["key"] if len(config["downstream_stations"]) > 1 else "dam_toe",
+            list(res["stations"].values())[-1]
+        )
+        sc["peak_depth_morbi"] = round(float(np.max(downstream_st["depth"])), 2)
         cell_area = res["cell_size"] ** 2
         sc["inund_area_km2"] = round(float(np.sum(res["max_depth"] >= 0.1) * (cell_area / 1e6)), 1)
         logging.info(f"Scenario {sc['name']} completed: Peak={sc['peak_depth_morbi']}m, Area={sc['inund_area_km2']}km2")

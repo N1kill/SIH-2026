@@ -49,6 +49,61 @@ import rasterio
 from rasterio.crs import CRS
 from rasterio.transform import rowcol, xy
 from scipy.ndimage import gaussian_filter
+from numba import njit, prange
+
+# Numba-optimized 2D Diffusive Wave routing step
+@njit(parallel=True)
+def diffusive_wave_step(box_dem, box_depth, n_substeps, dt_sub, cell_size, cell_area, manning_n):
+    nrows, ncols = box_dem.shape
+    drs = np.array([-1, 1, 0, 0, -1, -1, 1, 1], dtype=np.int32)
+    dcs = np.array([0, 0, -1, 1, -1, 1, -1, 1], dtype=np.int32)
+    # distance weights
+    dists = np.array([cell_size, cell_size, cell_size, cell_size, 
+                      cell_size * 1.4142, cell_size * 1.4142, 
+                      cell_size * 1.4142, cell_size * 1.4142], dtype=np.float32)
+
+    for _ in range(n_substeps):
+        box_wse = box_dem + box_depth
+        
+        fluxes = np.zeros((nrows, ncols, 8), dtype=np.float32)
+        total_out = np.zeros((nrows, ncols), dtype=np.float32)
+        
+        for r in prange(nrows):
+            for c in range(ncols):
+                depth = box_depth[r, c]
+                if depth <= 0.05:
+                    continue
+                
+                wse = box_wse[r, c]
+                for i in range(8):
+                    nr = r + drs[i]
+                    nc = c + dcs[i]
+                    if 0 <= nr < nrows and 0 <= nc < ncols:
+                        nwse = box_wse[nr, nc]
+                        slope = (wse - nwse) / dists[i]
+                        if slope > 0.0001:
+                            v_flow = (1.0 / manning_n) * (depth ** (2.0 / 3.0)) * np.sqrt(slope)
+                            flux = v_flow * depth * cell_size * dt_sub
+                            fluxes[r, c, i] = flux
+                            total_out[r, c] += flux
+                            
+        d_vol = np.zeros((nrows, ncols), dtype=np.float32)
+        max_out = box_depth * cell_area * 0.85
+        
+        for r in prange(nrows):
+            for c in range(ncols):
+                tout = total_out[r, c]
+                if tout > 0.0:
+                    scale = min(1.0, max_out[r, c] / (tout + 1e-6))
+                    for i in range(8):
+                        f = fluxes[r, c, i] * scale
+                        if f > 0.0:
+                            d_vol[r, c] -= f
+                            d_vol[r + drs[i], c + dcs[i]] += f
+                            
+        for r in prange(nrows):
+            for c in range(ncols):
+                box_depth[r, c] = max(0.0, box_depth[r, c] + d_vol[r, c] / cell_area)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="[%(asctime)s] %(levelname)s: %(message)s")
@@ -181,7 +236,7 @@ def run_2d_hydrodynamic_simulation(dem_path, breach_hydrograph_tuple, breach_par
         valid_mask = np.isfinite(dem)
 
     # Fill NaNs with interpolation for stability
-    min_elev = np.nanmin(dem[valid_mask])
+    min_elev = np.nanmax(dem[valid_mask]) + 100.0  # NaN cells become walls to prevent water pooling
     dem[np.isnan(dem)] = min_elev
 
     # Convert real geographic station coordinates to grid row/col
@@ -234,10 +289,11 @@ def run_2d_hydrodynamic_simulation(dem_path, breach_hydrograph_tuple, breach_par
     cell_area = cell_size * cell_size
 
     # Define active downstream computational bounding box
-    r_start = max(0, r_dam - 1300)
-    r_end = min(nrows, r_dam + 100)
-    c_start = max(0, c_dam - 500)
-    c_end = min(ncols, c_dam + 500)
+    domain_radius = 700
+    r_start = max(0, r_dam - domain_radius)
+    r_end = min(nrows, r_dam + domain_radius)
+    c_start = max(0, c_dam - domain_radius)
+    c_end = min(ncols, c_dam + domain_radius)
     logging.info(f"Active simulation domain: rows [{r_start}:{r_end}], cols [{c_start}:{c_end}] ({r_end-r_start}×{c_end-c_start} cells, res={cell_size:.1f}m)")
 
     logging.info(f"Starting 2D hydrodynamic simulation ({n_steps} timesteps, dt={dt_sim}s)...")
@@ -258,20 +314,18 @@ def run_2d_hydrodynamic_simulation(dem_path, breach_hydrograph_tuple, breach_par
 
     max_dam_head = float(breach_params.get("H_dam_m", breach_params.get("h_dam_m", 22.56)))
 
-    # 8 connectivity directions (4 cardinal + 4 diagonal)
-    directions = [
-        ((-1, 0), cell_size),           # North
-        ((1, 0), cell_size),            # South
-        ((0, -1), cell_size),           # West
-        ((0, 1), cell_size),            # East
-        ((-1, -1), cell_size * 1.4142), # Northwest
-        ((-1, 1), cell_size * 1.4142),  # Northeast
-        ((1, -1), cell_size * 1.4142),  # Southwest
-        ((1, 1), cell_size * 1.4142),   # Southeast
-    ]
-
-    n_substeps = 4
+    n_substeps = 1
     dt_sub = dt_sim / float(n_substeps)
+
+    # Pre-check PySPH files to avoid disk I/O in the tight loop
+    pysph_vals = {}
+    for pysph_file in OUTPUTS_SIM.glob("pysph_hydrograph_*.txt"):
+        try:
+            step_idx = int(pysph_file.stem.split("_")[-1])
+            with open(pysph_file, "r") as pf:
+                pysph_vals[step_idx] = float(pf.read().strip())
+        except ValueError:
+            pass
 
     for step in range(n_steps):
         t_sec = time_seconds[step]
@@ -279,13 +333,8 @@ def run_2d_hydrodynamic_simulation(dem_path, breach_hydrograph_tuple, breach_par
         q_in = q_total[step]
 
         # 1. Exact Physical Breach Mass Injection (with PySPH fallback)
-        import os
-        pysph_file = OUTPUTS_SIM / f"pysph_hydrograph_{step}.txt"
-        if pysph_file.is_file():
-            # Ingest PySPH boundary condition
-            with open(pysph_file, "r") as pf:
-                val = float(pf.read().strip())
-                v_in = val * dt_sim
+        if step in pysph_vals:
+            v_in = pysph_vals[step] * dt_sim
         else:
             v_in = q_in * dt_sim
         d_h_in = (v_in / float(n_src)) / cell_area
@@ -306,79 +355,27 @@ def run_2d_hydrodynamic_simulation(dem_path, breach_hydrograph_tuple, breach_par
             b_c0 = max(0, local_c_dam - 5)
             b_c1 = min(sub_ncols, local_c_dam + 5)
 
-        box_dem = sub_dem[b_r0:b_r1, b_c0:b_c1]
-        box_depth = sub_depth[b_r0:b_r1, b_c0:b_c1]
+        # Contiguous copies are required for Numba njit
+        box_dem = np.ascontiguousarray(sub_dem[b_r0:b_r1, b_c0:b_c1])
+        box_depth = np.ascontiguousarray(sub_depth[b_r0:b_r1, b_c0:b_c1])
+        box_vel_active = sub_vel[b_r0:b_r1, b_c0:b_c1]
+        
+        # Adaptive CFL timestepping for current active box
+        active_wet = box_depth > 0.05
+        v_max = np.max(box_vel_active[active_wet]) if np.any(active_wet) else 0.0
+        h_max = np.max(box_depth[active_wet]) if np.any(active_wet) else 0.0
+        wave_speed = v_max + np.sqrt(9.81 * h_max)
+        if wave_speed > 0:
+            dt_cfl = 0.45 * cell_size / wave_speed
+            n_substeps = max(1, int(np.ceil(dt_sim / dt_cfl)))
+        else:
+            n_substeps = 1
+        dt_sub = dt_sim / float(n_substeps)
 
-        for _ in range(n_substeps):
-            box_wse = box_dem + box_depth
-            wet_mask = box_depth > 0.05
+        if np.any(box_depth > 0.05):
+            diffusive_wave_step(box_dem, box_depth, n_substeps, dt_sub, cell_size, cell_area, manning_n)
 
-            if not np.any(wet_mask):
-                continue
-
-            fluxes = []
-            for (dr, dc), dist in directions:
-                # Non-wrapping shifted neighbor WSE
-                neighbor_wse = np.zeros_like(box_wse)
-                r_src_start = max(0, dr)
-                r_src_end = min(box_wse.shape[0], box_wse.shape[0] + dr)
-                r_tgt_start = max(0, -dr)
-                r_tgt_end = min(box_wse.shape[0], box_wse.shape[0] - dr)
-
-                c_src_start = max(0, dc)
-                c_src_end = min(box_wse.shape[1], box_wse.shape[1] + dc)
-                c_tgt_start = max(0, -dc)
-                c_tgt_end = min(box_wse.shape[1], box_wse.shape[1] - dc)
-
-                neighbor_wse[r_tgt_start:r_tgt_end, c_tgt_start:c_tgt_end] = box_wse[r_src_start:r_src_end, c_src_start:c_src_end]
-
-                slope_to_neighbor = (box_wse - neighbor_wse) / dist
-                # Maintain downstream physical thalweg bed slope along northern channel (dr < 0)
-                if dr < 0:
-                    slope_to_neighbor = np.maximum(slope_to_neighbor, 0.0012 * wet_mask)
-
-                route_mask = wet_mask & (slope_to_neighbor > 0.0001)
-
-                flux = np.zeros_like(box_depth)
-                if np.any(route_mask):
-                    v_flow = (
-                        (1.0 / manning_n)
-                        * (box_depth[route_mask] ** (2.0 / 3.0))
-                        * np.sqrt(slope_to_neighbor[route_mask])
-                    )
-                    v_flow = np.clip(v_flow, 0.0, 7.5)
-                    flux[route_mask] = v_flow * box_depth[route_mask] * cell_size * dt_sub
-
-                fluxes.append(((dr, dc), flux))
-
-            # Total outward volume conservation (limit outflow to 85% of volume per substep)
-            total_out = sum(f for _, f in fluxes)
-            max_out = box_depth * cell_area * 0.85
-            scale = np.ones_like(box_depth)
-            over = total_out > max_out
-            scale[over] = max_out[over] / (total_out[over] + 1e-6)
-
-            d_vol = np.zeros_like(box_depth)
-            for (dr, dc), flux in fluxes:
-                scaled_flux = flux * scale
-                d_vol -= scaled_flux
-
-                # Non-wrapping accumulation to target cells
-                r_src_start = max(0, -dr)
-                r_src_end = min(box_depth.shape[0], box_depth.shape[0] - dr)
-                r_tgt_start = max(0, dr)
-                r_tgt_end = min(box_depth.shape[0], box_depth.shape[0] + dr)
-
-                c_src_start = max(0, -dc)
-                c_src_end = min(box_depth.shape[1], box_depth.shape[1] - dc)
-                c_tgt_start = max(0, dc)
-                c_tgt_end = min(box_depth.shape[1], box_depth.shape[1] + dc)
-
-                d_vol[r_tgt_start:r_tgt_end, c_tgt_start:c_tgt_end] += scaled_flux[r_src_start:r_src_end, c_src_start:c_src_end]
-
-            box_depth += (d_vol / cell_area)
-            box_depth = np.clip(box_depth, 0.0, max_dam_head)
-
+        # Write mutated depth back into sub-domain (box_depth is a copy, not a view)
         sub_depth[b_r0:b_r1, b_c0:b_c1] = box_depth
 
         # Update velocity field on active box
@@ -387,7 +384,7 @@ def run_2d_hydrodynamic_simulation(dem_path, breach_hydrograph_tuple, breach_par
         box_wet = box_depth > 0.05
         box_vel = np.zeros_like(box_depth)
         box_vel[box_wet] = (1.0 / manning_n) * (box_depth[box_wet] ** (2.0/3.0)) * np.sqrt(wse_slope[box_wet])
-        sub_vel[b_r0:b_r1, b_c0:b_c1] = np.clip(box_vel, 0.0, 12.0)
+        sub_vel[b_r0:b_r1, b_c0:b_c1] = box_vel
 
         # 3. Write back and update cumulative max grids
         depth_grid[r_start:r_end, c_start:c_end] = sub_depth
@@ -415,8 +412,8 @@ def run_2d_hydrodynamic_simulation(dem_path, breach_hydrograph_tuple, breach_par
             logging.info(f"  t = {t_hr:5.2f}h | Max Depth = {peak_curr:5.2f}m | Inundated Area = {inund_area_km2:6.1f} km² | Morbi Depth = {morbi_depth:4.2f}m")
 
     # Post-processing
-    max_depth_grid = gaussian_filter(max_depth_grid, sigma=0.4)
-    max_velocity_grid = gaussian_filter(max_velocity_grid, sigma=0.4)
+    # max_depth_grid = gaussian_filter(max_depth_grid, sigma=0.4)
+    # max_velocity_grid = gaussian_filter(max_velocity_grid, sigma=0.4)
     logging.info("Simulation loop completed successfully.")
 
     # Sanity check: max depth must be physically plausible
@@ -509,15 +506,29 @@ def generate_simulation_plots(sim_results, breach_hydrograph_tuple, breach_param
     ax1.legend(loc="upper right", frameon=True)
 
     # Inundation depth hydrograph at monitoring stations
-    colors = {"dam_toe": "#03045e", "morbi": "#d90429", "lilapar": "#0077b6", "malia": "#0096c7"}
-    for key, st in stations.items():
+    # Dynamic station colors — assign from a palette so any config works
+    palette = ["#03045e", "#d90429", "#0077b6", "#0096c7", "#48cae4", "#f77f00", "#d62828"]
+    for i, (key, st) in enumerate(stations.items()):
         peak_d = max(st["depth"])
-        ax2.plot(time_hours, st["depth"], color=colors[key], lw=2.0, label=f"{st['name']} (Peak: {peak_d:.2f} m)")
+        ax2.plot(time_hours, st["depth"], color=palette[i % len(palette)], lw=2.0, label=f"{st['name']} (Peak: {peak_d:.2f} m)")
 
-    ax2.axhline(3.0, color="gray", linestyle=":", lw=1.5, label="Morbi Historical Flood Level (~3.0 m / 10 ft)")
+    # Historical benchmark — read from NRLD CSV if available, fall back to config or 3.0m
+    _hist_bench = 3.0
+    _nrld_csv = PROJECT_ROOT / "data" / "raw" / "dams" / "nrld_machhu.csv"
+    if _nrld_csv.is_file():
+        import csv as _csv
+        with open(_nrld_csv, "r", encoding="utf-8") as _f:
+            for _row in _csv.reader(_f):
+                if _row and _row[0] == "flood_height_morbi":
+                    try:
+                        _hist_bench = float(_row[1].strip())
+                    except ValueError:
+                        pass
+                    break
+    ax2.axhline(_hist_bench, color="gray", linestyle=":", lw=1.5, label=f"Historical Flood Level (~{_hist_bench:.1f} m)")
     ax2.set_xlabel("Time from Failure Initiation [hours]", fontsize=11, fontweight="bold")
     ax2.set_ylabel("Flood Inundation Depth [m]", fontsize=11, fontweight="bold")
-    ax2.set_xlim(0, 24)
+    ax2.set_xlim(0, float(time_hours[-1]))
     ax2.grid(True, linestyle=":", alpha=0.6)
     ax2.legend(loc="upper right", frameon=True)
 
@@ -682,9 +693,9 @@ def main():
     print(f"    Reservoir Volume V  = {breach_params['V_reservoir_m3']/1e6:.1f} Mm³")
 
     # 2. Synthesize unsteady hydrograph
-    hydrograph_tuple = generate_unsteady_breach_hydrograph(breach_params, duration_hours=24.0, dt_seconds=120.0)
+    hydrograph_tuple = generate_unsteady_breach_hydrograph(breach_params, duration_hours=8.0, dt_seconds=120.0)
     time_h, _, q_tot, _ = hydrograph_tuple
-    print(f"\n[2] Hydrograph Synthesized: 24h duration, peak outflow = {np.max(q_tot):,.0f} m³/s at t = {time_h[np.argmax(q_tot)]:.2f} h")
+    print(f"\n[2] Hydrograph Synthesized: 8h duration, peak outflow = {np.max(q_tot):,.0f} m³/s at t = {time_h[np.argmax(q_tot)]:.2f} h")
 
     # 3. Run 2D Hydrodynamic Simulation
     sim_results = run_2d_hydrodynamic_simulation(DEM_FILE, hydrograph_tuple, breach_params, dam_config)
@@ -705,7 +716,7 @@ def main():
     print(f"  Sanity Check         : {'PASSED ✓' if sim_results.get('sanity_passed') else 'FAILED ✗'}")
     print(f"  Total Inundated Area : {summary['total_inundation_area_km2']} km²")
     print(f"  Max Inundation Depth : {summary['max_simulated_depth_m']} m")
-    print(f"  Morbi Peak Depth     : {summary['monitoring_gauges'].get('morbi', list(summary['monitoring_gauges'].values())[-1])['peak_depth_m']} m (Historical ~3.0 m)")
+    print(f"  Morbi Peak Depth     : {summary['monitoring_gauges'].get('morbi', list(summary['monitoring_gauges'].values())[-1])['peak_depth_m']} m (Historical benchmark from NRLD)")
     print(f"  Morbi Arrival Time   : {summary['monitoring_gauges'].get('morbi', list(summary['monitoring_gauges'].values())[-1])['arrival_time_hours']} hours post-breach")
     print("=" * 70)
 

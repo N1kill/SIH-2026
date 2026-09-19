@@ -1,0 +1,4 @@
+[geometry]
+NetFile = domain_net.nc
+[time]
+DtUser = 300

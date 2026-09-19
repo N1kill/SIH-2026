@@ -18,7 +18,6 @@ shapely>=2.0.0
 xarray>=2023.1.0
 netCDF4>=1.6.0
 scipy>=1.11.0
-pysph>=1.0b1
 earthengine-api>=0.1.370
 fastapi>=0.103.0
 uvicorn>=0.23.0

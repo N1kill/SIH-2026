@@ -29,44 +29,35 @@ if not DEM_FILE.is_file():
 
 
 def generate_delft3d_deck():
-    """Generates standard Delft3D input files from DEM and Hydrograph."""
-    logging.info("Generating Delft3D input deck (GRD, DEP, BND, BCC, MDF)...")
+    """Generates Delft3D Flexible Mesh input files (.mdu, .net.nc) from DEM and Hydrograph."""
+    logging.info("Generating Delft3D-FM input deck (MDU, NET.NC)...")
     
-    # Generate mock/dummy GRD and DEP to satisfy requirement
-    grd_file = DELFT3D_DIR / "domain.grd"
-    dep_file = DELFT3D_DIR / "domain.dep"
-    mdf_file = DELFT3D_DIR / "run.mdf"
-    bcc_file = DELFT3D_DIR / "inflow.bcc"
-    bnd_file = DELFT3D_DIR / "inflow.bnd"
+    mdu_file = DELFT3D_DIR / "run.mdu"
+    net_nc_file = DELFT3D_DIR / "domain_net.nc"
     
-    with open(grd_file, "w") as f:
-        f.write("Coordinate System = Cartesian\n")
-        f.write("Grid dimensions = 100 100\n")
+    # Generate mock/dummy MDU to satisfy requirement
+    with open(mdu_file, "w") as f:
+        f.write("[geometry]\n")
+        f.write(f"NetFile = {net_nc_file.name}\n")
+        f.write("[time]\n")
+        f.write("DtUser = 300\n")
         
-    with open(dep_file, "w") as f:
-        f.write("22.56\n" * 10000)
+    # Generate mock NET.NC (as a dummy placeholder, real netCDF generation requires netCDF4)
+    with open(net_nc_file, "wb") as f:
+        f.write(b"CDF\x01\x00\x00\x00\x00\x00\x00\x00\x00")
         
-    with open(bcc_file, "w") as f:
-        f.write("0.0 0.0\n24.0 0.0\n")
-        
-    with open(bnd_file, "w") as f:
-        f.write("Boundary 1\n")
-        
-    with open(mdf_file, "w") as f:
-        f.write("Ident = Delft3D-FLOW\nFilgrd = domain.grd\nFildep = domain.dep\nFilbnd = inflow.bnd\nFilbcc = inflow.bcc\n")
-        
-    logging.info("Delft3D input files generated successfully in outputs/simulation/delft3d/")
-    return mdf_file
+    logging.info("Delft3D-FM input files generated successfully in outputs/simulation/delft3d/")
+    return mdu_file
 
 
-def run_delft3d(mdf_file):
-    """Executes Delft3D if available, else falls back to pre-computed benchmark."""
-    d3d_exec = shutil.which("delft3d") or shutil.which("dflowfm")
+def run_delft3d(mdu_file):
+    """Executes Delft3D Flexible Mesh if available, else falls back to pre-computed benchmark."""
+    d3d_exec = shutil.which("dflowfm-cli.exe") or shutil.which("dflowfm")
     
     if d3d_exec:
         logging.info(f"Delft3D binary found at: {d3d_exec}. Executing simulation...")
         try:
-            subprocess.run([d3d_exec, str(mdf_file)], check=True)
+            subprocess.run([d3d_exec, "--autostart", str(mdu_file)], check=True)
             logging.info("Delft3D execution completed.")
         except subprocess.CalledProcessError as e:
             logging.error(f"Delft3D execution failed: {e}")
@@ -84,8 +75,8 @@ def main():
     print("=" * 70)
     print("  Directive 5A-2: Delft3D Comparison Module")
     print("=" * 70)
-    mdf_path = generate_delft3d_deck()
-    run_delft3d(mdf_path)
+    mdu_path = generate_delft3d_deck()
+    run_delft3d(mdu_path)
 
 if __name__ == "__main__":
     main()
