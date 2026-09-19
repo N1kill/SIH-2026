@@ -24,7 +24,6 @@ import logging
 from datetime import datetime, timezone
 from pathlib import Path
 
-import ee
 import matplotlib.pyplot as plt
 import numpy as np
 import rasterio
@@ -63,6 +62,9 @@ def generate_satellite_flood_extent(ref_dem_path):
     Applies SAR backscatter thresholding (Otsu threshold on VV/VH backscatter).
     Uses Live GEE API with headless fallback.
     """
+    cached_s1_file = PROJECT_ROOT / "data" / "raw" / "satellite" / "cached_sentinel1.tif"
+    if not cached_s1_file.is_file():
+        raise FileNotFoundError("No observed SAR raster: supply data/raw/satellite/cached_sentinel1.tif. Missing observations must not become an empty observed flood mask.")
     logging.info(f"Loading reference grid geometry from: {ref_dem_path}")
     with rasterio.open(ref_dem_path) as src:
         dem = src.read(1)
@@ -74,77 +76,32 @@ def generate_satellite_flood_extent(ref_dem_path):
         res_y = abs(transform[4])
         cell_area_km2 = (res_x * res_y) / 1e6
 
-    # GEE Authentication
-    gee_authenticated = False
-    try:
-        import ee
-        ee.Initialize()
-        gee_authenticated = True
-        logging.info("GEE API initialized successfully.")
-    except Exception:
-        logging.warning("GEE not initialized. Attempting interactive auth...")
-        try:
-            import ee
-            ee.Authenticate()
-            ee.Initialize()
-            gee_authenticated = True
-            logging.info("GEE API initialized after authentication.")
-        except Exception as e:
-            logging.warning(f"GEE Auth failed: {e}. Falling back to bundled static GeoTIFF.")
-            gee_authenticated = False
-
-    if gee_authenticated:
-        logging.info("Fetching real Sentinel-1 pass from GEE...")
-        try:
-            import ee
-            aoi = ee.Geometry.Rectangle([bounds.left, bounds.bottom, bounds.right, bounds.top])
-            collection = (ee.ImageCollection('COPERNICUS/S1_GRD')
-                .filterBounds(aoi)
-                .filterDate('2026-08-01', '2026-08-31') # Example dates
-                .filter(ee.Filter.eq('instrumentMode', 'IW'))
-                .filter(ee.Filter.listContains('transmitterReceiverPolarisation', 'VV'))
-                .select('VV')
-                .sort('system:time_start', False)
-                .first())
-            
-            # Note: in a real implementation, you would download this via geemap or getDownloadURL
-            # and populate sar_backscatter_db. For this demo, if GEE succeeds, we pretend it returned
-            # a valid array. In reality, you'd process the downloaded GeoTIFF.
-            logging.info("Successfully fetched Sentinel-1 metadata from GEE. Proceeding to use cached image for consistency.")
-        except Exception as e:
-            logging.error(f"Failed to fetch GEE data: {e}. Proceeding to fallback.")
-            
+    # Network context is handled by src.observations. This operation requires
+    # an actual local SAR raster and never triggers interactive authentication.
     # Fallback to locally cached genuine Sentinel-1 GeoTIFF
     cached_s1_file = PROJECT_ROOT / "data" / "raw" / "satellite" / "cached_sentinel1.tif"
-    sar_backscatter_db = np.full(dem.shape, -12.5, dtype=np.float32)
+    sar_backscatter_db = np.full(dem.shape, np.nan, dtype=np.float32)
     
     if cached_s1_file.is_file():
         logging.info(f"Loading cached real Sentinel-1 GeoTIFF from {cached_s1_file}")
         with rasterio.open(cached_s1_file) as s_src:
             cached_data = s_src.read(1)
-            # Ensure it matches the DEM shape, or warp it. Here we assume it's pre-aligned.
-            if cached_data.shape == sar_backscatter_db.shape:
-                sar_backscatter_db = cached_data
-            else:
-                from rasterio.warp import reproject, Resampling
-                reproject(
-                    source=cached_data,
-                    destination=sar_backscatter_db,
-                    src_transform=s_src.transform,
-                    src_crs=s_src.crs,
-                    dst_transform=transform,
-                    dst_crs=crs,
-                    resampling=Resampling.bilinear
-                )
+            from rasterio.warp import reproject, Resampling
+            if s_src.crs is None:
+                raise ValueError("SAR raster requires a CRS")
+            reproject(source=cached_data,destination=sar_backscatter_db,
+                src_transform=s_src.transform,src_crs=s_src.crs,src_nodata=s_src.nodata,
+                dst_transform=transform,dst_crs=crs,dst_nodata=np.nan,resampling=Resampling.bilinear)
     else:
         logging.warning("Cached Sentinel-1 file not found. Generating empty mask as fallback to avoid fake data.")
         # We explicitly DO NOT generate synthetic data here per user request.
 
-    # Apply Otsu automatic thresholding for water delineation (standard Sentinel-1 threshold: -17.0 dB)
+    # Explicit fixed exploratory threshold, not an Otsu estimate or validated flood classifier.
     otsu_threshold = -17.0
     water_mask = (sar_backscatter_db < otsu_threshold).astype(np.uint8)
     
     water_mask_clean = (gaussian_filter(water_mask.astype(float), sigma=0.5) > 0.35).astype(np.uint8)
+    water_mask_clean[~np.isfinite(sar_backscatter_db)] = 255
     satellite_water_area_km2 = float(np.sum(water_mask_clean == 1) * cell_area_km2)
     logging.info(f"Derived satellite water surface area: {satellite_water_area_km2:.2f} km� (Machhu AOI)")
 

@@ -1,7 +1,7 @@
 {
   "project": "Machhu-II Dam Breach Simulation",
   "directive": "5A",
-  "timestamp": "2026-09-19T06:58:32.687703+00:00",
+  "timestamp": "2026-09-19T11:00:53.723718+00:00",
   "model_engine": "2D Unsteady Hydrodynamic Raster Engine (Manning / Diffusive Wave)",
   "grid_resolution_m": 29.989044303443436,
   "breach_parameters_used": {
@@ -13,51 +13,51 @@
     "H_dam_m": 22.56
   },
   "peak_discharge_m3s": 6641.06594847223,
-  "total_inundation_area_km2": 17.27,
-  "area_depth_gt_2m_km2": 12.52,
-  "max_simulated_depth_m": 21.44,
-  "max_simulated_velocity_ms": 123.63,
+  "total_inundation_area_km2": 24.49,
+  "area_depth_gt_2m_km2": 16.49,
+  "max_simulated_depth_m": 25.34,
+  "max_simulated_velocity_ms": 139.41,
   "sanity_check_passed": true,
   "metrics": {
     "peak_discharge_m3s": 6641.06594847223,
-    "total_inundated_area_km2": 17.27,
-    "morbi_peak_depth_m": 14.94,
-    "morbi_arrival_time_hours": 1.57,
-    "max_depth_m": 21.44,
-    "max_velocity_ms": 123.63
+    "total_inundated_area_km2": 24.49,
+    "morbi_peak_depth_m": 16.88,
+    "morbi_arrival_time_hours": 1.37,
+    "max_depth_m": 25.34,
+    "max_velocity_ms": 139.41
   },
   "monitoring_gauges": {
     "dam_toe": {
       "name": "Machhu-II Dam Toe (0 km)",
-      "peak_depth_m": 16.95,
+      "peak_depth_m": 17.69,
       "arrival_time_hours": 0.07,
-      "peak_time_hours": 2.77
+      "peak_time_hours": 3.33
     },
     "morbi": {
       "name": "Morbi City Center (5.2 km)",
-      "peak_depth_m": 14.94,
-      "arrival_time_hours": 1.57,
-      "peak_time_hours": 7.67
+      "peak_depth_m": 16.88,
+      "arrival_time_hours": 1.37,
+      "peak_time_hours": 7.8
     },
     "lilapar": {
       "name": "Lilapar / Dhuva (12 km)",
-      "peak_depth_m": 13.03,
-      "arrival_time_hours": 2.73,
-      "peak_time_hours": 7.73
+      "peak_depth_m": 15.34,
+      "arrival_time_hours": 2.4,
+      "peak_time_hours": 8.0
     },
     "malia": {
       "name": "Malia Miyana (25 km)",
-      "peak_depth_m": 12.12,
-      "arrival_time_hours": 4.43,
-      "peak_time_hours": 8.0
+      "peak_depth_m": 14.83,
+      "arrival_time_hours": 3.93,
+      "peak_time_hours": 7.97
     }
   },
   "output_files": {
-    "depth_max": "C:\\Users\\S Srirama Mithilesh\\practice\\SIH-2026\\outputs\\simulation\\depth_max.tif",
-    "velocity_max": "C:\\Users\\S Srirama Mithilesh\\practice\\SIH-2026\\outputs\\simulation\\velocity_max.tif",
-    "arrival_time": "C:\\Users\\S Srirama Mithilesh\\practice\\SIH-2026\\outputs\\simulation\\arrival_time.tif",
-    "flood_duration": "C:\\Users\\S Srirama Mithilesh\\practice\\SIH-2026\\outputs\\simulation\\flood_duration.tif",
-    "hydrograph_plot": "C:\\Users\\S Srirama Mithilesh\\practice\\SIH-2026\\outputs\\gis\\morbi_hydrograph.png",
-    "depth_map": "C:\\Users\\S Srirama Mithilesh\\practice\\SIH-2026\\outputs\\gis\\inundation_depth_map.png"
+    "depth_max": "/mnt/c/Users/DELL/SIH-2026/outputs/simulation/depth_max.tif",
+    "velocity_max": "/mnt/c/Users/DELL/SIH-2026/outputs/simulation/velocity_max.tif",
+    "arrival_time": "/mnt/c/Users/DELL/SIH-2026/outputs/simulation/arrival_time.tif",
+    "flood_duration": "/mnt/c/Users/DELL/SIH-2026/outputs/simulation/flood_duration.tif",
+    "hydrograph_plot": "/mnt/c/Users/DELL/SIH-2026/outputs/gis/morbi_hydrograph.png",
+    "depth_map": "/mnt/c/Users/DELL/SIH-2026/outputs/gis/inundation_depth_map.png"
   }
 }

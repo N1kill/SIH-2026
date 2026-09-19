@@ -1,14 +1,24 @@
-# Specula Engineering & Design Standards
+# Flood dashboard UI and report rules
 
-The following rules MUST pass code review on all UI components, marketing pages, and ReportLab PDF renderers. They are non-negotiable standards for the Specula brand.
+Apply these rules only when changing user interfaces, maps, charts, or generated
+reports in this repository.
 
-## Pre-Commit Engineering & Design Checklist
-
-*   **Zero Glassmorphism:** Ensure no `backdrop-filter: blur(...)` is applied; containers must use solid `#1C1844` on top of `#120E32`.
-*   **Zero Drop Shadows:** Disallow soft drop shadows on dark backgrounds; depth must be structured entirely through 1px solid `var(--sp-color-border-grid)` borders.
-*   **Sharp Contours:** Cap border-radius strictly at 2px (or 0px on tables/terminal panes). No pill-shaped buttons.
-*   **Telemetry Data in Monospace:** Every hash (SHA-256), timestamp, IP address, Merkle leaf, and numeric benchmark metric must be explicitly rendered in `var(--sp-font-mono)` (Fira Code or JetBrains Mono).
-*   **Deterministic Progress States:** Indefinite spinning indicators are prohibited; all agent operations must expose timestamped telemetry lines or bounded progress trackers (0%–100%).
-*   **Copy Integrity:** Marketing and UI copy must reject SaaS buzzwords (magic, copilot, seamless, unlock) in favor of forensic, empirical language (admissible, reconstruct, topological, provenance).
-
-Any agent modifying the UI or generating reports MUST adhere to these rules.
+- Prioritize emergency interpretation: flood extent, depth, velocity, arrival time,
+  duration, timestamps, units, and data status must be unambiguous.
+- Never communicate hazard severity by color alone. Pair colors with labels, values,
+  patterns, or icons and maintain readable contrast.
+- Preserve the dashboard's established dark command-center visual language unless the
+  user asks for a redesign. Reuse existing CSS tokens before introducing new values.
+- Use monospaced numerals where alignment materially improves telemetry readability.
+- Prefer bounded progress when total work is known. For indeterminate work, show an
+  explicit activity state, elapsed time or latest timestamp, and a useful status label.
+- Maps and charts must include the relevant legend, units, time basis, and source or
+  provenance note. Do not imply precision beyond the underlying simulation or data.
+- Keep controls keyboard-accessible, provide visible focus states, label icon-only
+  controls, and respect reduced-motion preferences.
+- Test layouts at narrow and wide viewport sizes. Critical alerts and primary actions
+  must not depend on hover.
+- Use factual, operational language. Clearly distinguish observed, simulated,
+  estimated, unavailable, and fallback data.
+- For UI design or implementation, use the `ui-ux-pro-max` skill in
+  `.agents/skills/ui-ux-pro-max/` when its specialized guidance is relevant.

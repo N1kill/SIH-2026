@@ -171,9 +171,12 @@ class SPHBreachSolver:
         return B * ((density / p.rest_density) ** p.gamma_tait - 1.0)
 
     def step(self, dt_s: float = None) -> dict:
-        """Advance SPH using a fixed stable timestep for physical integration,
-        treating the macro dt_s as a qualitative driver."""
-        dt_sph = 0.05
+        """Advance one CFL/acceleration-limited substep; report actual elapsed time."""
+        if dt_s is not None and (not np.isfinite(dt_s) or dt_s <= 0):
+            raise ValueError("SPH timestep must be finite and positive")
+        speed = float(np.max(np.linalg.norm(self.vel, axis=1))) if len(self.vel) else 0.
+        dt_sph = min(dt_s if dt_s is not None else float("inf"),
+                     self.p.dt_cfl_factor*self.p.h/(self.p.sound_speed+speed+1e-6))
         
         p = self.p
         h = p.h
@@ -194,7 +197,7 @@ class SPHBreachSolver:
         np.add.at(density, j, p.particle_mass * w)
         density = np.maximum(density, 0.2 * p.rest_density)
         self.density = density
-        self.pressure = self._tait_pressure(density)
+        self.pressure = np.maximum(self._tait_pressure(density), 0.)
 
         # --- pressure + artificial viscosity forces ---
         vij = self.vel[i] - self.vel[j]
@@ -228,7 +231,9 @@ class SPHBreachSolver:
             f_idx = np.where(~b_mask)[0]
             b_idx = np.where(b_mask)[0]
             if len(f_idx) and len(b_idx):
-                pi_b, pj_b = self._neighbor_pairs_between(f_idx, b_idx, cutoff)
+                cross = self.is_boundary[i] != self.is_boundary[j]
+                pi_b = np.where(self.is_boundary[i[cross]], j[cross], i[cross])
+                pj_b = np.where(self.is_boundary[i[cross]], i[cross], j[cross])
                 if len(pi_b):
                     rvec = self.pos[pi_b] - self.pos[pj_b]
                     dist = np.linalg.norm(rvec, axis=1) + 1e-9
@@ -242,7 +247,9 @@ class SPHBreachSolver:
             max_speed = np.max(np.linalg.norm(self.vel, axis=1)) if n else 0.0
             dt_s = p.dt_cfl_factor * h / (p.sound_speed + max_speed + 1e-6)
 
-        # --- integration (using stable dt_sph) ---
+        max_accel = float(np.max(np.linalg.norm(accel, axis=1)))
+        dt_sph = min(dt_sph, .2*np.sqrt(h/max(max_accel,1e-9)))
+        # Symplectic Euler, bounded by both acoustic and acceleration limits.
         fluid = ~self.is_boundary
         self.vel[fluid] += accel[fluid] * dt_sph
         self.pos[fluid] += self.vel[fluid] * dt_sph
@@ -250,6 +257,9 @@ class SPHBreachSolver:
         self.time_s += dt_sph
 
         self._remove_particles_outside_domain()
+        if not np.isfinite(self.pos).all() or not np.isfinite(self.vel).all():
+            raise ArithmeticError("SPH instability: nonfinite state")
+        n = len(self.pos)
 
         return {
             "time_s": self.time_s,
@@ -340,7 +350,7 @@ class SPHBreachSolver:
                      "spray_fraction": 0.0}
         vx = self.vel[near_gate, 0]
         moving_through = vx > 0
-        flux = np.sum(vx[moving_through]) * self.p.particle_spacing_m ** 2 / dx_m
+        flux = np.sum(vx[moving_through]) * self.p.particle_spacing_m ** 2 / (2*dx_m)
         mean_v = float(np.mean(vx[moving_through])) if moving_through.any() else 0.0
         # crude spray proxy: particles with a large vertical velocity component
         # relative to horizontal, i.e. ballistic droplets rather than sheet flow

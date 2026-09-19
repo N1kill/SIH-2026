@@ -76,7 +76,7 @@ def download_dem(api_key: str, bbox: tuple, out_path: pathlib.Path):
         "outputFormat": "GTiff",
         "API_Key": api_key,
     }
-    logging.info(f"Requesting DEM from OpenTopography: {params}")
+    logging.info("Requesting SRTM DEM from OpenTopography for bbox %s", bbox)
 
     def _do():
         response = requests.get(url, params=params, timeout=180)

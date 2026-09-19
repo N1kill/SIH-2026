@@ -49,7 +49,14 @@ import rasterio
 from rasterio.crs import CRS
 from rasterio.transform import rowcol, xy
 from scipy.ndimage import gaussian_filter
-from numba import njit, prange
+from numba import njit, prange, cuda
+
+GPU_AVAILABLE = False
+try:
+    if cuda.is_available():
+        GPU_AVAILABLE = True
+except Exception:
+    pass
 
 # Numba-optimized 2D Diffusive Wave routing step
 @njit(parallel=True)
@@ -104,6 +111,188 @@ def diffusive_wave_step(box_dem, box_depth, n_substeps, dt_sub, cell_size, cell_
         for r in prange(nrows):
             for c in range(ncols):
                 box_depth[r, c] = max(0.0, box_depth[r, c] + d_vol[r, c] / cell_area)
+
+if GPU_AVAILABLE:
+    @cuda.jit
+    def cuda_zero_arrays(wse, dem, depth, fluxes, total_out, d_vol):
+        r, c = cuda.grid(2)
+        if r < dem.shape[0] and c < dem.shape[1]:
+            wse[r, c] = dem[r, c] + depth[r, c]
+            total_out[r, c] = 0.0
+            d_vol[r, c] = 0.0
+            for i in range(8):
+                fluxes[r, c, i] = 0.0
+
+    @cuda.jit
+    def cuda_compute_flux(box_dem, box_depth, box_wse, fluxes, total_out, dt_sub, cell_size, cell_area, manning_n):
+        r, c = cuda.grid(2)
+        nrows, ncols = box_dem.shape
+        drs_0, drs_1, drs_2, drs_3, drs_4, drs_5, drs_6, drs_7 = -1, 1, 0, 0, -1, -1, 1, 1
+        dcs_0, dcs_1, dcs_2, dcs_3, dcs_4, dcs_5, dcs_6, dcs_7 = 0, 0, -1, 1, -1, 1, -1, 1
+        d_0 = d_1 = d_2 = d_3 = cell_size
+        d_4 = d_5 = d_6 = d_7 = cell_size * 1.4142
+
+        if r < nrows and c < ncols:
+            depth = box_depth[r, c]
+            if depth > 0.05:
+                wse = box_wse[r, c]
+                
+                # Check 8 neighbors
+                # 0
+                nr = r + drs_0; nc = c + dcs_0
+                if 0 <= nr < nrows and 0 <= nc < ncols:
+                    slope = (wse - box_wse[nr, nc]) / d_0
+                    if slope > 0.0001:
+                        flux = (1.0 / manning_n) * (depth ** (2.0 / 3.0)) * math.sqrt(slope) * depth * cell_size * dt_sub
+                        fluxes[r, c, 0] = flux
+                        total_out[r, c] += flux
+                # 1
+                nr = r + drs_1; nc = c + dcs_1
+                if 0 <= nr < nrows and 0 <= nc < ncols:
+                    slope = (wse - box_wse[nr, nc]) / d_1
+                    if slope > 0.0001:
+                        flux = (1.0 / manning_n) * (depth ** (2.0 / 3.0)) * math.sqrt(slope) * depth * cell_size * dt_sub
+                        fluxes[r, c, 1] = flux
+                        total_out[r, c] += flux
+                # 2
+                nr = r + drs_2; nc = c + dcs_2
+                if 0 <= nr < nrows and 0 <= nc < ncols:
+                    slope = (wse - box_wse[nr, nc]) / d_2
+                    if slope > 0.0001:
+                        flux = (1.0 / manning_n) * (depth ** (2.0 / 3.0)) * math.sqrt(slope) * depth * cell_size * dt_sub
+                        fluxes[r, c, 2] = flux
+                        total_out[r, c] += flux
+                # 3
+                nr = r + drs_3; nc = c + dcs_3
+                if 0 <= nr < nrows and 0 <= nc < ncols:
+                    slope = (wse - box_wse[nr, nc]) / d_3
+                    if slope > 0.0001:
+                        flux = (1.0 / manning_n) * (depth ** (2.0 / 3.0)) * math.sqrt(slope) * depth * cell_size * dt_sub
+                        fluxes[r, c, 3] = flux
+                        total_out[r, c] += flux
+                # 4
+                nr = r + drs_4; nc = c + dcs_4
+                if 0 <= nr < nrows and 0 <= nc < ncols:
+                    slope = (wse - box_wse[nr, nc]) / d_4
+                    if slope > 0.0001:
+                        flux = (1.0 / manning_n) * (depth ** (2.0 / 3.0)) * math.sqrt(slope) * depth * cell_size * dt_sub
+                        fluxes[r, c, 4] = flux
+                        total_out[r, c] += flux
+                # 5
+                nr = r + drs_5; nc = c + dcs_5
+                if 0 <= nr < nrows and 0 <= nc < ncols:
+                    slope = (wse - box_wse[nr, nc]) / d_5
+                    if slope > 0.0001:
+                        flux = (1.0 / manning_n) * (depth ** (2.0 / 3.0)) * math.sqrt(slope) * depth * cell_size * dt_sub
+                        fluxes[r, c, 5] = flux
+                        total_out[r, c] += flux
+                # 6
+                nr = r + drs_6; nc = c + dcs_6
+                if 0 <= nr < nrows and 0 <= nc < ncols:
+                    slope = (wse - box_wse[nr, nc]) / d_6
+                    if slope > 0.0001:
+                        flux = (1.0 / manning_n) * (depth ** (2.0 / 3.0)) * math.sqrt(slope) * depth * cell_size * dt_sub
+                        fluxes[r, c, 6] = flux
+                        total_out[r, c] += flux
+                # 7
+                nr = r + drs_7; nc = c + dcs_7
+                if 0 <= nr < nrows and 0 <= nc < ncols:
+                    slope = (wse - box_wse[nr, nc]) / d_7
+                    if slope > 0.0001:
+                        flux = (1.0 / manning_n) * (depth ** (2.0 / 3.0)) * math.sqrt(slope) * depth * cell_size * dt_sub
+                        fluxes[r, c, 7] = flux
+                        total_out[r, c] += flux
+
+    @cuda.jit
+    def cuda_update_dvol(box_depth, fluxes, total_out, d_vol, cell_area):
+        r, c = cuda.grid(2)
+        nrows, ncols = box_depth.shape
+        drs_0, drs_1, drs_2, drs_3, drs_4, drs_5, drs_6, drs_7 = -1, 1, 0, 0, -1, -1, 1, 1
+        dcs_0, dcs_1, dcs_2, dcs_3, dcs_4, dcs_5, dcs_6, dcs_7 = 0, 0, -1, 1, -1, 1, -1, 1
+
+        if r < nrows and c < ncols:
+            tout = total_out[r, c]
+            if tout > 0.0:
+                max_out = box_depth[r, c] * cell_area * 0.85
+                scale = 1.0
+                if max_out < tout:
+                    scale = max_out / tout
+                
+                f0 = fluxes[r, c, 0] * scale
+                if f0 > 0.0:
+                    cuda.atomic.add(d_vol, (r, c), -f0)
+                    cuda.atomic.add(d_vol, (r + drs_0, c + dcs_0), f0)
+                f1 = fluxes[r, c, 1] * scale
+                if f1 > 0.0:
+                    cuda.atomic.add(d_vol, (r, c), -f1)
+                    cuda.atomic.add(d_vol, (r + drs_1, c + dcs_1), f1)
+                f2 = fluxes[r, c, 2] * scale
+                if f2 > 0.0:
+                    cuda.atomic.add(d_vol, (r, c), -f2)
+                    cuda.atomic.add(d_vol, (r + drs_2, c + dcs_2), f2)
+                f3 = fluxes[r, c, 3] * scale
+                if f3 > 0.0:
+                    cuda.atomic.add(d_vol, (r, c), -f3)
+                    cuda.atomic.add(d_vol, (r + drs_3, c + dcs_3), f3)
+                f4 = fluxes[r, c, 4] * scale
+                if f4 > 0.0:
+                    cuda.atomic.add(d_vol, (r, c), -f4)
+                    cuda.atomic.add(d_vol, (r + drs_4, c + dcs_4), f4)
+                f5 = fluxes[r, c, 5] * scale
+                if f5 > 0.0:
+                    cuda.atomic.add(d_vol, (r, c), -f5)
+                    cuda.atomic.add(d_vol, (r + drs_5, c + dcs_5), f5)
+                f6 = fluxes[r, c, 6] * scale
+                if f6 > 0.0:
+                    cuda.atomic.add(d_vol, (r, c), -f6)
+                    cuda.atomic.add(d_vol, (r + drs_6, c + dcs_6), f6)
+                f7 = fluxes[r, c, 7] * scale
+                if f7 > 0.0:
+                    cuda.atomic.add(d_vol, (r, c), -f7)
+                    cuda.atomic.add(d_vol, (r + drs_7, c + dcs_7), f7)
+
+    @cuda.jit
+    def cuda_apply_dvol(box_depth, d_vol, cell_area):
+        r, c = cuda.grid(2)
+        nrows, ncols = box_depth.shape
+        if r < nrows and c < ncols:
+            nd = box_depth[r, c] + d_vol[r, c] / cell_area
+            if nd < 0.0:
+                nd = 0.0
+            box_depth[r, c] = nd
+
+def run_diffusive_wave_gpu(box_dem, box_depth, n_substeps, dt_sub, cell_size, cell_area, manning_n):
+    nrows, ncols = box_dem.shape
+    d_box_dem = cuda.to_device(box_dem)
+    d_box_depth = cuda.to_device(box_depth)
+    
+    threadsperblock = (16, 16)
+    blockspergrid_x = math.ceil(nrows / threadsperblock[0])
+    blockspergrid_y = math.ceil(ncols / threadsperblock[1])
+    blockspergrid = (blockspergrid_x, blockspergrid_y)
+
+    d_box_wse = cuda.device_array((nrows, ncols), dtype=np.float32)
+    d_fluxes = cuda.device_array((nrows, ncols, 8), dtype=np.float32)
+    d_total_out = cuda.device_array((nrows, ncols), dtype=np.float32)
+    d_d_vol = cuda.device_array((nrows, ncols), dtype=np.float32)
+
+    for _ in range(n_substeps):
+        cuda_zero_arrays[blockspergrid, threadsperblock](d_box_wse, d_box_dem, d_box_depth, d_fluxes, d_total_out, d_d_vol)
+        cuda.synchronize()
+        cuda_compute_flux[blockspergrid, threadsperblock](d_box_dem, d_box_depth, d_box_wse, d_fluxes, d_total_out, dt_sub, cell_size, cell_area, manning_n)
+        cuda.synchronize()
+        cuda_update_dvol[blockspergrid, threadsperblock](d_box_depth, d_fluxes, d_total_out, d_d_vol, cell_area)
+        cuda.synchronize()
+        cuda_apply_dvol[blockspergrid, threadsperblock](d_box_depth, d_d_vol, cell_area)
+        cuda.synchronize()
+        
+    d_box_depth.copy_to_host(box_depth)
+
+def dispatch_diffusive_wave(box_dem, box_depth, n_substeps, dt_sub, cell_size, cell_area, manning_n):
+    if GPU_AVAILABLE:
+        run_diffusive_wave_gpu(box_dem, box_depth, n_substeps, dt_sub, cell_size, cell_area, manning_n)
+    else:
+        diffusive_wave_step(box_dem, box_depth, n_substeps, dt_sub, cell_size, cell_area, manning_n)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="[%(asctime)s] %(levelname)s: %(message)s")
@@ -222,11 +411,11 @@ def run_2d_hydrodynamic_simulation(dem_path, breach_hydrograph_tuple, breach_par
         transform = src.transform
         crs = src.crs
         nodata = src.nodata
-        res_x = abs(transform[0])
-        res_y = abs(transform[4])
+        res_x = abs(transform.a)
+        res_y = abs(transform.e)
         cell_size = (res_x + res_y) / 2.0
         nrows, ncols = dem.shape
-        bounds = src.bounds
+
 
     # Handle nodata
     if nodata is not None:
@@ -245,7 +434,8 @@ def run_2d_hydrodynamic_simulation(dem_path, breach_hydrograph_tuple, breach_par
     def geo_to_grid(lat, lon, snap_radius=12):
         """Convert lat/lon to grid row/col, snap to lowest elevation (channel thalweg)."""
         x, y = transformer.transform(lon, lat)
-        r, c = rowcol(transform, x, y)
+        c = int((x - transform.c) // transform.a)
+        r = int((y - transform.f) // transform.e)
         r = int(np.clip(r, 0, nrows - 1))
         c = int(np.clip(c, 0, ncols - 1))
         # Snap to channel (lowest elevation within radius)
@@ -373,7 +563,7 @@ def run_2d_hydrodynamic_simulation(dem_path, breach_hydrograph_tuple, breach_par
         dt_sub = dt_sim / float(n_substeps)
 
         if np.any(box_depth > 0.05):
-            diffusive_wave_step(box_dem, box_depth, n_substeps, dt_sub, cell_size, cell_area, manning_n)
+            dispatch_diffusive_wave(box_dem, box_depth, n_substeps, dt_sub, cell_size, cell_area, manning_n)
 
         # Write mutated depth back into sub-domain (box_depth is a copy, not a view)
         sub_depth[b_r0:b_r1, b_c0:b_c1] = box_depth

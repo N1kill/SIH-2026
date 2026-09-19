@@ -1,0 +1,17 @@
+FROM node:22-alpine AS frontend
+WORKDIR /build
+COPY package.json package-lock.json ./
+RUN npm ci --ignore-scripts
+COPY scripts/build_frontend.mjs scripts/build_frontend.mjs
+COPY outputs/3d/dashboard/twin.html outputs/3d/dashboard/twin.css outputs/3d/dashboard/twin.js outputs/3d/dashboard/
+RUN npm run build
+
+FROM python:3.13-slim
+WORKDIR /app
+COPY requirements-core.txt ./
+RUN pip install --no-cache-dir -r requirements-core.txt
+COPY src/ src/
+COPY server.py config.json ./
+COPY --from=frontend /build/outputs/3d/dashboard/ outputs/3d/dashboard/
+EXPOSE 8050
+CMD ["python","-m","uvicorn","server:app","--host","0.0.0.0","--port","8050","--workers","1"]

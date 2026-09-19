@@ -1,6 +1,7 @@
 rasterio>=1.3.0
+affine>=2.4.0
 geopandas>=0.14.0
-numpy>=1.24.0
+numpy>=1.24.0,<2.0.0
 pandas>=2.0.0
 matplotlib>=3.7.0
 imdlib>=0.1.7

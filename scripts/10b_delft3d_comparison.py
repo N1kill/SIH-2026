@@ -288,7 +288,9 @@ def export_dashboard_wet_cells(map_path: Path, output_path: Path) -> None:
     with Dataset(map_path) as nc:
         node_x = np.asarray(nc["mesh2d_node_x"][:], dtype=float)
         node_y = np.asarray(nc["mesh2d_node_y"][:], dtype=float)
-        faces = np.ma.filled(nc["mesh2d_face_nodes"][:], -1).astype(int)
+        face_variable = nc["mesh2d_face_nodes"]
+        start_index = int(getattr(face_variable, "start_index", 0))
+        faces = np.ma.filled(face_variable[:], -999).astype(int) - start_index
         times = np.asarray(nc["time"][:], dtype=float)
         depths = np.ma.filled(nc["mesh2d_waterdepth"][:], 0.0).astype(float)
         levels = np.ma.filled(nc["mesh2d_s1"][:], 0.0).astype(float)

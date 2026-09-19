@@ -1,0 +1,10 @@
+.git
+.agents
+node_modules
+.venv
+**/__pycache__
+.env
+data
+outputs/runs
+outputs/simulation
+outputs/gis

@@ -1,0 +1,11 @@
+services:
+  twin:
+    build: .
+    ports:
+      - "127.0.0.1:8050:8050"
+    volumes:
+      - ./data:/app/data
+      - ./outputs/runs:/app/outputs/runs
+    environment:
+      EE_PROJECT: ${EE_PROJECT:-}
+    restart: unless-stopped

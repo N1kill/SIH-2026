@@ -36,6 +36,15 @@ powershell.bat
 powershell.cmd
 scratch/
 docs/
+!docs/IMPLEMENTATION.md
+!docs/REQUIREMENTS_STATUS.md
+.env
+.env.*
+!.env.example
+*service-account*.json
+data/cache/
+outputs/runs/
+outputs/3d/dashboard/vendor/
 
 # Ignore large simulation output folders and 3D data json
 outputs/simulation/delft3d_fm/DFM_OUTPUT_*/

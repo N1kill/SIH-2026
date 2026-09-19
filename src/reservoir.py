@@ -44,11 +44,15 @@ class StorageElevationCurve:
     is_synthetic: bool = True
 
     def __post_init__(self):
+        if self.coeff <= 0 or self.exponent <= 0:
+            raise ValueError("Stage-storage coefficient and exponent must be positive")
         if self.elevations_m is not None:
             self.is_synthetic = False
             order = np.argsort(self.elevations_m)
             self.elevations_m = np.asarray(self.elevations_m)[order]
             self.storages_m3 = np.asarray(self.storages_m3)[order]
+            if len(order) < 2 or not np.isfinite(self.elevations_m).all() or not np.isfinite(self.storages_m3).all() or np.any(np.diff(self.elevations_m) <= 0) or np.any(np.diff(self.storages_m3) <= 0) or self.storages_m3[0] < 0:
+                raise ValueError("Survey stage-storage points must be finite, strictly increasing, and nonnegative")
             if self.areas_m2 is not None:
                 self.areas_m2 = np.asarray(self.areas_m2)[order]
 
@@ -90,8 +94,8 @@ class ReservoirState:
     time_s: float = 0.0
 
     def __post_init__(self):
-        if self.storage_m3 == 0.0:
-            raise ValueError("Initialize storage_m3 to the reservoir's starting volume.")
+        if not np.isfinite(self.storage_m3) or self.storage_m3 < 0:
+            raise ValueError("Initial storage must be finite and nonnegative")
 
     @property
     def elevation_m(self) -> float:
@@ -142,6 +146,8 @@ class ReservoirState:
         sub-stepped correction so storage never goes negative (mass conservation
         is enforced exactly, not just approximately).
         """
+        if not np.isfinite([dt_s, inflow_m3s, breach_outflow_m3s, seepage_m3s]).all() or dt_s <= 0 or min(inflow_m3s, breach_outflow_m3s, seepage_m3s) < 0:
+            raise ValueError("Timestep must be positive and flows finite/nonnegative")
         spill_q = self.spillway_outflow_m3s()
         over_q = self.overtopping_outflow_m3s() if include_overtopping else 0.0
         total_out = breach_outflow_m3s + spill_q + over_q + seepage_m3s
