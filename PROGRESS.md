@@ -20,3 +20,18 @@
 - Verify execution of test suite or pipeline locally.
 - Review and finalize documentation for submission.
   - Updated .gitignore to prevent massive simulation output files from triggering GitHub file size limits, and restaged commit.
+
+---
+
+## Log of Changes (continued)
+- **2026-09-19**:
+  - **Performance optimization**: Rewrote the 2D diffusive-wave routing solver in `scripts/10_hydrodynamic_simulation.py` using `numba.njit(parallel=True)`.
+    - Extracted the inner 8-direction routing loop into `diffusive_wave_step()`, decorated with `@njit(parallel=True)` — eliminates all Python interpreter overhead and temporary NumPy array allocations inside the hot path.
+    - Replaced the Python-level `for (dr, dc), dist in directions` loop (8 passes over the grid per substep, each allocating `neighbor_wse`, `flux`, `scale`, `d_vol` arrays) with a single Numba-compiled kernel that runs in parallel across rows.
+    - Removed the PySPH file-existence `os.path.is_file()` check from inside the main simulation loop (was executing 1000s of disk I/O syscalls per run) — pre-loads all PySPH boundary conditions into a dict before the loop begins.
+    - Used `np.ascontiguousarray()` to ensure Numba receives C-contiguous arrays for correct memory layout.
+    - Removed dead `directions` list that was no longer referenced.
+  - Fixed `scripts/12_validation_and_sensitivity.py`: sensitivity analysis was still running each of its 5 scenarios at 24h (`duration_hours=24.0`), changed to `duration_hours=8.0` for consistency.
+  - **Digital twin de-hardcoding** (scripts 10 & 12):
+    - `scripts/10_hydrodynamic_simulation.py`: replaced hardcoded station color dict keyed by Machhu-specific names with a dynamic palette; historical flood benchmark now read from `nrld_machhu.csv` (with 3.0m fallback); `xlim` on hydrograph plot now uses actual simulation duration instead of `24`.
+    - `scripts/12_validation_and_sensitivity.py`: sensitivity scenarios now read base breach parameters (`B_avg`, `t_f`, `Q_p`, `Z_HV`) live from `breach_params.json` (Directive 4 output) instead of hardcoded values; config key auto-selects first dam in `config.json`; primary downstream gauge resolved from config's `downstream_stations[1]` instead of hardcoded `"morbi"`.

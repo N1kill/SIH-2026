@@ -8,7 +8,7 @@
   },
   "summary": {
     "dem": {
-      "path": "C:\\PS\\SIH-2026\\data\\raw\\dem\\dem_raw.tif",
+      "path": "C:\\Users\\S Srirama Mithilesh\\practice\\SIH-2026\\data\\raw\\dem\\dem_raw.tif",
       "crs": "EPSG:4326",
       "width": 3240,
       "height": 4320,
@@ -42,7 +42,7 @@
         "7500": 3130.1664772605154,
         "10000": 2630.0091963676855
       },
-      "hydro_rivers_path": "C:\\PS\\SIH-2026\\data\\raw\\rivers\\hydrorivers_clip.shp",
+      "hydro_rivers_path": "C:\\Users\\S Srirama Mithilesh\\practice\\SIH-2026\\data\\raw\\rivers\\hydrorivers_clip.shp",
       "hydro_rivers_feature_count": 564,
       "hydro_rivers_length_km": 2859.375304923331
     },

@@ -23,6 +23,8 @@ $scripts = @(
     @{ Name = "08_curve_number_hydrology.py"; Desc = "Directive 3: SCS-CN Hydrology & Inflow Hydrograph" },
     @{ Name = "09_breach_parameters.py"; Desc = "Directive 4: Froehlich Dam Breach Parameter Estimation" },
     @{ Name = "10_hydrodynamic_simulation.py"; Desc = "Directive 5A: 2D Hydrodynamic Flood Simulation Engine" },
+    @{ Name = "10a_pysph_breach_zone.py"; Desc = "Directive 5A-1: Tightly Scoped PySPH Near-Field Simulation" },
+    @{ Name = "10b_delft3d_comparison.py"; Desc = "Directive 5A-2: Delft3D Comparison Module" },
     @{ Name = "11_gee_flood_analysis.py"; Desc = "Directive 5B: GEE / Satellite Flood Extent Analysis" },
     @{ Name = "12_validation_and_sensitivity.py"; Desc = "Directive 6: Accuracy Assessment & Sensitivity Analysis" },
     @{ Name = "13_damage_analysis.py"; Desc = "Directive 7: Population, Infrastructure & Economic Damage Assessment" },

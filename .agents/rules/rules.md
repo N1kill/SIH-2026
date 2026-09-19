@@ -4,12 +4,6 @@ trigger: always_on
 
 # AGENTS.md — Antigravity IDE Development Guidelines
 
-## Project Identity
-Name: Specula Multi-Agent DFIR System Development
-Goal: Construct an asynchronous, event-driven, multi-agent digital forensics platform using LangGraph, Neo4j, Kafka, and FastAPI.
-
----
-
 ## CRITICAL OPERATIONAL DIRECTIVES (TOKEN & WORKFLOW CONSTRAINTS)
 
 ### 1. Package Installation & Terminal Rule (STRICT)
