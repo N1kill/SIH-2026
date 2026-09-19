@@ -1,0 +1,22 @@
+{
+  "title": "Machhu-2 Water Resources Project data bank",
+  "source_url": "https://guj-nwrws.gujarat.gov.in/showpage.aspx/mediafiles/file/pdf/showpage.aspx?contentid=2038&lang=English",
+  "publisher": "Narmada, Water Resources, Water Supply and Kalpsar Department, Government of Gujarat",
+  "retrieval_date": "2026-09-20",
+  "license": "Public government page; no explicit reuse license found; factual extraction only",
+  "facts": {
+    "area_at_full_reservoir_level_km2": 13.96,
+    "dam_length_top_m": 5125,
+    "maximum_height_m": 25,
+    "gross_storage_summary_mcm": 100.55,
+    "gross_storage_salient_table_mcm": 87.9,
+    "frl_m": 57.3,
+    "hfl_m": 59.2,
+    "top_of_dam_m": 63.7,
+    "spillway_type": "Ogee",
+    "spillway_summary_length_m": 508,
+    "spillway_salient_table_length_m": 663.7,
+    "radial_gate_configuration": "18 x 9.15 m by 6.1 m plus 20 x 12.5 m by 8.23 m"
+  },
+  "note": "The same government page contains conflicting summary and salient-table values; preserve both and do not average them."
+}

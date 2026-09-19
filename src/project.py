@@ -1,6 +1,7 @@
 """Validated scenario inputs and explicit, traceable demonstration assumptions."""
 from pathlib import Path
 import json
+import math
 from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -40,6 +41,30 @@ class Project(Inputs):
     stage_storage: list[tuple[float, float]] | None = None
     provenance: list[dict] = Field(default_factory=list)
     assumptions: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_evidence_geometry(self):
+        if self.crest_coordinates is not None:
+            if len(self.crest_coordinates) < 2 or len(set(self.crest_coordinates)) < 2:
+                raise ValueError("Crest coordinates require at least two distinct WGS84 points")
+            for longitude, latitude in self.crest_coordinates:
+                if not -180 <= longitude <= 180 or not -80 <= latitude <= 84:
+                    raise ValueError("Crest coordinates must be valid WGS84 longitude/latitude pairs")
+        if self.stage_storage is not None:
+            if len(self.stage_storage) < 2:
+                raise ValueError("Stage-storage data require at least two points")
+            elevations = [point[0] for point in self.stage_storage]
+            storages = [point[1] for point in self.stage_storage]
+            if any(not math.isfinite(value) for value in elevations + storages):
+                raise ValueError("Stage-storage values must be finite")
+            if any(b <= a for a, b in zip(elevations, elevations[1:])):
+                raise ValueError("Stage elevations must be strictly increasing")
+            if storages[0] < 0 or any(b <= a for a, b in zip(storages, storages[1:])):
+                raise ValueError("Stage storage must be nonnegative and strictly increasing")
+        if (self.initial_water_level_m is not None and self.maximum_water_level_m is not None
+                and self.initial_water_level_m > self.maximum_water_level_m):
+            raise ValueError("Initial water level cannot exceed maximum water level")
+        return self
 
 
 class Scenario(Inputs):

@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "project_id": "machhu-ii",
+  "images": [
+    {
+      "path": "replace-with-licensed-image.jpg",
+      "source": "required: photographer, archive, or agency",
+      "license": "required: license or written permission",
+      "captured_at": "required: ISO-8601 date or null when unknown",
+      "camera": "optional: make/model and focal length",
+      "position_wgs84": null,
+      "orientation_degrees": null
+    }
+  ],
+  "notes": "This example is not evidence. Add only licensed, attributable images; survey-grade reconstruction also requires camera calibration or control points."
+}

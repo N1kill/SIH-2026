@@ -89,6 +89,19 @@ class PhysicsTests(unittest.TestCase):
             self.assertEqual(frame['protocol_version'],1)
             self.assertGreater(frame['breach']['discharge_m3s'],0)
 
+    def test_what_if_breach_width_changes_release(self):
+        summaries=[]
+        with tempfile.TemporaryDirectory() as directory, patch('src.run_engine.load_terrain',return_value=fixture_terrain()):
+            for width in (20,40):
+                run=Run(fixture_project(),Scenario(project_id='test',duration_s=4,dt_s=1,
+                    output_interval_s=1,breach_depth_m=5,breach_width_m=width,
+                    max_breach_width_m=width),directory)
+                run.execute()
+                self.assertEqual(run.status()['status'],'COMPLETE',run.status())
+                summaries.append(run.summary)
+        self.assertNotEqual(summaries[0]['peak_discharge_m3s'],summaries[1]['peak_discharge_m3s'])
+        self.assertNotEqual(summaries[0]['metrics']['downstream_volume_m3'],summaries[1]['metrics']['downstream_volume_m3'])
+
     def test_cancellation(self):
         with tempfile.TemporaryDirectory() as directory, patch('src.run_engine.load_terrain',return_value=fixture_terrain()):
             run=Run(fixture_project(),Scenario(duration_s=100),directory);run.cancel.set();run.execute()
@@ -114,6 +127,8 @@ class APITests(unittest.TestCase):
                 self.assertEqual([f['time_s'] for f in frames],sorted(f['time_s'] for f in frames))
                 self.assertGreater(len(frames),1)
                 self.assertEqual(client.get(f'/api/export/{run_id}').status_code,200)
+                self.assertEqual(client.get('/api/reconstruction/machhu-ii').status_code,200)
+                self.assertEqual(client.get('/api/reconstruction/machhu-ii/preview').status_code,200)
                 self.assertEqual(client.get('/api/simulation/results/bad').status_code,404)
                 self.assertEqual(client.get(f'/api/simulation/results/{run_id}/frames/9999').status_code,404)
 

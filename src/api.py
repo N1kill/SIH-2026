@@ -43,9 +43,21 @@ def run_status(run_id):
 
 @router.get("/api/health")
 def health():
-    return {"status":"ok","protocol_version":1,"core_simulator":"available", "single_worker_required":True,
-            "demo_dem_available":(ROOT/"data/processed/dem_conditioned.tif").is_file(),
-            "threejs_available":(ROOT/"outputs/3d/dashboard/vendor/three.module.js").is_file(),
+    checks = {
+        "dashboard_available": (ROOT/"outputs/3d/dashboard/twin.html").is_file(),
+        "demo_dem_available": (ROOT/"data/processed/dem_conditioned.tif").is_file(),
+        "threejs_available": (ROOT/"outputs/3d/dashboard/vendor/three.module.js").is_file(),
+    }
+    project_error = None
+    try:
+        checks["project_configs_valid"] = bool(projects())
+    except (OSError, ValueError) as exc:
+        checks["project_configs_valid"] = False
+        project_error = str(exc)
+    core_ready = all(checks.values())
+    return {"status":"ok" if core_ready else "degraded","protocol_version":1,
+            "core_simulator":"available" if core_ready else "configuration incomplete",
+            "single_worker_required":True, **checks, "project_error":project_error,
             "optional":{"openfoam":"installed" if shutil.which("foamRun") else "not installed",
                         "delft3d":"installed" if shutil.which("dflowfm-cli") else "not installed",
                         "gee":"configured, not authenticated" if os.getenv("EE_PROJECT") else "disabled: EE_PROJECT not set"}}
@@ -59,6 +71,26 @@ def list_projects():
 @router.get("/api/observations")
 def observations(project_id:str="machhu-ii"):
     return satellite_context(project_for(project_id))
+
+
+@router.get("/api/reconstruction/{project_id}")
+def reconstruction_draft(project_id:str):
+    if not re.fullmatch(r"[a-zA-Z0-9_-]{1,64}",project_id):
+        raise HTTPException(404,"Invalid project ID")
+    path=ROOT/"data/candidates"/project_id/"reconstruction-draft.json"
+    if not path.is_file():
+        raise HTTPException(404,"No reconstruction draft")
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+@router.get("/api/reconstruction/{project_id}/preview")
+def reconstruction_preview(project_id:str):
+    if not re.fullmatch(r"[a-zA-Z0-9_-]{1,64}",project_id):
+        raise HTTPException(404,"Invalid project ID")
+    path=ROOT/"data/candidates"/project_id/"reconstruction-preview.png"
+    if not path.is_file():
+        raise HTTPException(404,"No reconstruction preview")
+    return FileResponse(path,media_type="image/png")
 
 
 @router.post("/api/observations/refresh")

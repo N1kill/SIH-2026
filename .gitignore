@@ -36,8 +36,10 @@ powershell.bat
 powershell.cmd
 scratch/
 docs/
+!docs/
 !docs/IMPLEMENTATION.md
 !docs/REQUIREMENTS_STATUS.md
+!docs/RECONSTRUCTION_EVIDENCE.md
 .env
 .env.*
 !.env.example

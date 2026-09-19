@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "status": "approximate",
+  "approved": false,
+  "source_image": "data/raw/imagery/machhu-ii-reconstruction-sentinel2-rgb.tif",
+  "source_image_sha256": "c0bbe0acac89caa01c8b57ccf90a0c9c136748299772f71faa737c3b18281521",
+  "source_crs": "EPSG:32642",
+  "source_pixels_column_row": [[158, 800], [310, 650], [445, 515], [483, 482], [515, 471], [575, 472], [651, 478]],
+  "crest_coordinates_wgs84": [
+    [70.8386697414, 22.7438514108],
+    [70.8503719725, 22.7542987799],
+    [70.8607685893, 22.7637021627],
+    [70.8636905122, 22.7659962078],
+    [70.8661350514, 22.7667436880],
+    [70.8706978366, 22.7666197216],
+    [70.8764727736, 22.7661286318]
+  ],
+  "digitized_length_m": 4881.89,
+  "method": "Manual visual tracing of the embankment/spillway centreline on orthorectified Sentinel-2 RGB; no field control points.",
+  "estimated_horizontal_uncertainty_m": [20, 40],
+  "review": "Candidate only. Human map approval is required before promotion."
+}

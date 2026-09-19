@@ -40,13 +40,24 @@ def main():
     # This is downstream release routing; do not introduce the legacy invented gated dam.
     text=mdu.read_text(encoding='ascii').replace('StructureFile = structures.ini','StructureFile =')
     mdu.write_text(text,encoding='ascii')
-    (model/'comparison_metadata.json').write_text(json.dumps({
+    metadata={
         'source_simulation':args.simulation,'source_hydrograph':'../hydrograph.csv',
         'solver':'D-Flow FM','domain_crs':summary['terrain']['crs'],
         'limitations':['Open boundary differs from closed screening model.',
                       'Reservoir not dynamically represented; prescribed released hydrograph only.',
-                      'No surveyed dam structures or calibrated friction. Comparison is not validation.']},indent=2),encoding='utf-8')
-    if not args.build_only:adapter.run_model(mdu,args.threads)
+                      'No surveyed dam structures or calibrated friction. Comparison is not validation.']}
+    if not args.build_only:
+        adapter.run_model(mdu,args.threads)
+        stderr=(model/'dflowfm_stderr.log').read_text(encoding='utf-8',errors='replace')
+        diagnostic=model/'DFM_OUTPUT_machhu_dambreak'/'machhu_dambreak.dia'
+        dia=diagnostic.read_text(encoding='utf-8',errors='replace') if diagnostic.exists() else ''
+        warnings=[]
+        for line in (stderr+'\n'+dia).splitlines():
+            stripped=line.strip()
+            if stripped.startswith('** WARNING') or stripped.lower().startswith('proj_create'):
+                if stripped not in warnings: warnings.append(stripped)
+        metadata['runtime_warnings']=warnings
+    (model/'comparison_metadata.json').write_text(json.dumps(metadata,indent=2),encoding='utf-8')
     print(f"D-Flow FM {'inputs prepared' if args.build_only else 'completed'}: {model}")
 
 

@@ -96,8 +96,17 @@ def acquire_geometry(project):
         if tags.get('waterway')=='dam':dams.append((item,coords))
         if tags.get('water')=='reservoir' and len(coords)>=4 and coords[0]==coords[-1]:reservoirs.append((item,coords))
     if len(dams)==1 and not project.crest_coordinates:
-        project.crest_coordinates=dams[0][1]
-        project.provenance.append({"source":f"https://www.openstreetmap.org/way/{dams[0][0]['id']}","dataset":"Mapped dam crest","license":"ODbL 1.0","note":"OSM geometry, not engineering survey"})
+        from pyproj import Geod
+        geod=Geod(ellps="WGS84")
+        coords=dams[0][1]
+        closest=min(geod.inv(project.longitude,project.latitude,lon,lat)[2] for lon,lat in coords)
+        length=sum(geod.inv(*coords[i-1],*coords[i])[2] for i in range(1,len(coords)))
+        plausible_length=(project.dam_length_m is None or .5*project.dam_length_m<=length<=1.5*project.dam_length_m)
+        if closest<=500 and plausible_length:
+            project.crest_coordinates=coords
+            project.provenance.append({"source":f"https://www.openstreetmap.org/way/{dams[0][0]['id']}","dataset":"Mapped dam crest","license":"ODbL 1.0","note":"OSM geometry, not engineering survey"})
+        else:
+            print(f"Rejected mapped dam way: closest point {closest:.0f} m from configured dam, length {length:.0f} m")
     named=[(item,c) for item,c in reservoirs if 'mach' in item.get('tags',{}).get('name','').lower()] if project.dam_id=='machhu-ii' else []
     if len(named)==1 and not project.reservoir_polygon_path:
         path=target.with_name(f"{project.dam_id}-reservoir.geojson")

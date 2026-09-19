@@ -19,7 +19,7 @@ def main():
     p=Path(args.project)
     project=Project.model_validate_json(p.read_text(encoding="utf-8")) if p.is_file() else projects()[args.project]
     data=build_twin(project,args.half_width,args.grid_size)
-    print(json.dumps({k:v for k,v in data.items() if k not in {"elevation","valid","reservoir_mask","river_lines"}},indent=2))
+    print(json.dumps({k:v for k,v in data.items() if k not in {"elevation","valid","reservoir_mask","river_lines","detail","crest_local"}},indent=2))
 
 
 if __name__=="__main__":

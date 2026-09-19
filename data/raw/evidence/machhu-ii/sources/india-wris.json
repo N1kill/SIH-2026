@@ -1,0 +1,9 @@
+{
+  "title": "Dams in Gujarat — Machhu II inventory row",
+  "source_url": "https://indiawris.gov.in/wiki/doku.php?id=dams_in_gujarat",
+  "publisher": "National Water Informatics Centre, Ministry of Jal Shakti",
+  "retrieval_date": "2026-09-20",
+  "license": "CC BY-SA 4.0",
+  "facts": {"completion_year": 1989, "type": "Earthen / Gravity & Masonry", "length_m": 4930, "height_m": 22.56},
+  "note": "Official inventory attributes, not survey geometry."
+}

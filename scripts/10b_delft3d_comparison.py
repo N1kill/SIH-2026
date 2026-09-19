@@ -14,6 +14,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import os
 import shutil
 import subprocess
 from pathlib import Path
@@ -263,11 +264,19 @@ def run_model(mdu_path: Path, threads: int) -> None:
     cache_path = mdu_path.parent / "machhu_dambreak.cache"
     if cache_path.exists():
         cache_path.unlink()
+    environment=os.environ.copy()
+    try:
+        from pyproj import datadir
+        environment.setdefault("PROJ_DATA",datadir.get_data_dir())
+        environment.setdefault("PROJ_LIB",datadir.get_data_dir())
+    except ImportError:
+        pass
     result = subprocess.run(
         [str(cli), "--threads", str(threads), "--autostartstop", mdu_path.name],
         cwd=mdu_path.parent,
         text=True,
         capture_output=True,
+        env=environment,
     )
     (mdu_path.parent / "dflowfm_stdout.log").write_text(result.stdout, encoding="utf-8")
     (mdu_path.parent / "dflowfm_stderr.log").write_text(result.stderr, encoding="utf-8")

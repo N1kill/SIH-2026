@@ -1,0 +1,9 @@
+{
+  "title": "Gujarat reservoir storage report, 22 February 2022",
+  "source_url": "https://wrd-dam.gujarat.gov.in/downloads/home_pdf.php?dt=MjAyMi0wMi0yMg%3D%3D",
+  "publisher": "Narmada, Water Resources, Water Supply and Kalpsar Department, Government of Gujarat",
+  "retrieval_date": "2026-09-20",
+  "license": "Public government report; no explicit reuse license found; factual extraction only",
+  "facts": {"osl_m": 47.24, "frl_m": 57.3, "present_water_level_m": 56.41, "design_gross_mcm": 87.9, "design_live_mcm": 84.1, "design_dead_mcm": 3.8},
+  "note": "Vertical datum is not stated and must not be assumed to equal the DEM datum."
+}

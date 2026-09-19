@@ -1,0 +1,9 @@
+{
+  "title": "National Register of Specified Dams — Machhu II row",
+  "source_url": "https://dharma.cwc.gov.in/dharma/public/uploads/front_upload_file/174860534186541140.pdf",
+  "publisher": "Central Water Commission / DRIP",
+  "retrieval_date": "2026-09-20",
+  "license": "Public government register; no explicit reuse license found; factual extraction only",
+  "facts": {"registry_id": "GJ04MH0498", "coordinate": "22°46'0\"N 70°52'0\"E", "height_m": 22.56, "gross_storage_mcm": 87.9, "live_storage_mcm": 84.1, "spillway_capacity_m3s": 26419},
+  "note": "Coordinate is minute-resolution and suitable only as a search seed. The listed 508.18 m length conflicts with state and India-WRIS total lengths and may describe the overflow section."
+}

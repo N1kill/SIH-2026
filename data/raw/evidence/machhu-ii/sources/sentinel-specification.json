@@ -1,0 +1,9 @@
+{
+  "title": "Sentinel-2 Level-2A product specification",
+  "source_url": "https://sentinels.copernicus.eu/data-products/-/asset_publisher/fp37fc19FN8F/content/id/4715515",
+  "publisher": "European Space Agency / Copernicus",
+  "retrieval_date": "2026-09-20",
+  "license": "Free and open Copernicus Sentinel data; attribution required",
+  "facts": {"projection": "UTM/WGS84", "absolute_geolocation_95_5_percent": "<12 m", "resolutions_m": [10, 20, 60]},
+  "note": "Product accuracy does not include manual digitization or structure-identification error."
+}
