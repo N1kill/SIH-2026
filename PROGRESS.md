@@ -47,6 +47,10 @@
   draft, and preview endpoints all returned HTTP 200.
 
 ## Log of Changes
+- **2026-09-20**:
+  - Connected real-time dam data scraper to frontend dashboard and landing page with full UI telemetry visualization.
+  - Configured dossier persistence directly to `/scraper/output/` directory with API retrieval endpoints (`/api/scrape-dam`, `/api/scraped-files`, `/api/scraped-files/{filename}`).
+  - Fixed variable shadowing bug in `downstream_stations.py` Nominatim fallback query.
 - **2026-09-18**: 
   - Added `config.json` incorporating Panshet Dam for generalization testing.
   - Refactored `scripts/10_hydrodynamic_simulation.py` to accept CLI `--dam_config` and ingest PySPH output.

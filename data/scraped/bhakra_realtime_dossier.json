@@ -1,0 +1,137 @@
+{
+  "dam_id": "bhakra",
+  "dam_name": "Bhakra Dam",
+  "scrape_timestamp_utc": "2026-09-20T11:09:29Z",
+  "elapsed_seconds": 27.5,
+  "geography": {
+    "dam_name": "Bhakra Dam",
+    "matched_name": "Bhakra Dam, Naina Devi, Bilaspur, Bangana, Una, Himachal Pradesh, India",
+    "lat": 31.41159,
+    "lon": 76.43264,
+    "state": "Himachal Pradesh",
+    "district": "Una",
+    "country": "India",
+    "osm_id": 120587569,
+    "osm_type": "way",
+    "wikidata_id": "Q83436",
+    "wikipedia_title": null,
+    "extratags": {
+      "operator": "Bhakra Beas Management Board",
+      "wikidata": "Q83436"
+    },
+    "bbox": {
+      "min_lat": 31.3116,
+      "max_lat": 31.5116,
+      "min_lon": 76.3339,
+      "max_lon": 76.5339
+    },
+    "provenance": {
+      "source": "OpenStreetMap Nominatim Live Geocoding API",
+      "url": "https://nominatim.openstreetmap.org/search",
+      "timestamp": "2026-09-20T11:09:04Z",
+      "license": "ODbL 1.0"
+    }
+  },
+  "structural_parameters": {
+    "dam_height_m": 225.55,
+    "crest_length_m": 520.0,
+    "reservoir_volume_m3": 7552102986.1,
+    "spillway_capacity_m3s": null,
+    "dam_type": null,
+    "river": "Satluj River",
+    "surface_elevation_m": 471.0,
+    "sources": [
+      "Wikidata entity Q83436",
+      "https://en.wikipedia.org/wiki/Bhakra_Dam",
+      "Open-Meteo Global Elevation Model"
+    ],
+    "type_wikidata_id": "Q3497167",
+    "wikidata_id": "Q83436"
+  },
+  "realtime_weather": {
+    "timestamp": "2026-09-20T16:30",
+    "timezone": "Asia/Kolkata",
+    "current_conditions": {
+      "temperature_c": 30.1,
+      "relative_humidity_pct": 57,
+      "precipitation_rate_mmh": 0.0,
+      "rain_mmh": 0.0,
+      "wind_speed_kmh": 6.8,
+      "wind_direction_deg": 287,
+      "surface_pressure_hpa": 960.1,
+      "soil_moisture_surface_m3m3": null,
+      "rainfall_classification": "No Rain"
+    },
+    "antecedent_rainfall": {
+      "past_24h_mm": 0.0,
+      "past_48h_mm": 0.0,
+      "past_72h_mm": 0.0,
+      "antecedent_moisture_condition": "AMC-I (Dry)"
+    },
+    "precipitation_forecast": {
+      "next_24h_mm": 0.0,
+      "next_72h_mm": 0.0,
+      "peak_hourly_intensity_mmh": 0.0
+    },
+    "inflow_risk_assessment": {
+      "level": "NORMAL",
+      "summary": "Current rain: 0.0 mm/h (No Rain). Past 24h: 0.0 mm, Next 24h: 0.0 mm."
+    },
+    "provenance": {
+      "source": "Open-Meteo Global Numerical Weather Prediction (ECMWF/GFS)",
+      "url": "https://api.open-meteo.com/v1/forecast",
+      "retrieved_at": "2026-09-20T11:09:13Z",
+      "license": "Non-commercial/Open-Data Attribution"
+    }
+  },
+  "downstream_monitoring_stations": [
+    {
+      "name": "Bhakra Dam Toe (0 km)",
+      "key": "dam_toe",
+      "lat": 31.41159,
+      "lon": 76.43264,
+      "dist_km": 0.0
+    }
+  ],
+  "live_reservoir_telemetry": {
+    "dam_name": "Bhakra Dam",
+    "telemetry_available": false,
+    "water_level_m": null,
+    "full_reservoir_level_frl_m": null,
+    "live_storage_mcm": null,
+    "storage_pct_of_frl": null,
+    "inflow_cumecs": null,
+    "outflow_cumecs": null,
+    "status_message": "CWC API returned HTTP status 404",
+    "provenance": {
+      "source": "Central Water Commission (CWC) / India-WRIS Telemetry",
+      "url": "https://ffs.india-water.gov.in/api/v1/stations",
+      "checked_at": "2026-09-20T11:09:28Z"
+    }
+  },
+  "simulation_config_entry": {
+    "dam_name": "Bhakra Dam",
+    "state": "Himachal Pradesh",
+    "lat": 31.41159,
+    "lon": 76.43264,
+    "dam_height_m": 225.55,
+    "crest_length_m": 520.0,
+    "reservoir_volume_m3": 7552102986.1,
+    "spillway_capacity_m3s": null,
+    "downstream_stations": [
+      {
+        "name": "Bhakra Dam Toe (0 km)",
+        "key": "dam_toe",
+        "lat": 31.41159,
+        "lon": 76.43264,
+        "dist_km": 0.0
+      }
+    ],
+    "bbox": {
+      "min_lat": 31.3116,
+      "max_lat": 31.5116,
+      "min_lon": 76.3339,
+      "max_lon": 76.5339
+    }
+  }
+}

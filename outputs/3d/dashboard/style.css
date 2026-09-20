@@ -1932,4 +1932,200 @@ body:not(.is-landing-mode) .landing-only-try {
 .pill-dot.yellow { background: #e9c46a; }
 .pill-dot.green { background: #06d6a0; box-shadow: 0 0 8px #06d6a0; }
 
+/* ==========================================================================
+   Dynamic Real-Time Dam Scraper Hero & Modal Styles
+   ========================================================================== */
+.hero-scraper-card {
+  margin-top: 24px;
+  background: rgba(10, 18, 38, 0.75);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(0, 180, 216, 0.35);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.5), 0 0 24px rgba(0, 180, 216, 0.15);
+  border-radius: var(--radius-lg);
+  padding: 20px 24px;
+  max-width: 680px;
+}
+
+.hero-scraper-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.hero-scraper-tag {
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--accent-cyan);
+  text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pulse-dot-cyan {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent-cyan);
+  box-shadow: 0 0 10px var(--accent-cyan);
+  animation: pulseCyan 2s infinite;
+}
+
+@keyframes pulseCyan {
+  0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(0, 180, 216, 0.7); }
+  70% { transform: scale(1); box-shadow: 0 0 0 8px rgba(0, 180, 216, 0); }
+  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(0, 180, 216, 0); }
+}
+
+.hero-scraper-sub {
+  font-size: 0.73rem;
+  color: var(--text-muted);
+}
+
+.hero-scraper-form {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.hero-input-wrapper {
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: center;
+}
+
+.hero-input-icon {
+  position: absolute;
+  left: 14px;
+  color: var(--accent-cyan);
+  font-size: 0.9rem;
+  pointer-events: none;
+}
+
+.hero-input-wrapper input {
+  width: 100%;
+  padding: 12px 14px 12px 38px;
+  background: rgba(5, 10, 24, 0.85);
+  border: 1px solid rgba(0, 180, 216, 0.3);
+  border-radius: var(--radius-md);
+  color: #fff;
+  font-family: var(--font-main);
+  font-size: 0.92rem;
+  outline: none;
+  transition: all var(--transition-fast);
+}
+
+.hero-input-wrapper input:focus {
+  border-color: var(--accent-cyan);
+  box-shadow: 0 0 16px rgba(0, 180, 216, 0.35);
+  background: rgba(7, 14, 32, 0.95);
+}
+
+.btn-hero-scrape {
+  background: linear-gradient(135deg, #00b4d8 0%, #0077b6 100%);
+  color: #ffffff;
+  border: none;
+  padding: 0 20px;
+  border-radius: var(--radius-md);
+  font-family: var(--font-main);
+  font-weight: 700;
+  font-size: 0.9rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+  box-shadow: 0 4px 16px rgba(0, 180, 216, 0.35);
+  transition: all var(--transition-fast);
+}
+
+.btn-hero-scrape:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 22px rgba(0, 180, 216, 0.55);
+}
+
+.hero-quick-chips {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 0.75rem;
+}
+
+.chip-label {
+  color: var(--text-dim);
+  font-weight: 600;
+}
+
+.quick-chip-btn {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--text-muted);
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 0.74rem;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.quick-chip-btn:hover {
+  background: rgba(0, 180, 216, 0.15);
+  border-color: var(--accent-cyan);
+  color: var(--accent-cyan);
+  transform: translateY(-1px);
+}
+
+.hero-scrape-status {
+  margin-top: 12px;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 0.82rem;
+  animation: fadeIn 0.3s ease;
+}
+
+.storage-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(6, 214, 160, 0.1);
+  border: 1px solid rgba(6, 214, 160, 0.3);
+  color: var(--accent-emerald);
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-family: monospace;
+}
+
+.recent-dams-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 4px 0;
+  margin-top: 10px;
+}
+
+.recent-dam-tag {
+  background: rgba(0, 180, 216, 0.1);
+  border: 1px solid rgba(0, 180, 216, 0.25);
+  color: var(--accent-cyan);
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 0.72rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.recent-dam-tag:hover {
+  background: rgba(0, 180, 216, 0.25);
+  border-color: var(--accent-cyan);
+}
+
+
 

@@ -52,7 +52,7 @@
 
       <!-- Telemetry & Action Buttons -->
       <div class="header-actions">
-        <button id="btn-new-sim" class="action-btn dashboard-only"><i class="fa-solid fa-plus"></i> New Dam</button>
+        <button id="btn-new-sim" class="action-btn" title="Live Real-Time Dam Data Scraper"><i class="fa-solid fa-satellite-dish"></i> Live Dam Scraper</button>
         <button class="action-btn btn-try-header launch-model-btn landing-only-try" data-tab="view-gis" title="Try PRALAYA Model">
           <i class="fa-solid fa-play"></i> Try
         </button>
@@ -108,6 +108,36 @@
                   <i class="fa-solid fa-circle-info"></i>
                   <span>Explore Capabilities</span>
                 </a>
+              </div>
+
+              <!-- Real-Time Dam Scraper Hero Widget -->
+              <div class="hero-scraper-card">
+                <div class="hero-scraper-header">
+                  <div class="hero-scraper-tag">
+                    <span class="pulse-dot-cyan"></span>
+                    <i class="fa-solid fa-satellite-dish"></i> Live Dam Data Scraper
+                  </div>
+                  <span class="hero-scraper-sub"><i class="fa-solid fa-folder-open" style="color:#06d6a0;"></i> Auto-stores into <code>/scraper/output</code></span>
+                </div>
+                <div class="hero-scraper-form">
+                  <div class="hero-input-wrapper">
+                    <i class="fa-solid fa-water hero-input-icon"></i>
+                    <input type="text" id="hero-dam-input" placeholder="Enter dam name to scrape (e.g. Idukki Dam, Tehri Dam, Bhakra Dam, Hirakud)..." autocomplete="off" />
+                  </div>
+                  <button type="button" id="btn-hero-scrape" class="btn-hero-scrape" title="Scrape and save to /scraper/output">
+                    <i class="fa-solid fa-bolt" id="hero-scrape-icon"></i>
+                    <span id="hero-scrape-btn-text">Scrape Data</span>
+                  </button>
+                </div>
+                <div class="hero-quick-chips">
+                  <span class="chip-label">Quick presets:</span>
+                  <button type="button" class="quick-chip-btn" data-dam="Idukki Dam">Idukki Dam</button>
+                  <button type="button" class="quick-chip-btn" data-dam="Tehri Dam">Tehri Dam</button>
+                  <button type="button" class="quick-chip-btn" data-dam="Bhakra Dam">Bhakra Dam</button>
+                  <button type="button" class="quick-chip-btn" data-dam="Hirakud Dam">Hirakud Dam</button>
+                  <button type="button" class="quick-chip-btn" data-dam="Machhu-II Dam">Machhu-II Dam</button>
+                </div>
+                <div id="hero-scrape-status" class="hero-scrape-status" style="display: none;"></div>
               </div>
 
               <!-- Quick Metrics Grid -->
@@ -1107,52 +1137,492 @@
   <!-- Master Application Script -->
   <script src="app.js"></script>
 
-    <!-- New Dam Simulation Modal -->
-    <div id="sim-modal" class="modal-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 9999; justify-content: center; align-items: center;">
-      <div class="modal-content" style="background: #1e1e24; padding: 30px; border-radius: 12px; width: 400px; color: white; font-family: 'Plus Jakarta Sans', sans-serif;">
-        <h2 style="margin-top: 0;"><i class="fa-solid fa-water"></i> New Dam Simulation</h2>
-        <form id="sim-form" style="display: flex; flex-direction: column; gap: 15px;">
-          <input type="text" id="sim-name" placeholder="Dam Name" required style="padding: 10px; border-radius: 6px; border: 1px solid #444; background: #2a2a35; color: white;">
-          <input type="number" step="any" id="sim-lat" placeholder="Latitude" required style="padding: 10px; border-radius: 6px; border: 1px solid #444; background: #2a2a35; color: white;">
-          <input type="number" step="any" id="sim-lon" placeholder="Longitude" required style="padding: 10px; border-radius: 6px; border: 1px solid #444; background: #2a2a35; color: white;">
-          <input type="number" step="any" id="sim-height" placeholder="Dam Height (m)" required style="padding: 10px; border-radius: 6px; border: 1px solid #444; background: #2a2a35; color: white;">
-          <input type="number" step="any" id="sim-volume" placeholder="Reservoir Volume (m3)" required style="padding: 10px; border-radius: 6px; border: 1px solid #444; background: #2a2a35; color: white;">
-          <button type="submit" style="padding: 12px; background: #06d6a0; color: #111; font-weight: bold; border: none; border-radius: 6px; cursor: pointer;">Initiate Simulation</button>
-          <button type="button" id="sim-close" style="padding: 12px; background: #e63946; color: white; font-weight: bold; border: none; border-radius: 6px; cursor: pointer;">Cancel</button>
+    <!-- Real-Time Dam Scraper & Simulation Modal -->
+    <div id="sim-modal" class="modal-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(2, 6, 18, 0.88); backdrop-filter: blur(12px); z-index: 99999; justify-content: center; align-items: center; padding: 20px;">
+      <div class="modal-content" style="background: linear-gradient(180deg, #0d1527 0%, #080e1c 100%); border: 1px solid rgba(0, 180, 216, 0.4); box-shadow: 0 16px 48px rgba(0,0,0,0.8), 0 0 30px rgba(0, 180, 216, 0.2); padding: 26px; border-radius: 16px; width: 660px; max-width: 95vw; max-height: 90vh; overflow-y: auto; color: #f8fafc; font-family: 'Plus Jakarta Sans', sans-serif;">
+        
+        <!-- Modal Header -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 14px;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <div style="width: 38px; height: 38px; border-radius: 8px; background: rgba(0, 180, 216, 0.15); border: 1px solid rgba(0, 180, 216, 0.4); display: flex; align-items: center; justify-content: center; color: #00b4d8;">
+              <i class="fa-solid fa-satellite-dish" style="font-size: 18px;"></i>
+            </div>
+            <div>
+              <h2 style="margin: 0; font-size: 1.22rem; font-weight: 700; color: #fff;">Real-Time Dam Data Scraper</h2>
+              <span style="font-size: 0.75rem; color: #94a3b8;">Zero hardcoding • Live telemetry, OpenStreetMap geocoding & Open-Meteo APIs</span>
+            </div>
+          </div>
+          <button type="button" id="sim-close" style="background: transparent; border: none; color: #94a3b8; font-size: 24px; cursor: pointer; padding: 4px 8px; border-radius: 6px; line-height: 1;">&times;</button>
+        </div>
+
+        <!-- Output Folder Notice -->
+        <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(0, 180, 216, 0.08); border: 1px solid rgba(0, 180, 216, 0.22); border-radius: 8px; padding: 8px 14px; margin-bottom: 14px; font-size: 0.75rem;">
+          <span style="color: #cbd5e1;"><i class="fa-solid fa-folder-open" style="color: #06d6a0; margin-right: 6px;"></i> Storage Target: <code style="color: #06d6a0; background: rgba(6,214,160,0.1); padding: 2px 6px; border-radius: 4px; font-weight: 600;">/scraper/output/</code></span>
+          <span id="saved-quick-badge" style="display: none; color: #38bdf8; font-size: 0.72rem;"><i class="fa-solid fa-check"></i> File saved</span>
+        </div>
+
+        <!-- Scraper Input Bar -->
+        <div style="background: rgba(18, 28, 52, 0.7); border: 1px solid rgba(0, 180, 216, 0.25); border-radius: 12px; padding: 14px; margin-bottom: 16px;">
+          <label style="display: block; font-size: 0.76rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #00b4d8; margin-bottom: 8px;">
+            <i class="fa-solid fa-magnifying-glass"></i> Enter Any Dam Name
+          </label>
+          <div style="display: flex; gap: 10px;">
+            <input type="text" id="sim-name" placeholder="e.g. Idukki Dam, Tehri Dam, Bhakra Dam, Hirakud..." value="Idukki Dam" style="flex: 1; padding: 11px 14px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.15); background: #070d1a; color: #fff; font-size: 0.95rem; outline: none;">
+            <button type="button" id="btn-auto-scrape" style="background: linear-gradient(135deg, #00b4d8 0%, #0077b6 100%); color: #fff; border: none; padding: 0 18px; border-radius: 8px; font-weight: 700; font-size: 0.88rem; cursor: pointer; display: flex; align-items: center; gap: 8px; box-shadow: 0 4px 14px rgba(0, 180, 216, 0.35); transition: all 0.2s;">
+              <i class="fa-solid fa-bolt" id="scrape-icon"></i> <span id="scrape-btn-text">Auto-Scrape</span>
+            </button>
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px;">
+            <label style="display: flex; align-items: center; gap: 6px; font-size: 0.74rem; color: #94a3b8; cursor: pointer;">
+              <input type="checkbox" id="sim-update-cfg" checked style="cursor: pointer; accent-color: #00b4d8;">
+              <span>Auto-register entry into <code>config.json</code></span>
+            </label>
+            <span style="font-size: 0.7rem; color: #64748b;">Press Enter to Scrape</span>
+          </div>
+          <div id="scrape-status" style="margin-top: 10px; font-size: 0.82rem; color: #94a3b8; display: none;"></div>
+        </div>
+
+        <!-- Scraped Telemetry Card (Hidden until scraped) -->
+        <div id="scraped-results-card" style="display: none; background: rgba(14, 23, 42, 0.9); border: 1px solid rgba(6, 214, 160, 0.35); border-radius: 12px; padding: 16px; margin-bottom: 16px;">
+          <!-- Storage Confirmation Notice -->
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; background: rgba(6, 214, 160, 0.1); border: 1px solid rgba(6, 214, 160, 0.3); border-radius: 6px; padding: 6px 12px;">
+            <span style="color: #06d6a0; font-size: 0.76rem; font-weight: 600; display: flex; align-items: center; gap: 6px;">
+              <i class="fa-solid fa-file-circle-check"></i> Stored in: <code id="res-file-path" style="color: #fff; font-family: monospace;">scraper/output/...</code>
+            </span>
+            <span id="res-timestamp" style="font-size: 0.7rem; color: #94a3b8;"></span>
+          </div>
+
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 8px;">
+            <span style="font-weight: 700; color: #06d6a0; font-size: 0.9rem; display: flex; align-items: center; gap: 6px;">
+              <i class="fa-solid fa-circle-check"></i> Live Data Extracted: <span id="res-dam-title" style="color: #fff;"></span>
+            </span>
+            <span id="res-coords-badge" style="font-size: 0.72rem; color: #38bdf8; font-family: monospace;"></span>
+          </div>
+
+          <!-- Weather & Hydrology Grid -->
+          <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 12px;">
+            <div style="background: rgba(255,255,255,0.03); padding: 8px 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.06);">
+              <div style="font-size: 0.7rem; color: #94a3b8;">Current Rain</div>
+              <div id="res-curr-rain" style="font-weight: 700; font-size: 0.92rem; color: #00b4d8;">-</div>
+            </div>
+            <div style="background: rgba(255,255,255,0.03); padding: 8px 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.06);">
+              <div style="font-size: 0.7rem; color: #94a3b8;">Past 24h Rain</div>
+              <div id="res-past-rain" style="font-weight: 700; font-size: 0.92rem; color: #f4a261;">-</div>
+            </div>
+            <div style="background: rgba(255,255,255,0.03); padding: 8px 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.06);">
+              <div style="font-size: 0.7rem; color: #94a3b8;">Next 24h Forecast</div>
+              <div id="res-forecast-rain" style="font-weight: 700; font-size: 0.92rem; color: #e63946;">-</div>
+            </div>
+          </div>
+
+          <!-- Metadata Badges -->
+          <div style="display: flex; flex-wrap: wrap; gap: 8px; font-size: 0.78rem; margin-bottom: 10px;">
+            <span id="badge-river" style="background: rgba(0, 180, 216, 0.15); color: #00b4d8; padding: 4px 10px; border-radius: 20px; border: 1px solid rgba(0, 180, 216, 0.3);">River: -</span>
+            <span id="badge-elev" style="background: rgba(6, 214, 160, 0.15); color: #06d6a0; padding: 4px 10px; border-radius: 20px; border: 1px solid rgba(6, 214, 160, 0.3);">Elev: - m</span>
+            <span id="badge-state" style="background: rgba(244, 162, 97, 0.15); color: #f4a261; padding: 4px 10px; border-radius: 20px; border: 1px solid rgba(244, 162, 97, 0.3);">State: -</span>
+          </div>
+
+          <!-- Downstream Stations preview -->
+          <div style="font-size: 0.75rem; color: #94a3b8; margin-bottom: 10px;">
+            <strong style="color: #cbd5e1;"><i class="fa-solid fa-water"></i> Downstream Receptors: </strong>
+            <span id="res-stations-list">-</span>
+          </div>
+
+          <!-- Quick Actions on Dossier -->
+          <div style="display: flex; gap: 8px; margin-top: 10px;">
+            <button type="button" id="btn-view-dossier" style="flex: 1; padding: 8px 12px; background: rgba(255,255,255,0.06); color: #fff; font-weight: 600; border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; cursor: pointer; font-size: 0.76rem; display: flex; align-items: center; justify-content: center; gap: 6px;">
+              <i class="fa-solid fa-code"></i> View Raw JSON
+            </button>
+            <button type="button" id="btn-download-json" style="flex: 1; padding: 8px 12px; background: rgba(0, 180, 216, 0.12); color: #00b4d8; font-weight: 600; border: 1px solid rgba(0, 180, 216, 0.3); border-radius: 6px; cursor: pointer; font-size: 0.76rem; display: flex; align-items: center; justify-content: center; gap: 6px;">
+              <i class="fa-solid fa-download"></i> Download JSON
+            </button>
+            <button type="button" id="btn-copy-json" style="flex: 1; padding: 8px 12px; background: rgba(6, 214, 160, 0.12); color: #06d6a0; font-weight: 600; border: 1px solid rgba(6, 214, 160, 0.3); border-radius: 6px; cursor: pointer; font-size: 0.76rem; display: flex; align-items: center; justify-content: center; gap: 6px;">
+              <i class="fa-solid fa-copy"></i> Copy JSON
+            </button>
+          </div>
+        </div>
+
+        <!-- Saved Dossiers in /scraper/output -->
+        <div style="background: rgba(10, 16, 30, 0.6); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 12px 14px; margin-bottom: 16px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <span style="font-size: 0.74rem; font-weight: 700; text-transform: uppercase; color: #00b4d8; letter-spacing: 0.04em;">
+              <i class="fa-solid fa-box-archive"></i> Saved Dossiers in <code>/scraper/output</code>
+            </span>
+            <button type="button" id="btn-refresh-saved" style="background: none; border: none; color: #94a3b8; font-size: 0.72rem; cursor: pointer;" title="Refresh list of files in /scraper/output">
+              <i class="fa-solid fa-rotate"></i> Refresh
+            </button>
+          </div>
+          <div id="saved-files-container" style="display: flex; flex-wrap: wrap; gap: 6px; max-height: 80px; overflow-y: auto;">
+            <span style="font-size: 0.72rem; color: #64748b;">Loading saved files...</span>
+          </div>
+        </div>
+
+        <!-- Simulation Parameters Form (Auto-filled) -->
+        <form id="sim-form" style="display: flex; flex-direction: column; gap: 12px;">
+          <div style="font-size: 0.78rem; font-weight: 600; color: #cbd5e1; text-transform: uppercase; letter-spacing: 0.05em;">
+            Hydrodynamic Parameters (Auto-populated from Scraper)
+          </div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+            <div>
+              <label style="font-size: 0.72rem; color: #94a3b8; display: block; margin-bottom: 4px;">Latitude (°N)</label>
+              <input type="number" step="any" id="sim-lat" placeholder="Latitude" required style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1); background: #070d1a; color: white;">
+            </div>
+            <div>
+              <label style="font-size: 0.72rem; color: #94a3b8; display: block; margin-bottom: 4px;">Longitude (°E)</label>
+              <input type="number" step="any" id="sim-lon" placeholder="Longitude" required style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1); background: #070d1a; color: white;">
+            </div>
+          </div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+            <div>
+              <label style="font-size: 0.72rem; color: #94a3b8; display: block; margin-bottom: 4px;">Dam Height (m)</label>
+              <input type="number" step="any" id="sim-height" placeholder="Dam Height (m)" required style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1); background: #070d1a; color: white;">
+            </div>
+            <div>
+              <label style="font-size: 0.72rem; color: #94a3b8; display: block; margin-bottom: 4px;">Reservoir Volume (m³)</label>
+              <input type="number" step="any" id="sim-volume" placeholder="Reservoir Volume (m3)" required style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1); background: #070d1a; color: white;">
+            </div>
+          </div>
+
+          <div style="display: flex; gap: 10px; margin-top: 6px;">
+            <button type="submit" style="flex: 1; padding: 12px; background: linear-gradient(135deg, #06d6a0 0%, #059669 100%); color: #022c22; font-weight: 700; border: none; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 4px 14px rgba(6,214,160,0.3);">
+              <i class="fa-solid fa-play"></i> Initiate 2D Simulation
+            </button>
+          </div>
         </form>
-        <div id="sim-log" style="margin-top: 15px; height: 150px; overflow-y: auto; background: #111; padding: 10px; font-family: monospace; font-size: 12px; display: none;"></div>
+
+        <div id="sim-log" style="margin-top: 15px; max-height: 140px; overflow-y: auto; background: #040812; border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px; font-family: monospace; font-size: 11.5px; color: #38bdf8; display: none;"></div>
       </div>
     </div>
 
-
 <script>
 document.addEventListener("DOMContentLoaded", function() {
-    // Graceful degrade
-    if (window.location.protocol === 'file:') {
-        alert("Live backend disconnected. Running in demo mode with pre-computed scenario catalogs.");
-    }
-    
     const btnNewSim = document.getElementById("btn-new-sim");
     const modal = document.getElementById("sim-modal");
     const closeBtn = document.getElementById("sim-close");
     const form = document.getElementById("sim-form");
     const logDiv = document.getElementById("sim-log");
-    
-    if(btnNewSim) {
+
+    // Modal Scraper elements
+    const simNameInput = document.getElementById("sim-name");
+    const btnAutoScrape = document.getElementById("btn-auto-scrape");
+    const scrapeStatus = document.getElementById("scrape-status");
+    const scrapeIcon = document.getElementById("scrape-icon");
+    const scrapeBtnText = document.getElementById("scrape-btn-text");
+    const resultsCard = document.getElementById("scraped-results-card");
+    const chkUpdateConfig = document.getElementById("sim-update-cfg");
+
+    // Hero Scraper elements
+    const heroDamInput = document.getElementById("hero-dam-input");
+    const btnHeroScrape = document.getElementById("btn-hero-scrape");
+    const heroScrapeIcon = document.getElementById("hero-scrape-icon");
+    const heroScrapeBtnText = document.getElementById("hero-scrape-btn-text");
+    const heroScrapeStatus = document.getElementById("hero-scrape-status");
+    const quickChipBtns = document.querySelectorAll(".quick-chip-btn");
+
+    // Action buttons
+    const btnViewDossier = document.getElementById("btn-view-dossier");
+    const btnDownloadJson = document.getElementById("btn-download-json");
+    const btnCopyJson = document.getElementById("btn-copy-json");
+    const btnRefreshSaved = document.getElementById("btn-refresh-saved");
+    const savedFilesContainer = document.getElementById("saved-files-container");
+
+    let currentDossier = null;
+
+    if (btnNewSim) {
         btnNewSim.addEventListener("click", () => {
             modal.style.display = "flex";
             logDiv.style.display = "none";
             logDiv.innerHTML = "";
+            loadSavedFiles();
         });
     }
-    
-    if(closeBtn) {
+
+    if (closeBtn) {
         closeBtn.addEventListener("click", () => {
             modal.style.display = "none";
         });
     }
-    
-    if(form) {
+
+    // Populate Dossier to UI
+    function displayDossier(d, savedPath) {
+        currentDossier = d;
+        const geo = d.geography || {};
+        const meta = d.structural_parameters || {};
+        const weather = d.realtime_weather || {};
+        const cond = weather.current_conditions || {};
+        const rain = weather.antecedent_rainfall || {};
+        const forecast = weather.precipitation_forecast || {};
+        const stations = d.downstream_monitoring_stations || [];
+
+        // Form fields
+        if (geo.lat) document.getElementById("sim-lat").value = geo.lat;
+        if (geo.lon) document.getElementById("sim-lon").value = geo.lon;
+        if (meta.dam_height_m) document.getElementById("sim-height").value = meta.dam_height_m;
+        if (meta.reservoir_volume_m3) document.getElementById("sim-volume").value = meta.reservoir_volume_m3;
+        if (d.dam_name && simNameInput) simNameInput.value = d.dam_name;
+
+        // Header / Storage path
+        const resFilePath = document.getElementById("res-file-path");
+        if (resFilePath) {
+            resFilePath.innerText = savedPath || `scraper/output/${d.dam_id}_realtime_dossier.json`;
+        }
+
+        document.getElementById("res-dam-title").innerText = d.dam_name;
+        document.getElementById("res-timestamp").innerText = "Scraped: " + (d.scrape_timestamp_utc || "Live");
+        if (geo.lat && geo.lon) {
+            document.getElementById("res-coords-badge").innerText = `${geo.lat}°N, ${geo.lon}°E`;
+        }
+
+        // Hydrology / Weather
+        document.getElementById("res-curr-rain").innerText = (cond.precipitation_rate_mmh ?? 0) + " mm/h";
+        document.getElementById("res-past-rain").innerText = (rain.past_24h_mm ?? 0) + " mm (" + (rain.antecedent_moisture_condition || "Normal") + ")";
+        document.getElementById("res-forecast-rain").innerText = (forecast.next_24h_mm ?? 0) + " mm (Peak " + (forecast.peak_hourly_intensity_mmh ?? 0) + ")";
+
+        // Metadata badges
+        document.getElementById("badge-river").innerText = "River: " + (meta.river || "Basin Receptors");
+        document.getElementById("badge-elev").innerText = "Elev: " + (meta.surface_elevation_m ? meta.surface_elevation_m + " m MSL" : "N/A");
+        document.getElementById("badge-state").innerText = "State: " + (geo.state || "India");
+
+        // Downstream stations
+        const stText = stations.map(s => `${s.name}`).join(" → ");
+        document.getElementById("res-stations-list").innerText = stText || "None detected";
+
+        resultsCard.style.display = "block";
+    }
+
+    // Core scraping handler
+    async function executeScrape(damName) {
+        if (!damName) {
+            alert("Please enter a dam name first!");
+            return;
+        }
+
+        // Sync inputs
+        if (simNameInput) simNameInput.value = damName;
+        if (heroDamInput) heroDamInput.value = damName;
+
+        // Open modal
+        modal.style.display = "flex";
+
+        // Set Loading state in modal
+        if (scrapeIcon) scrapeIcon.className = "fa-solid fa-spinner fa-spin";
+        if (scrapeBtnText) scrapeBtnText.innerText = "Scraping...";
+        if (btnAutoScrape) btnAutoScrape.disabled = true;
+        if (scrapeStatus) {
+            scrapeStatus.style.display = "block";
+            scrapeStatus.innerHTML = `<span style="color: #00b4d8;"><i class="fa-solid fa-satellite fa-spin"></i> Fetching live OSM coordinates, structural metadata & Open-Meteo rainfall for "${damName}"...</span>`;
+        }
+
+        // Set Loading state in hero
+        if (heroScrapeIcon) heroScrapeIcon.className = "fa-solid fa-spinner fa-spin";
+        if (heroScrapeBtnText) heroScrapeBtnText.innerText = "Scraping...";
+        if (btnHeroScrape) btnHeroScrape.disabled = true;
+        if (heroScrapeStatus) {
+            heroScrapeStatus.style.display = "block";
+            heroScrapeStatus.style.background = "rgba(0, 180, 216, 0.1)";
+            heroScrapeStatus.style.border = "1px solid rgba(0, 180, 216, 0.3)";
+            heroScrapeStatus.innerHTML = `<span style="color: #00b4d8;"><i class="fa-solid fa-satellite fa-spin"></i> Contacting OpenStreetMap, Wikidata, Open-Meteo & CWC APIs...</span>`;
+        }
+
+        const shouldUpdateConfig = chkUpdateConfig ? chkUpdateConfig.checked : true;
+
+        try {
+            const res = await fetch("/api/scrape-dam", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ dam_name: damName, update_config: shouldUpdateConfig })
+            });
+
+            const data = await res.json();
+            if (data.status === "success" && data.dossier) {
+                const d = data.dossier;
+                const savedPath = data.saved_path || `scraper/output/${data.saved_file || (d.dam_id + '_realtime_dossier.json')}`;
+
+                displayDossier(d, savedPath);
+
+                const successMsg = `Scraped successfully in ${d.elapsed_seconds || 0}s! Stored in <strong>/${savedPath}</strong>`;
+                if (scrapeStatus) {
+                    scrapeStatus.innerHTML = `<span style="color: #06d6a0;"><i class="fa-solid fa-circle-check"></i> ${successMsg}</span>`;
+                }
+                if (heroScrapeStatus) {
+                    heroScrapeStatus.style.background = "rgba(6, 214, 160, 0.12)";
+                    heroScrapeStatus.style.border = "1px solid rgba(6, 214, 160, 0.35)";
+                    heroScrapeStatus.innerHTML = `<span style="color: #06d6a0;"><i class="fa-solid fa-circle-check"></i> ${successMsg}</span>`;
+                }
+
+                // Refresh saved files list
+                loadSavedFiles();
+            } else {
+                const errMsg = data.message || "Failed to scrape dam data.";
+                if (scrapeStatus) {
+                    scrapeStatus.innerHTML = `<span style="color: #e63946;"><i class="fa-solid fa-triangle-exclamation"></i> ${errMsg}</span>`;
+                }
+                if (heroScrapeStatus) {
+                    heroScrapeStatus.style.background = "rgba(230, 57, 70, 0.12)";
+                    heroScrapeStatus.style.border = "1px solid rgba(230, 57, 70, 0.35)";
+                    heroScrapeStatus.innerHTML = `<span style="color: #e63946;"><i class="fa-solid fa-triangle-exclamation"></i> ${errMsg}</span>`;
+                }
+            }
+        } catch (err) {
+            const errMsg = "Error connecting to backend: " + err.message;
+            if (scrapeStatus) scrapeStatus.innerHTML = `<span style="color: #e63946;"><i class="fa-solid fa-triangle-exclamation"></i> ${errMsg}</span>`;
+            if (heroScrapeStatus) {
+                heroScrapeStatus.style.background = "rgba(230, 57, 70, 0.12)";
+                heroScrapeStatus.style.border = "1px solid rgba(230, 57, 70, 0.35)";
+                heroScrapeStatus.innerHTML = `<span style="color: #e63946;"><i class="fa-solid fa-triangle-exclamation"></i> ${errMsg}</span>`;
+            }
+        } finally {
+            if (scrapeIcon) scrapeIcon.className = "fa-solid fa-bolt";
+            if (scrapeBtnText) scrapeBtnText.innerText = "Auto-Scrape";
+            if (btnAutoScrape) btnAutoScrape.disabled = false;
+
+            if (heroScrapeIcon) heroScrapeIcon.className = "fa-solid fa-bolt";
+            if (heroScrapeBtnText) heroScrapeBtnText.innerText = "Scrape Data";
+            if (btnHeroScrape) btnHeroScrape.disabled = false;
+        }
+    }
+
+    // Load saved files from /scraper/output
+    async function loadSavedFiles() {
+        if (!savedFilesContainer) return;
+        try {
+            const res = await fetch("/api/scraped-files");
+            const data = await res.json();
+            if (data.status === "success" && data.files && data.files.length > 0) {
+                savedFilesContainer.innerHTML = "";
+                data.files.forEach(f => {
+                    const tag = document.createElement("button");
+                    tag.type = "button";
+                    tag.className = "recent-dam-tag";
+                    tag.innerHTML = `<i class="fa-solid fa-file-lines" style="margin-right:4px;"></i>${f.dam_name} <span style="font-size:0.65rem; opacity:0.7;">(${Math.round(f.size_bytes/1024)}KB)</span>`;
+                    tag.title = `Click to load ${f.path}`;
+                    tag.addEventListener("click", async () => {
+                        try {
+                            const fres = await fetch(`/api/scraped-files/${f.filename}`);
+                            const fdossier = await fres.json();
+                            displayDossier(fdossier, f.path);
+                            if (scrapeStatus) {
+                                scrapeStatus.style.display = "block";
+                                scrapeStatus.innerHTML = `<span style="color: #06d6a0;"><i class="fa-solid fa-circle-check"></i> Loaded dossier for "${f.dam_name}" from <strong>${f.path}</strong></span>`;
+                            }
+                        } catch (err) {
+                            alert("Failed to load file: " + err.message);
+                        }
+                    });
+                    savedFilesContainer.appendChild(tag);
+                });
+            } else {
+                savedFilesContainer.innerHTML = `<span style="font-size:0.72rem; color:#64748b;">No saved dossiers found in /scraper/output yet.</span>`;
+            }
+        } catch (err) {
+            savedFilesContainer.innerHTML = `<span style="font-size:0.72rem; color:#e63946;">Failed to query /scraper/output.</span>`;
+        }
+    }
+
+    // Auto-Scrape Button Action in Modal
+    if (btnAutoScrape) {
+        btnAutoScrape.addEventListener("click", () => {
+            const damName = simNameInput ? simNameInput.value.trim() : "";
+            executeScrape(damName);
+        });
+    }
+
+    // Enter key inside modal input
+    if (simNameInput) {
+        simNameInput.addEventListener("keydown", (e) => {
+            if (e.key === "Enter") {
+                e.preventDefault();
+                executeScrape(simNameInput.value.trim());
+            }
+        });
+    }
+
+    // Hero Scrape Button Action
+    if (btnHeroScrape) {
+        btnHeroScrape.addEventListener("click", () => {
+            const damName = heroDamInput ? heroDamInput.value.trim() : "";
+            executeScrape(damName);
+        });
+    }
+
+    // Enter key inside hero input
+    if (heroDamInput) {
+        heroDamInput.addEventListener("keydown", (e) => {
+            if (e.key === "Enter") {
+                e.preventDefault();
+                executeScrape(heroDamInput.value.trim());
+            }
+        });
+    }
+
+    // Quick chip buttons
+    quickChipBtns.forEach(btn => {
+        btn.addEventListener("click", () => {
+            const damName = btn.getAttribute("data-dam");
+            if (damName) {
+                if (heroDamInput) heroDamInput.value = damName;
+                if (simNameInput) simNameInput.value = damName;
+                executeScrape(damName);
+            }
+        });
+    });
+
+    // View Dossier button (formatted in modal / new window)
+    if (btnViewDossier) {
+        btnViewDossier.addEventListener("click", () => {
+            if (currentDossier) {
+                const w = window.open("", "_blank");
+                w.document.write("<html><head><title>Scraped Dossier: " + currentDossier.dam_name + "</title><style>body{background:#040812;color:#00b4d8;font-family:monospace;padding:24px;line-height:1.4;}pre{background:#080e1c;padding:16px;border-radius:8px;border:1px solid rgba(0,180,216,0.3);color:#06d6a0;overflow:auto;}</style></head><body>");
+                w.document.write("<h2>Scraped Dossier (Stored in /scraper/output)</h2><pre>" + JSON.stringify(currentDossier, null, 2) + "</pre>");
+                w.document.write("</body></html>");
+            }
+        });
+    }
+
+    // Download JSON
+    if (btnDownloadJson) {
+        btnDownloadJson.addEventListener("click", () => {
+            if (currentDossier) {
+                const filename = (currentDossier.dam_id || "dam") + "_realtime_dossier.json";
+                const blob = new Blob([JSON.stringify(currentDossier, null, 2)], { type: "application/json" });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }
+        });
+    }
+
+    // Copy JSON
+    if (btnCopyJson) {
+        btnCopyJson.addEventListener("click", async () => {
+            if (currentDossier) {
+                try {
+                    await navigator.clipboard.writeText(JSON.stringify(currentDossier, null, 2));
+                    const origText = btnCopyJson.innerHTML;
+                    btnCopyJson.innerHTML = `<i class="fa-solid fa-check"></i> Copied!`;
+                    setTimeout(() => { btnCopyJson.innerHTML = origText; }, 2000);
+                } catch (e) {
+                    alert("Failed to copy to clipboard");
+                }
+            }
+        });
+    }
+
+    // Refresh saved files
+    if (btnRefreshSaved) {
+        btnRefreshSaved.addEventListener("click", loadSavedFiles);
+    }
+
+    // Initial load of saved files
+    loadSavedFiles();
+
+    // Simulation Form Submit
+    if (form) {
         form.addEventListener("submit", async (e) => {
             e.preventDefault();
             if (window.location.protocol === 'file:') {
@@ -1161,7 +1631,7 @@ document.addEventListener("DOMContentLoaded", function() {
             }
             
             logDiv.style.display = "block";
-            logDiv.innerHTML = "Submitting...<br>";
+            logDiv.innerHTML = "Submitting simulation payload...<br>";
             
             const payload = {
                 dam_name: document.getElementById("sim-name").value,
@@ -1202,3 +1672,5 @@ document.addEventListener("DOMContentLoaded", function() {
 
 </body>
 </html>
+
+

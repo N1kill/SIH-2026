@@ -77,6 +77,82 @@ async def run_simulation_task(req: SimRequest):
     simulation_status["running"] = False
     simulation_status["log"].append("Simulation finished.")
 
+SCRAPER_OUTPUT_DIR = Path("scraper/output").resolve()
+if not SCRAPER_OUTPUT_DIR.exists():
+    SCRAPER_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+from scraper.pipeline import DamDataScraper
+
+class ScrapeRequest(BaseModel):
+    dam_name: str
+    country_code: str = "in"
+    update_config: bool = False
+
+@app.post("/api/scrape-dam")
+async def scrape_dam_endpoint(req: ScrapeRequest):
+    dam_name = req.dam_name.strip()
+    if not dam_name:
+        return {"status": "error", "message": "Dam name cannot be empty"}
+    try:
+        scraper = DamDataScraper()
+        dossier = await asyncio.to_thread(scraper.scrape, dam_name, country_code=req.country_code)
+        saved_path = scraper.save_dossier(dossier)
+        if req.update_config:
+            scraper.update_config_json(dossier)
+        rel_path = os.path.relpath(saved_path, Path.cwd()) if str(saved_path).startswith(str(Path.cwd())) else str(saved_path)
+        return {
+            "status": "success",
+            "dam_name": dam_name,
+            "dam_id": dossier.get("dam_id"),
+            "saved_file": saved_path.name,
+            "saved_path": rel_path.replace("\\", "/"),
+            "output_folder": "/scraper/output",
+            "dossier": dossier
+        }
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+@app.get("/api/scrape-dam")
+async def scrape_dam_get(dam_name: str, country_code: str = "in", update_config: bool = False):
+    return await scrape_dam_endpoint(ScrapeRequest(dam_name=dam_name, country_code=country_code, update_config=update_config))
+
+@app.get("/api/scraped-files")
+async def list_scraped_files():
+    """List all saved dam dossiers in /scraper/output."""
+    if not SCRAPER_OUTPUT_DIR.exists():
+        SCRAPER_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    import json
+    files = []
+    for f in sorted(SCRAPER_OUTPUT_DIR.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True):
+        try:
+            with open(f, "r", encoding="utf-8") as jf:
+                data = json.load(jf)
+                d_name = data.get("dam_name", f.stem)
+                ts = data.get("scrape_timestamp_utc", "")
+                st_count = len(data.get("downstream_monitoring_stations", []))
+        except Exception:
+            d_name = f.stem
+            ts = ""
+            st_count = 0
+        files.append({
+            "filename": f.name,
+            "path": f"/scraper/output/{f.name}",
+            "dam_name": d_name,
+            "stations_count": st_count,
+            "size_bytes": f.stat().st_size,
+            "modified_time": f.stat().st_mtime,
+            "timestamp": ts,
+        })
+    return {"status": "success", "folder": "/scraper/output", "files": files}
+
+@app.get("/api/scraped-files/{filename}")
+async def get_scraped_file(filename: str):
+    """Serve a specific scraped dossier from /scraper/output."""
+    target_file = (SCRAPER_OUTPUT_DIR / filename).resolve()
+    if not target_file.is_file() or not str(target_file).startswith(str(SCRAPER_OUTPUT_DIR)):
+        return {"status": "error", "message": "File not found"}
+    return FileResponse(target_file, media_type="application/json")
+
 @app.post("/api/simulate")
 async def start_simulation(req: SimRequest):
     if simulation_status["running"]:

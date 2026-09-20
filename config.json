@@ -9,10 +9,34 @@
     "reservoir_volume_m3": 101000000,
     "spillway_capacity_m3s": null,
     "downstream_stations": [
-      {"name": "Machhu-II Dam Toe (0 km)", "key": "dam_toe", "lat": 22.8212, "lon": 70.8414, "dist_km": 0},
-      {"name": "Morbi City Center (5.2 km)", "key": "morbi", "lat": 22.8684, "lon": 70.8117, "dist_km": 5.2},
-      {"name": "Lilapar / Dhuva (12 km)", "key": "lilapar", "lat": 22.9161, "lon": 70.7853, "dist_km": 12.0},
-      {"name": "Malia Miyana (25 km)", "key": "malia", "lat": 22.9802, "lon": 70.7675, "dist_km": 32.0}
+      {
+        "name": "Machhu-II Dam Toe (0 km)",
+        "key": "dam_toe",
+        "lat": 22.8212,
+        "lon": 70.8414,
+        "dist_km": 0
+      },
+      {
+        "name": "Morbi City Center (5.2 km)",
+        "key": "morbi",
+        "lat": 22.8684,
+        "lon": 70.8117,
+        "dist_km": 5.2
+      },
+      {
+        "name": "Lilapar / Dhuva (12 km)",
+        "key": "lilapar",
+        "lat": 22.9161,
+        "lon": 70.7853,
+        "dist_km": 12.0
+      },
+      {
+        "name": "Malia Miyana (25 km)",
+        "key": "malia",
+        "lat": 22.9802,
+        "lon": 70.7675,
+        "dist_km": 32.0
+      }
     ],
     "bbox": {
       "min_lat": 22.0,
@@ -31,15 +55,106 @@
     "reservoir_volume_m3": 303000000,
     "spillway_capacity_m3s": 3000,
     "downstream_stations": [
-      {"name": "Panshet Dam Toe (0 km)", "key": "dam_toe", "lat": 18.3797, "lon": 73.6111, "dist_km": 0},
-      {"name": "Khadakwasla", "key": "khadakwasla", "lat": 18.4358, "lon": 73.7628, "dist_km": 18.0},
-      {"name": "Pune City", "key": "pune", "lat": 18.5204, "lon": 73.8567, "dist_km": 35.0}
+      {
+        "name": "Panshet Dam Toe (0 km)",
+        "key": "dam_toe",
+        "lat": 18.3797,
+        "lon": 73.6111,
+        "dist_km": 0
+      },
+      {
+        "name": "Khadakwasla",
+        "key": "khadakwasla",
+        "lat": 18.4358,
+        "lon": 73.7628,
+        "dist_km": 18.0
+      },
+      {
+        "name": "Pune City",
+        "key": "pune",
+        "lat": 18.5204,
+        "lon": 73.8567,
+        "dist_km": 35.0
+      }
     ],
     "bbox": {
-      "min_lat": 18.30,
-      "max_lat": 18.60,
+      "min_lat": 18.3,
+      "max_lat": 18.6,
       "min_lon": 73.55,
       "max_lon": 73.95
+    }
+  },
+  "tehri": {
+    "dam_name": "Tehri Dam",
+    "state": "Uttarakhand",
+    "lat": 30.37618,
+    "lon": 78.48031,
+    "dam_height_m": 260.5,
+    "crest_length_m": 575.0,
+    "reservoir_volume_m3": 15540.0,
+    "spillway_capacity_m3s": 2.0,
+    "downstream_stations": [
+      {
+        "name": "Tehri Dam Toe (0 km)",
+        "key": "dam_toe",
+        "lat": 30.37618,
+        "lon": 78.48031,
+        "dist_km": 0.0
+      }
+    ],
+    "bbox": {
+      "min_lat": 30.2761,
+      "max_lat": 30.4761,
+      "min_lon": 78.3804,
+      "max_lon": 78.5804
+    }
+  },
+  "bhakra": {
+    "dam_name": "Bhakra Dam",
+    "state": "Himachal Pradesh",
+    "lat": 31.41159,
+    "lon": 76.43264,
+    "dam_height_m": 225.55,
+    "crest_length_m": 520.0,
+    "reservoir_volume_m3": 7552102986.1,
+    "spillway_capacity_m3s": null,
+    "downstream_stations": [
+      {
+        "name": "Bhakra Dam Toe (0 km)",
+        "key": "dam_toe",
+        "lat": 31.41159,
+        "lon": 76.43264,
+        "dist_km": 0.0
+      }
+    ],
+    "bbox": {
+      "min_lat": 31.3116,
+      "max_lat": 31.5116,
+      "min_lon": 76.3339,
+      "max_lon": 76.5339
+    }
+  },
+  "custom_dam": {
+    "dam_name": "Bhakra Dam",
+    "state": "Custom",
+    "lat": 31.41159,
+    "lon": 76.43264,
+    "dam_height_m": 225.55,
+    "reservoir_volume_m3": 7552102986.1,
+    "downstream_stations": [
+      {
+        "name": "Dam Toe",
+        "key": "dam_toe",
+        "lat": 31.41159,
+        "lon": 76.43264,
+        "dist_km": 0
+      }
+    ],
+    "bbox": {
+      "min_lat": 31.21159,
+      "max_lat": 31.61159,
+      "min_lon": 76.23264,
+      "max_lon": 76.63264000000001
     }
   }
 }
