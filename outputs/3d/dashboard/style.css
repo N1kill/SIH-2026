@@ -1254,7 +1254,7 @@ body {
 }
 
 /* ==========================================================================
-   INUNDAX LANDING PAGE & BRANDING STYLES
+   PRALAYA LANDING PAGE & BRANDING STYLES
    ========================================================================== */
 
 /* Navbar Brand & Corner Logo */
@@ -1587,7 +1587,7 @@ body {
   line-height: 1.6;
 }
 
-/* Features Grid (What is InundaX?) */
+/* Features Grid (What is PRALAYA?) */
 .features-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);

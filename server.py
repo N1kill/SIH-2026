@@ -1,78 +1,118 @@
-"""Local single-user digital-twin API and static dashboard.
-
-Start with: python -m uvicorn server:app --host 127.0.0.1 --port 8050 --workers 1
-The historical dashboard is retained at /index.html for reference only.
-"""
+import os
+import sys
+import subprocess
 import asyncio
-import json
-from contextlib import asynccontextmanager
 from pathlib import Path
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
-from fastapi.responses import FileResponse
+from pydantic import BaseModel
+from fastapi import FastAPI, Request
+from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
-from src.api import router, manager
+from fastapi.middleware.cors import CORSMiddleware
+from sse_starlette.sse import EventSourceResponse
 
-ROOT=Path(__file__).resolve().parent
-DASHBOARD_DIR=ROOT/"outputs/3d/dashboard"
+app = FastAPI(title="PRALAYA Backend")
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
-
-@asynccontextmanager
-async def lifespan(app):
-    yield
-    if manager.active:
-        manager.active.cancel.set()
-        for _ in range(100):
-            if manager.active.status()["status"] in {"COMPLETE","FAILED","CANCELLED"}:
-                break
-            await asyncio.sleep(.05)
+DASHBOARD_DIR = Path("outputs/3d/dashboard").resolve()
+if not DASHBOARD_DIR.exists():
+    DASHBOARD_DIR.mkdir(parents=True, exist_ok=True)
 
 
-app=FastAPI(title="InundaX scenario laboratory",version="1.0",lifespan=lifespan)
-app.include_router(router)
+simulation_status = {"running": False, "log": []}
 
+class SimRequest(BaseModel):
+    dam_name: str
+    lat: float
+    lon: float
+    height: float
+    volume: float
 
-@app.get("/")
-def index():
-    return FileResponse(DASHBOARD_DIR/"twin.html")
-
+async def run_simulation_task(req: SimRequest):
+    simulation_status["running"] = True
+    simulation_status["log"] = [f"Starting simulation for {req.dam_name}..."]
+    
+    # Save config
+    import json
+    config_path = Path("config.json")
+    if config_path.exists():
+        with open(config_path, "r") as f:
+            config = json.load(f)
+    else:
+        config = {}
+        
+    config["custom_dam"] = {
+        "dam_name": req.dam_name,
+        "state": "Custom",
+        "lat": req.lat,
+        "lon": req.lon,
+        "dam_height_m": req.height,
+        "reservoir_volume_m3": req.volume,
+        "downstream_stations": [
+            {"name": "Dam Toe", "key": "dam_toe", "lat": req.lat, "lon": req.lon, "dist_km": 0}
+        ],
+        "bbox": {
+            "min_lat": req.lat - 0.2,
+            "max_lat": req.lat + 0.2,
+            "min_lon": req.lon - 0.2,
+            "max_lon": req.lon + 0.2
+        }
+    }
+    with open(config_path, "w") as f:
+        json.dump(config, f, indent=2)
+        
+    process = subprocess.Popen(
+        [sys.executable, "scripts/10_hydrodynamic_simulation.py", "--dam_config", "custom_dam"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True
+    )
+    
+    while True:
+        line = process.stdout.readline()
+        if not line and process.poll() is not None:
+            break
+        if line:
+            simulation_status["log"].append(line.strip())
+            
+    simulation_status["running"] = False
+    simulation_status["log"].append("Simulation finished.")
 
 @app.post("/api/simulate")
-@app.get("/api/physics/snapshot")
-def retired_physics():
-    raise HTTPException(410,"Use /api/simulation/start and /api/simulation/results/{id}; legacy uncoupled runs are disabled")
+async def start_simulation(req: SimRequest):
+    if simulation_status["running"]:
+        return {"status": "error", "message": "Simulation already running."}
+    asyncio.create_task(run_simulation_task(req))
+    return {"status": "started"}
 
+@app.get("/api/status")
+async def get_status(request: Request):
+    async def event_generator():
+        last_idx = 0
+        while True:
+            if await request.is_disconnected():
+                break
+            
+            if last_idx < len(simulation_status["log"]):
+                for i in range(last_idx, len(simulation_status["log"])):
+                    yield {"data": simulation_status["log"][i]}
+                last_idx = len(simulation_status["log"])
+                
+            if not simulation_status["running"] and last_idx >= len(simulation_status["log"]):
+                # One last flush
+                yield {"data": "EOF"}
+                break
+                
+            await asyncio.sleep(0.5)
+            
+    return EventSourceResponse(event_generator())
 
-@app.websocket("/ws/physics")
-async def retired_stream(ws:WebSocket):
-    await ws.accept()
-    await ws.send_json({"type":"simulation_error","error":"Use /ws/simulation/{simulation_id}; legacy mock-grid stream is disabled"})
-    await ws.close()
+@app.get("/")
+async def serve_index():
+    return FileResponse(DASHBOARD_DIR / "index.html")
 
+# Mount static files at root
+app.mount("/", StaticFiles(directory=str(DASHBOARD_DIR)), name="static")
 
-@app.websocket("/ws/dflowfm")
-async def dflow_replay(ws:WebSocket):
-    """Explicit archived D-Flow result playback, never part of a new run."""
-    await ws.accept()
-    path=DASHBOARD_DIR/"delft3d_fm_latest.json"
-    try:
-        if not path.is_file():
-            await ws.send_json({"type":"dflow_unavailable"})
-            return
-        result=await asyncio.to_thread(lambda:json.loads(path.read_text(encoding="utf-8")))
-        await ws.send_json({"type":"dflow_start","archived":True,"coordinate_bounds":result.get("coordinate_bounds"),"frame_count":len(result.get("frames",[]))})
-        for index,frame in enumerate(result.get("frames",[])):
-            await ws.send_json({"type":"dflow_frame","frame_index":index,"frame":frame,"archived":True})
-            await asyncio.sleep(.1)
-        await ws.send_json({"type":"dflow_complete"})
-    except WebSocketDisconnect:
-        pass
-    finally:
-        try:await ws.close()
-        except RuntimeError:pass
-
-
-app.mount("/",StaticFiles(directory=str(DASHBOARD_DIR)),name="dashboard")
-
-if __name__=="__main__":
+if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("server:app",host="127.0.0.1",port=8050)
+    uvicorn.run("server:app", host="0.0.0.0", port=8050, reload=True)
