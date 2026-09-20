@@ -1,162 +1,103 @@
 /* ==========================================================================
-   SIH-2026: Machhu-II Dam Failure Digital Twin & HADR Decision Support Platform
-   Master Application Logic (2D GIS + 3D WebGL Digital Twin + Analytics Engine)
+   SIH-2026: Dam Breach HADR Decision Support Platform
+   Generic 2D Hydrodynamic Dashboard — works for any dam + river system
    ========================================================================== */
 
 document.addEventListener("DOMContentLoaded", () => {
   // ------------------------------------------------------------------------
-  // 1. VERIFIED PIPELINE SIMULATION DATA REPOSITORY (GROUND TRUTH)
+  // 1. PIPELINE DATA REPOSITORY
+  // Skeleton only — fully populated at startup from simulation_summary.json
+  // and validation_report.json via loadPipelineData().
+  // The socio-economic fields (pop_exposed, economic_loss_cr, etc.) and
+  // HADR fields (shelters, routes) remain Machhu-II specific and are
+  // explicitly NOT overwritten by the loader (no pipeline equivalent).
   // ------------------------------------------------------------------------
   const PIPELINE_DATA = {
-    dam_name: "Machhu-II Dam (Irrigation Project)",
-    cwc_id: "GJ04MH0002",
-    coordinates: { lat: 22.8212, lon: 70.8414 },
-    structural_height_m: 22.56,
-    crest_length_m: 3542.0,
-    gross_storage_mcm: 101.0,
-    designed_spillway_m3s: 5663.0,
-    inflow_peak_m3s: 3078.30,
+    // Dam metadata — populated from simulation_summary.json
+    dam_name:            "Dam Breach",
+    dam_id:              "—",
+    coordinates:         { lat: 0, lon: 0 },
+    structural_height_m: 0,
+    gross_storage_mcm:   0,
+    inflow_peak_m3s:     0,
+    sim_duration_hours:  24,
 
-    // Scenarios (Base case verified from 2D hydrodynamic simulation)
+    // Scenarios — keyed by scenario id from validation_report.json.
+    // Populated dynamically. Always has at least 'base'.
     scenarios: {
       base: {
         id: "base",
-        name: "Base Case (Froehlich 2008)",
-        q_peak: 6647.0,
-        b_avg: 156.0,
-        t_f: 2.50,
-        morbi_peak_depth: 6.32,
-        morbi_arrival_time: 7.47,
-        morbi_peak_time: 19.30,
-        inund_area_km2: 123.38,
-        pop_exposed: 214559,
-        buildings_affected: 44699,
-        economic_loss_cr: 3629.14,
+        name: "Base Case",
+        q_peak: 0,
+        b_avg: 0,
+        t_f: 2.5,
+        primary_peak_depth: 0,
+        morbi_peak_depth: 0,   // alias kept for backward compat
+        morbi_arrival_time: 0, // alias
+        morbi_peak_time: 0,    // alias
+        inund_area_km2: 0,
+        // Socio-economic (Machhu-II specific, kept as fallback)
+        pop_exposed:          214559,
+        buildings_affected:   44699,
+        economic_loss_cr:     3629.14,
         critical_risk_area_km2: 6.82,
-        cropland_ha: 4274.7,
-        roads_km: 394.8,
-        bridges: 6,
-      },
-      plus25: {
-        id: "plus25",
-        name: "+25% Breach Width",
-        q_peak: 8309.0,
-        b_avg: 195.0,
-        t_f: 2.00,
-        morbi_peak_depth: 7.58,
-        morbi_arrival_time: 6.20,
-        morbi_peak_time: 16.50,
-        inund_area_km2: 145.60,
-        pop_exposed: 253180,
-        buildings_affected: 52745,
-        economic_loss_cr: 4282.40,
-        critical_risk_area_km2: 8.05,
-        cropland_ha: 5044.1,
-        roads_km: 465.9,
-        bridges: 6,
-      },
-      minus25: {
-        id: "minus25",
-        name: "-25% Conservative",
-        q_peak: 4985.0,
-        b_avg: 117.0,
-        t_f: 3.12,
-        morbi_peak_depth: 4.93,
-        morbi_arrival_time: 9.10,
-        morbi_peak_time: 21.00,
-        inund_area_km2: 101.20,
-        pop_exposed: 175938,
-        buildings_affected: 36653,
-        economic_loss_cr: 2975.90,
-        critical_risk_area_km2: 5.59,
-        cropland_ha: 3505.2,
-        roads_km: 323.8,
-        bridges: 6,
-      },
-      extreme50: {
-        id: "extreme50",
-        name: "+50% Extreme Overtopping",
-        q_peak: 10500.0,
-        b_avg: 234.0,
-        t_f: 1.50,
-        morbi_peak_depth: 9.16,
-        morbi_arrival_time: 4.80,
-        morbi_peak_time: 14.20,
-        inund_area_km2: 172.70,
-        pop_exposed: 300383,
-        buildings_affected: 62580,
-        economic_loss_cr: 5080.80,
-        critical_risk_area_km2: 9.55,
-        cropland_ha: 5984.6,
-        roads_km: 552.6,
-        bridges: 6,
+        cropland_ha:          4274.7,
+        roads_km:             394.8,
+        bridges:              6,
       }
     },
 
-    // Gauge Telemetry Data
+    // _scenarioList: ordered array of scenario ids for button rendering.
+    // Built by loadPipelineData from validation_report.sensitivity_scenarios.
+    _scenarioList: ["base"],
+
+    // Stations — keyed by gauge id from simulation_summary.json.
+    // Populated dynamically.
     stations: {
-      dam_toe: { name: "Machhu-II Dam Toe (0 km)", lat: 22.8212, lon: 70.8414, peak_depth: 22.56, arrival: 0.07, peak_time: 1.23 },
-      morbi: { name: "Morbi City Center (5.2 km)", lat: 22.8684, lon: 70.8117, peak_depth: 6.32, arrival: 7.47, peak_time: 19.30 },
-      lilapar: { name: "Lilapar / Dhuva (12 km)", lat: 22.9161, lon: 70.7853, peak_depth: 3.87, arrival: 17.50, peak_time: 23.73 },
-      malia: { name: "Malia Miyana (25 km)", lat: 22.9802, lon: 70.7675, peak_depth: 0.85, arrival: 22.00, peak_time: 24.00 }
+      dam_toe: { name: "Dam Toe (0 km)", lat: 0, lon: 0, peak_depth: 0, arrival: 0, peak_time: 0 }
     },
 
-    // High Ground Evacuation Centers (With Real Hydrodynamic Safety Calculations)
+    // _stationSlots: ordered array of gauge keys mapped to the 4 fixed DOM
+    // gauge slots [dam_toe, primary, secondary, tertiary].
+    // Element 0 is always the dam_toe gauge; 1-3 are downstream stations.
+    _stationSlots: ["dam_toe"],
+
+    // _primaryStationKey: the first downstream gauge (used for phase labels)
+    _primaryStationKey: "morbi",
+
+    // _maxVelocity: from sim metrics, used for velocity HUD
+    _maxVelocity: 12.0,
+
+    // High Ground Evacuation Centers — Machhu-II specific HADR data.
+    // Kept as-is; no pipeline equivalent.
     shelters: [
       {
-        id: "S1_EAST",
-        shortName: "SHELTER 1 (EAST)",
+        id: "S1_EAST", shortName: "SHELTER 1 (EAST)",
         name: "Morbi East High Ground Shelter 1",
-        lat: 22.875,
-        lon: 70.852,
-        elev: 56.40,
-        capacity: 25000,
-        type: "Topographic Elevation Ridge",
-        distance_km: 2.10,
-        walk_time_hrs: 0.60,
-        allocation: 23550,
-        safe_clearance_m: 23.87,
-        safety_factor: 1.73,
-        lead_buffer_hrs: 6.87,
-        hazard_rating_site: 0.00
+        lat: 22.875, lon: 70.852, elev: 56.40, capacity: 25000,
+        type: "Topographic Elevation Ridge", distance_km: 2.10,
+        walk_time_hrs: 0.60, allocation: 23550, safe_clearance_m: 23.87,
+        safety_factor: 1.73, lead_buffer_hrs: 6.87, hazard_rating_site: 0.00
       },
       {
-        id: "S2_SOUTHEAST",
-        shortName: "SHELTER 2 (SE)",
+        id: "S2_SOUTHEAST", shortName: "SHELTER 2 (SE)",
         name: "South-East Relief Complex",
-        lat: 22.842,
-        lon: 70.848,
-        elev: 54.20,
-        capacity: 18000,
-        type: "Reinforced Government Complex",
-        distance_km: 3.45,
-        walk_time_hrs: 0.99,
-        allocation: 16820,
-        safe_clearance_m: 21.67,
-        safety_factor: 1.67,
-        lead_buffer_hrs: 6.48,
-        hazard_rating_site: 0.00
+        lat: 22.842, lon: 70.848, elev: 54.20, capacity: 18000,
+        type: "Reinforced Government Complex", distance_km: 3.45,
+        walk_time_hrs: 0.99, allocation: 16820, safe_clearance_m: 21.67,
+        safety_factor: 1.67, lead_buffer_hrs: 6.48, hazard_rating_site: 0.00
       },
       {
-        id: "S3_LILIYA",
-        shortName: "SHELTER 3 (LILIYA)",
+        id: "S3_LILIYA", shortName: "SHELTER 3 (LILIYA)",
         name: "Liliya Ridge Transit Hub",
-        lat: 22.905,
-        lon: 70.825,
-        elev: 53.80,
-        capacity: 12000,
-        type: "Elevated Transit Interchange",
-        distance_km: 4.80,
-        walk_time_hrs: 1.37,
-        allocation: 11150,
-        safe_clearance_m: 21.27,
-        safety_factor: 1.65,
-        lead_buffer_hrs: 6.10,
-        hazard_rating_site: 0.00
+        lat: 22.905, lon: 70.825, elev: 53.80, capacity: 12000,
+        type: "Elevated Transit Interchange", distance_km: 4.80,
+        walk_time_hrs: 1.37, allocation: 11150, safe_clearance_m: 21.27,
+        safety_factor: 1.65, lead_buffer_hrs: 6.10, hazard_rating_site: 0.00
       }
     ],
 
-    // Evacuation Routes
+    // Evacuation Routes — Machhu-II specific.
     routes: [
       {
         id: "R1_EAST",
@@ -187,6 +128,7 @@ document.addEventListener("DOMContentLoaded", () => {
   let hydrographChart = null;
   let sectorChart = null;
   let popChart = null;
+
 
   // ------------------------------------------------------------------------
   // 2. TAB VIEW SWITCHER & LANDING PAGE NAVIGATION
@@ -518,27 +460,37 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function updatePhaseDescription(t) {
-    let status = "Breach Inflow Routing";
-    let color = "var(--accent-cyan)";
+    const sc  = PIPELINE_DATA.scenarios[currentScenarioKey];
+    const tf  = sc.t_f;
+    const arr = sc.morbi_arrival_time;
+    const pk  = sc.morbi_peak_time;
+    
+    // Fallback if there are less than 3 stations
+    const st2Key = PIPELINE_DATA._stationSlots.length > 2 ? PIPELINE_DATA._stationSlots[2] : null;
+    const st2Arr = st2Key && PIPELINE_DATA.stations[st2Key] ? PIPELINE_DATA.stations[st2Key].arrival : arr * 2;
 
-    if (t < 0.5) {
-      status = "Crest Overtopping & Embankment Erosion";
-      color = "var(--accent-amber)";
-    } else if (t >= 0.5 && t < 3.0) {
-      status = "Catastrophic Breach Expansion (Q_peak = 6,647 m³/s)";
-      color = "var(--accent-red)";
-    } else if (t >= 3.0 && t < 7.5) {
-      status = "High-Velocity Surge Advancing Down Machhu Gorge";
-      color = "var(--accent-amber)";
-    } else if (t >= 7.5 && t < 15.0) {
-      status = "Destructive Flood Inundating Central Morbi (Peak 6.32m)";
-      color = "var(--accent-red)";
-    } else if (t >= 15.0 && t < 22.0) {
-      status = "Drainage Through Lilapar & Downstream Delta";
-      color = "var(--accent-cyan)";
+    let status = "Breach Inflow Routing";
+    let color  = "var(--accent-cyan)";
+
+    if (t < 0.25) {
+      status = "Crest Overtopping \u0026 Embankment Erosion Initiated";
+      color  = "var(--accent-amber)";
+    } else if (t < tf) {
+      status = `Catastrophic Breach Expansion (Q_peak = ${Math.round(sc.q_peak).toLocaleString()} m\u00B3/s)`;
+      color  = "var(--accent-red)";
+    } else if (t < arr) {
+      status = "High-Velocity Surge Advancing Down Gorge";
+      color  = "var(--accent-amber)";
+    } else if (t < pk) {
+      const pName = PIPELINE_DATA.stations[PIPELINE_DATA._primaryStationKey]?.name.split(' ')[0] || "Primary Zone";
+      status = `Destructive Flood Inundating ${pName} (Peak ${sc.primary_peak_depth.toFixed(2)}m)`;
+      color  = "var(--accent-red)";
+    } else if (t < pk + (st2Arr - arr)) {
+      status = "Drainage Through Secondary Zone \u0026 Downstream Delta";
+      color  = "var(--accent-cyan)";
     } else {
-      status = "Late-Stage Attenuation & Recession Towards Gulf of Kutch";
-      color = "var(--accent-emerald)";
+      status = "Late-Stage Attenuation \u0026 Recession";
+      color  = "var(--accent-emerald)";
     }
 
     if (hudWaveStatus) {
@@ -547,70 +499,92 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  // Helper: power-law rise then exponential recession gauge curve.
+  // Returns depth at time t for a gauge with given arrival, peak time, peak depth.
+  // tau_rec: e-folding recession time in hours (larger = slower drain).
+  function gaugeDepthAtTime(t, arrival, peakTime, peakDepth, tauRec) {
+    if (t < arrival || peakDepth <= 0) return 0.0;
+    const dt       = t - arrival;
+    const riseTime = Math.max(0.01, peakTime - arrival);
+    if (dt <= riseTime) {
+      // Power-law rising limb (gamma-like shape, exponent 1.4 matches SCS unit hydrograph)
+      return peakDepth * Math.pow(dt / riseTime, 1.4);
+    } else {
+      // Exponential recession — goes to 0 (no artificial floor)
+      return Math.max(0.0, peakDepth * Math.exp(-(dt - riseTime) / tauRec));
+    }
+  }
+
   function updateGaugesAtTime(t) {
     const sc = PIPELINE_DATA.scenarios[currentScenarioKey];
+    const st = PIPELINE_DATA.stations;
+    const slots = PIPELINE_DATA._stationSlots; // Array of up to 4 gauges
 
-    // Dam toe depth curve (rises fast to 22.56m, then decays)
-    let dDam = 0.0;
-    if (t <= 1.2) dDam = (t / 1.2) * sc.morbi_peak_depth * 3.5;
-    else dDam = Math.max(2.5, 22.56 * Math.exp(-(t - 1.2) / 6.0));
-    dDam = Math.min(22.56, dDam);
-
-    // Morbi depth curve (arrives at ~7.47h, peaks at 19.3h at 6.32m)
-    let dMorbi = 0.0;
-    if (t >= sc.morbi_arrival_time) {
-      const dt = t - sc.morbi_arrival_time;
-      const riseTime = sc.morbi_peak_time - sc.morbi_arrival_time;
-      if (dt <= riseTime) {
-        dMorbi = sc.morbi_peak_depth * Math.pow(dt / riseTime, 1.4);
+    const depths = [0, 0, 0, 0];
+    const V_res_m3 = (PIPELINE_DATA.gross_storage_mcm || 101) * 1e6;
+    
+    // --- Compute Depths for the 4 slots ---
+    for (let i = 0; i < Math.min(4, slots.length); i++) {
+      const key = slots[i];
+      const station = st[key];
+      // Fallback heuristics if gauge data is missing
+      const peakD = station ? station.peak_depth : (i===0 ? sc.primary_peak_depth * 2.5 : sc.primary_peak_depth * 0.5);
+      const arrT = station ? station.arrival : (i===0 ? 0 : sc.morbi_arrival_time * (i * 0.8));
+      const peakT = station ? station.peak_time : (i===0 ? sc.t_f : sc.morbi_peak_time * (1 + 0.1*i));
+      
+      let tau = 4.0;
+      if (i === 0) {
+        // Dam reservoir draining tau
+        tau = Math.max(1.0, (V_res_m3 / (sc.q_peak || 1)) / 3600);
       } else {
-        dMorbi = Math.max(1.0, sc.morbi_peak_depth * Math.exp(-(dt - riseTime) / 10.0));
+        // Floodplain routing tau
+        tau = Math.max(4.0, (peakT - arrT) * (0.9 + 0.1*i));
+      }
+
+      depths[i] = gaugeDepthAtTime(t, arrT, peakT, peakD, tau);
+      
+      // Map to the 4 fixed DOM elements
+      const el = document.getElementById(i === 0 ? "val-dam-toe" : (i === 1 ? "val-morbi" : (i === 2 ? "val-lilapar" : "val-malia")));
+      const bar = document.getElementById(i === 0 ? "bar-dam-toe" : (i === 1 ? "bar-morbi" : (i === 2 ? "bar-lilapar" : "bar-malia")));
+      
+      if (el) el.textContent = `${depths[i].toFixed(2)} m`;
+      if (bar) bar.style.width = `${Math.min(100, peakD > 0 ? (depths[i] / peakD) * 100 : 0)}%`;
+    }
+
+    const dDam = depths[0] || 0;
+    const dPrimary = depths[1] || 0;
+    const primaryPeakD = sc.primary_peak_depth;
+
+    // --- Breach outflow Q(t) — Froehlich power-law rise / exponential recession ---
+    const tauQ = Math.max(1.0, (V_res_m3 / (sc.q_peak || 1)) / 3600);
+    let currentQ = 0.0;
+    if (t > 0 && sc.t_f > 0) {
+      if (t <= sc.t_f) {
+        currentQ = sc.q_peak * Math.pow(t / sc.t_f, 1.8);
+      } else {
+        currentQ = Math.max(0.0, sc.q_peak * Math.exp(-(t - sc.t_f) / tauQ));
       }
     }
 
-    // Lilapar depth curve (arrives at 17.5h)
-    let dLilapar = 0.0;
-    if (t >= 17.5) {
-      dLilapar = Math.min(3.87, 3.87 * ((t - 17.5) / 6.2));
-    }
+    // Manning velocity estimate scaled to pipeline max velocity
+    const maxVel  = PIPELINE_DATA._maxVelocity || 12.0;
+    const velFrac = sc.q_peak > 0 ? currentQ / sc.q_peak : 0;
+    const thalwegVel = Math.max(0.0, maxVel * Math.pow(velFrac, 0.6));
 
-    // Update gauge DOM
-    const elDam = document.getElementById("val-dam-toe");
-    const barDam = document.getElementById("bar-dam-toe");
-    if (elDam) elDam.textContent = `${dDam.toFixed(2)} m`;
-    if (barDam) barDam.style.width = `${Math.min(100, (dDam / 22.56) * 100)}%`;
-
-    const elMorbi = document.getElementById("val-morbi");
-    const barMorbi = document.getElementById("bar-morbi");
-    if (elMorbi) elMorbi.textContent = `${dMorbi.toFixed(2)} m`;
-    if (barMorbi) barMorbi.style.width = `${Math.min(100, (dMorbi / sc.morbi_peak_depth) * 100)}%`;
-
-    const elLilapar = document.getElementById("val-lilapar");
-    const barLilapar = document.getElementById("bar-lilapar");
-    if (elLilapar) elLilapar.textContent = `${dLilapar.toFixed(2)} m`;
-    if (barLilapar) barLilapar.style.width = `${Math.min(100, (dLilapar / 3.87) * 100)}%`;
-
-    // Update 3D HUD Telemetry
-    const hudQ = document.getElementById("hud-q-out");
-    const hudHead = document.getElementById("hud-head");
-    const hudVel = document.getElementById("hud-velocity");
+    // --- 3D HUD Telemetry ---
+    const hudQ     = document.getElementById("hud-q-out");
+    const hudHead  = document.getElementById("hud-head");
+    const hudVel   = document.getElementById("hud-velocity");
     const hudStage = document.getElementById("hud-morbi-stage");
 
-    let currentQ = 0.0;
-    if (t <= sc.t_f) {
-      currentQ = sc.q_peak * Math.pow(t / sc.t_f, 1.8);
-    } else {
-      currentQ = Math.max(450.0, sc.q_peak * Math.exp(-(t - sc.t_f) / 4.5));
-    }
+    if (hudQ)     hudQ.textContent     = `${Math.round(currentQ).toLocaleString()} m\u00B3/s`;
+    if (hudHead)  hudHead.textContent  = `${dDam.toFixed(1)} m`;
+    if (hudVel)   hudVel.textContent   = `${thalwegVel.toFixed(1)} m/s`;
+    if (hudStage) hudStage.textContent = `${dPrimary.toFixed(2)} m`;
 
-    if (hudQ) hudQ.textContent = `${Math.round(currentQ).toLocaleString()} m³/s`;
-    if (hudHead) hudHead.textContent = `${dDam.toFixed(1)} m`;
-    if (hudVel) hudVel.textContent = `${(Math.min(12.0, 1.5 + (currentQ / sc.q_peak) * 9.5)).toFixed(1)} m/s`;
-    if (hudStage) hudStage.textContent = `${dMorbi.toFixed(2)} m`;
-
-    // Dynamic GeoJSON polygon opacity matching wave propagation
+    // --- GeoJSON flood extent opacity ---
     if (geojsonLayer) {
-      const alpha = Math.min(0.85, Math.max(0.15, (t / 12.0)));
+      const alpha = Math.min(0.85, Math.max(0.10, dPrimary / Math.max(0.01, primaryPeakD) * 0.85));
       geojsonLayer.setStyle({ fillOpacity: alpha });
     }
   }
@@ -3471,8 +3445,213 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  // ------------------------------------------------------------------------
+  // PIPELINE JSON LOADER — patches PIPELINE_DATA with live physics outputs
+  // Only overwrites fields that come directly from the simulation pipeline.
+  // Population, economic loss, shelter, road/bridge data remain hardcoded.
+  // ------------------------------------------------------------------------
+  async function loadPipelineData() {
+    try {
+      const [simRes, valRes] = await Promise.all([
+        fetch("simulation_summary.json"),
+        fetch("validation_report.json")
+      ]);
+      if (!simRes.ok || !valRes.ok) throw new Error("JSON fetch failed");
+      const sim = await simRes.json();
+      const val = await valRes.json();
+
+      const m = sim.metrics || {};
+      const gauges = sim.monitoring_gauges || {};
+      const bp = sim.breach_parameters_used || {};
+
+      // 1. Update Dam Metadata
+      PIPELINE_DATA.dam_name = sim.project || PIPELINE_DATA.dam_name;
+      PIPELINE_DATA.structural_height_m = bp.H_dam_m || PIPELINE_DATA.structural_height_m;
+      PIPELINE_DATA.gross_storage_mcm = (bp.V_reservoir_m3 || 0) / 1000000;
+
+      // 2. Load Stations dynamically and map to DOM slots
+      const gaugeKeys = Object.keys(gauges);
+      PIPELINE_DATA.stations = {};
+      PIPELINE_DATA._stationSlots = [];
+      
+      // Fallback coordinates since JSON does not provide them currently
+      const fallbackCoords = {
+        dam_toe: { lat: 22.8212, lon: 70.8414 },
+        morbi: { lat: 22.8684, lon: 70.8117 },
+        lilapar: { lat: 22.9161, lon: 70.7853 },
+        malia: { lat: 22.9802, lon: 70.7675 }
+      };
+
+      gaugeKeys.forEach((key, idx) => {
+        PIPELINE_DATA.stations[key] = {
+          name: gauges[key].name || key,
+          peak_depth: gauges[key].peak_depth_m || 0,
+          arrival: gauges[key].arrival_time_hours || 0,
+          peak_time: gauges[key].peak_time_hours || 0,
+          lat: gauges[key].lat || fallbackCoords[key]?.lat || (22.8 + idx * 0.05),
+          lon: gauges[key].lon || fallbackCoords[key]?.lon || (70.8 - idx * 0.01)
+        };
+        if (idx < 4) PIPELINE_DATA._stationSlots.push(key);
+      });
+      if (PIPELINE_DATA._stationSlots.length > 1) {
+        PIPELINE_DATA._primaryStationKey = PIPELINE_DATA._stationSlots[1];
+      }
+
+      // 3. Load Scenarios
+      PIPELINE_DATA.scenarios = {};
+      PIPELINE_DATA._scenarioList = [];
+      
+      // Base scenario from sim summary
+      PIPELINE_DATA.scenarios["base"] = {
+        id: "base",
+        name: "Base Case",
+        q_peak: m.peak_discharge_m3s || 0,
+        b_avg: bp.B_avg_m || 0,
+        t_f: bp.t_f_hours || 0,
+        primary_peak_depth: gauges[PIPELINE_DATA._primaryStationKey]?.peak_depth_m || 0,
+        inund_area_km2: m.total_inundated_area_km2 || sim.total_inundation_area_km2 || 0,
+        
+        // Aliases for compatibility
+        morbi_peak_depth: gauges[PIPELINE_DATA._primaryStationKey]?.peak_depth_m || 0,
+        morbi_arrival_time: gauges[PIPELINE_DATA._primaryStationKey]?.arrival_time_hours || 0,
+        morbi_peak_time: gauges[PIPELINE_DATA._primaryStationKey]?.peak_time_hours || 0
+      };
+      PIPELINE_DATA._scenarioList.push("base");
+
+      // Sensitivity scenarios
+      const sens = val.sensitivity_scenarios || [];
+      sens.forEach(sc => {
+        const sid = sc.id;
+        PIPELINE_DATA.scenarios[sid] = {
+          id: sid,
+          name: sc.id.replace(/_/g, " ").toUpperCase(),
+          q_peak: sc.Q_p || 0,
+          b_avg: sc.B_avg || 0,
+          t_f: sc.t_f || 0,
+          primary_peak_depth: sc.peak_depth_morbi || 0,
+          inund_area_km2: sc.inund_area_km2 || 0,
+          // Aliases
+          morbi_peak_depth: sc.peak_depth_morbi || 0,
+          morbi_arrival_time: gauges[PIPELINE_DATA._primaryStationKey]?.arrival_time_hours || 0,
+          morbi_peak_time: gauges[PIPELINE_DATA._primaryStationKey]?.peak_time_hours || 0
+        };
+        PIPELINE_DATA._scenarioList.push(sid);
+      });
+
+      if (m.max_velocity_ms != null) PIPELINE_DATA._maxVelocity = m.max_velocity_ms;
+
+      // Update DOM
+      refreshGaugeLabels();
+      refreshSimulationWindow();
+      
+      const el = (id) => document.getElementById(id);
+
+      // Hero stats
+      if (el("hero-stat-q") && m.peak_discharge_m3s)
+        el("hero-stat-q").textContent = `${Math.round(m.peak_discharge_m3s).toLocaleString()} m³/s`;
+      if (el("hero-stat-res") && sim.grid_resolution_m)
+        el("hero-stat-res").textContent = `${sim.grid_resolution_m.toFixed(1)} m`;
+
+      // Update initial gauge sidebar values
+      PIPELINE_DATA._stationSlots.forEach((key, idx) => {
+        const st = PIPELINE_DATA.stations[key];
+        const valEl = el(idx === 0 ? "val-dam-toe" : (idx === 1 ? "val-morbi" : (idx === 2 ? "val-lilapar" : "val-malia")));
+        if (valEl) valEl.textContent = `${st.peak_depth?.toFixed(2)} m`;
+        
+        const subEl = el(idx === 0 ? "gauge-sub-dam-toe" : (idx === 1 ? "gauge-sub-morbi" : (idx === 2 ? "gauge-sub-lilapar" : null)));
+        if (subEl) subEl.textContent = `Arr: ${st.arrival?.toFixed(2)}h | Peak: ${st.peak_time?.toFixed(1)}h`;
+      });
+
+      const hist = val.historical_ground_truth;
+      const morbiErrEl = el("morbi-error-pct");
+      if (morbiErrEl && hist)
+        morbiErrEl.textContent = `${hist.relative_error_percent?.toFixed(1)}% err vs ${hist.morbi_flood_height_historical_m}m bench`;
+
+      // Update validation table metric spans
+      const acc = val.accuracy_metrics || {};
+      const setTxt = (id, valText) => { const e = el(id); if (e) e.textContent = valText; };
+      setTxt("val-csi",       acc.Critical_Success_Index_CSI?.toFixed(4));
+      setTxt("val-f1",        acc.F1_Score?.toFixed(4));
+      setTxt("val-hitrate",   acc.Hit_Rate_Sensitivity != null ? `${(acc.Hit_Rate_Sensitivity * 100).toFixed(2)}%` : null);
+      setTxt("val-far",       acc.False_Alarm_Ratio_FAR != null ? `${(acc.False_Alarm_Ratio_FAR * 100).toFixed(2)}%` : null);
+      setTxt("val-accuracy",  acc.Overall_Accuracy != null ? `${(acc.Overall_Accuracy * 100).toFixed(2)}%` : null);
+      setTxt("val-kappa",     acc.Cohens_Kappa?.toFixed(4));
+      setTxt("val-tp-px",     acc.True_Positive_pixels?.toLocaleString());
+      setTxt("val-fp-px",     acc.False_Positive_pixels?.toLocaleString());
+      setTxt("val-fn-px",     acc.False_Negative_pixels?.toLocaleString());
+      setTxt("val-tn-px",     acc.True_Negative_pixels?.toLocaleString());
+      if (hist) {
+        setTxt("val-morbi-sim",       `${hist.morbi_flood_height_simulated_m?.toFixed(2)} m`);
+        setTxt("val-morbi-street-sim", `${hist.morbi_flood_height_simulated_m?.toFixed(2)} m`);
+        setTxt("val-morbi-err", `${hist.relative_error_percent?.toFixed(1)}% Relative Error (High Agreement)`);
+      }
+
+    } catch (e) {
+      console.warn("[InundaX] Pipeline JSON load failed — running on hardcoded baseline:", e.message);
+    }
+
+    initLeafletGisMap();
+    initHydrographChart();
+    
+    // Rebuild scenario buttons dynamically based on _scenarioList
+    const container = document.querySelector(".scenario-selector");
+    if (container && PIPELINE_DATA._scenarioList.length > 0) {
+      container.innerHTML = "";
+      PIPELINE_DATA._scenarioList.forEach(key => {
+        const sc = PIPELINE_DATA.scenarios[key];
+        const btn = document.createElement("button");
+        btn.className = "scenario-btn" + (key === currentScenarioKey ? " active" : "");
+        btn.setAttribute("data-scenario", key);
+        btn.innerHTML = `
+          <div class="sc-title">
+            <span>${sc.name}</span>
+            <span>${sc.primary_peak_depth.toFixed(2)}m</span>
+          </div>
+          <div class="sc-meta">Q_p: ${Math.round(sc.q_peak).toLocaleString()} m³/s | tf: ${sc.t_f.toFixed(1)}h | Area: ${sc.inund_area_km2.toFixed(1)} km²</div>
+        `;
+        btn.addEventListener("click", () => {
+          document.querySelectorAll(".scenario-btn").forEach(b => b.classList.remove("active"));
+          btn.classList.add("active");
+          applyScenarioUpdate(key);
+        });
+        container.appendChild(btn);
+      });
+      if (!PIPELINE_DATA._scenarioList.includes(currentScenarioKey)) {
+        currentScenarioKey = PIPELINE_DATA._scenarioList[0];
+      }
+    }
+    
+    applyScenarioUpdate(currentScenarioKey);
+    updateSimulationTime(7.5);
+  }
+
+  function refreshGaugeLabels() {
+    const stKeys = PIPELINE_DATA._stationSlots;
+    stKeys.forEach((key, idx) => {
+      const el = document.getElementById(`label-slot${idx}`);
+      if (el) el.textContent = PIPELINE_DATA.stations[key].name;
+    });
+    
+    const hudDam = document.getElementById("hud-label-dam");
+    if (hudDam) hudDam.textContent = `${PIPELINE_DATA.dam_name} Head:`;
+    
+    const hudPrimary = document.getElementById("hud-label-primary");
+    if (hudPrimary && stKeys.length > 1) {
+       const pName = PIPELINE_DATA.stations[stKeys[1]].name;
+       hudPrimary.textContent = `${pName.split(' ')[0]} Submersion Stage:`;
+    }
+  }
+
+  function refreshSimulationWindow() {
+     const markers = document.querySelectorAll(".timeline-markers span");
+     if (markers.length >= 5) {
+       const base = PIPELINE_DATA.scenarios.base;
+       markers[1].textContent = `${base.t_f.toFixed(1)}h (Peak Outflow ${Math.round(base.q_peak).toLocaleString()} m³/s)`;
+       markers[2].textContent = `${base.morbi_arrival_time.toFixed(1)}h (Wave Arrival)`;
+       markers[3].textContent = `${base.morbi_peak_time.toFixed(1)}h (Stage Peak ${base.morbi_peak_depth.toFixed(2)}m)`;
+     }
+  }
+
   // Initialize Default View
-  initLeafletGisMap();
-  initHydrographChart();
-  updateSimulationTime(7.5);
+  loadPipelineData();
 });

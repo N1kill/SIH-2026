@@ -405,49 +405,49 @@
               <div class="gauge-list">
                 <div class="gauge-item">
                   <div class="gauge-header">
-                    <span>Dam Toe (0 km)</span>
+                    <span id="label-slot0">Dam Toe (0 km)</span>
                     <span class="gauge-val" id="val-dam-toe">22.56 m</span>
                   </div>
                   <div class="progress-bar-wrap">
                     <div class="progress-bar-fill fill-red" id="bar-dam-toe" style="width: 100%;"></div>
                   </div>
                   <div class="gauge-subtext">
-                    <span>Arr: 0.07h | Peak: 1.2h</span>
+                    <span id="gauge-sub-dam-toe">Arr: 0.07h | Peak: 1.2h</span>
                     <span>Head: 22.56m</span>
                   </div>
                 </div>
 
                 <div class="gauge-item">
                   <div class="gauge-header">
-                    <span style="color: var(--accent-cyan); font-weight: 700;">Morbi Center (5.2 km)</span>
+                    <span id="label-slot1" style="color: var(--accent-cyan); font-weight: 700;">Morbi Center (5.2 km)</span>
                     <span class="gauge-val val-highlight" id="val-morbi">6.32 m</span>
                   </div>
                   <div class="progress-bar-wrap">
                     <div class="progress-bar-fill fill-amber" id="bar-morbi" style="width: 78%;"></div>
                   </div>
                   <div class="gauge-subtext">
-                    <span>Arr: 7.47h | Peak: 19.3h</span>
-                    <span style="color: var(--accent-emerald);">3.6% err vs 6.1m bench</span>
+                    <span id="gauge-sub-morbi">Arr: 7.47h | Peak: 19.3h</span>
+                    <span id="morbi-error-pct" style="color: var(--accent-emerald);">3.6% err vs 6.1m bench</span>
                   </div>
                 </div>
 
                 <div class="gauge-item">
                   <div class="gauge-header">
-                    <span>Lilapar Bridge (12 km)</span>
+                    <span id="label-slot2">Lilapar Bridge (12 km)</span>
                     <span class="gauge-val" id="val-lilapar">3.87 m</span>
                   </div>
                   <div class="progress-bar-wrap">
                     <div class="progress-bar-fill fill-cyan" id="bar-lilapar" style="width: 50%;"></div>
                   </div>
                   <div class="gauge-subtext">
-                    <span>Arr: 17.5h | Peak: 23.7h</span>
+                    <span id="gauge-sub-lilapar">Arr: 17.5h | Peak: 23.7h</span>
                     <span>Channel Thalweg</span>
                   </div>
                 </div>
 
                 <div class="gauge-item">
                   <div class="gauge-header">
-                    <span>Malia Delta (25 km)</span>
+                    <span id="label-slot3">Malia Delta (25 km)</span>
                     <span class="gauge-val" id="val-malia">0.00 m</span>
                   </div>
                   <div class="progress-bar-wrap">
@@ -702,7 +702,7 @@
                 <span class="hud-row-val num-cyan" id="hud-q-out">3,420 m³/s</span>
               </div>
               <div class="hud-row">
-                <span style="color: var(--text-muted);">Machhu-II Dam Head:</span>
+                <span id="hud-label-dam" style="color: var(--text-muted);">Machhu-II Dam Head:</span>
                 <span class="hud-row-val num-emerald" id="hud-head">16.8 m</span>
               </div>
               <div class="hud-row">
@@ -710,7 +710,7 @@
                 <span class="hud-row-val num-warning" id="hud-velocity">4.8 m/s</span>
               </div>
               <div class="hud-row">
-                <span style="color: var(--text-muted);">Morbi Submersion Stage:</span>
+                <span id="hud-label-primary" style="color: var(--text-muted);">Morbi Submersion Stage:</span>
                 <span class="hud-row-val num-danger" id="hud-morbi-stage">3.45 m</span>
               </div>
               <div class="hud-row">
@@ -837,22 +837,22 @@
           <div class="contingency-box">
             <div class="contingency-card">
               <h4>True Positives (TP)</h4>
-              <div class="val">68,389 px</div>
+              <div class="val" id="val-tp-px">68,389 px</div>
               <p style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">61.55 km² verified water</p>
             </div>
             <div class="contingency-card">
               <h4>False Positives (FP)</h4>
-              <div class="val" style="color: var(--accent-amber);">11,107 px</div>
+              <div class="val" id="val-fp-px" style="color: var(--accent-amber);">11,107 px</div>
               <p style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">9.99 km² over-prediction</p>
             </div>
             <div class="contingency-card">
               <h4>False Negatives (FN)</h4>
-              <div class="val" style="color: var(--accent-red);">1,578 px</div>
+              <div class="val" id="val-fn-px" style="color: var(--accent-red);">1,578 px</div>
               <p style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">1.42 km² omission</p>
             </div>
             <div class="contingency-card">
               <h4>True Negatives (TN)</h4>
-              <div class="val" style="color: var(--text-dim);">13,956,055 px</div>
+              <div class="val" id="val-tn-px" style="color: var(--text-dim);">13,956,055 px</div>
               <p style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">Regional dry land</p>
             </div>
           </div>
@@ -875,37 +875,37 @@
                 <tr>
                   <td><strong>Critical Success Index (CSI)</strong></td>
                   <td><code>TP / (TP + FP + FN)</code></td>
-                  <td><span class="badge-metric">0.8435</span></td>
+                  <td><span class="badge-metric" id="val-csi">0.8435</span></td>
                   <td>Excellent spatial intersection-over-union across active flood corridor</td>
                 </tr>
                 <tr>
                   <td><strong>F1-Score (Dice Coefficient)</strong></td>
                   <td><code>2TP / (2TP + FP + FN)</code></td>
-                  <td><span class="badge-metric">0.9151</span></td>
+                  <td><span class="badge-metric" id="val-f1">0.9151</span></td>
                   <td>Strong spatial congruence between hydrodynamic solver & Sentinel-1 SAR</td>
                 </tr>
                 <tr>
                   <td><strong>Hit Rate (Sensitivity / POD)</strong></td>
                   <td><code>TP / (TP + FN)</code></td>
-                  <td><span class="badge-metric">97.74%</span></td>
+                  <td><span class="badge-metric" id="val-hitrate">97.74%</span></td>
                   <td>Captures &gt;97% of all satellite-detected inundated water surface</td>
                 </tr>
                 <tr>
                   <td><strong>False Alarm Ratio (FAR)</strong></td>
                   <td><code>FP / (TP + FP)</code></td>
-                  <td><span class="badge-metric" style="color: var(--accent-amber);">13.97%</span></td>
+                  <td><span class="badge-metric" id="val-far" style="color: var(--accent-amber);">13.97%</span></td>
                   <td>Low false alarm rate on terrace boundary levees</td>
                 </tr>
                 <tr>
                   <td><strong>Overall Domain Accuracy</strong></td>
                   <td><code>(TP + TN) / Total</code></td>
-                  <td><span class="badge-metric">99.91%</span></td>
+                  <td><span class="badge-metric" id="val-accuracy">99.91%</span></td>
                   <td>Trivially high domain consistency due to vast regional dry land</td>
                 </tr>
                 <tr>
                   <td><strong>Cohen's Kappa Coefficient</strong></td>
                   <td><code>(Po - Pe) / (1 - Pe)</code></td>
-                  <td><span class="badge-metric">0.9147</span></td>
+                  <td><span class="badge-metric" id="val-kappa">0.9147</span></td>
                   <td>Substantial spatial agreement beyond random chance</td>
                 </tr>
               </tbody>
@@ -936,14 +936,14 @@
                 <tr>
                   <td><strong>Morbi In-Channel Flow Depth</strong></td>
                   <td>≈ 6.0 – 8.0 m (Sandesara & Wooten 2011, p. 112)</td>
-                  <td><strong>6.32 m</strong> (Central thalweg gauge)</td>
+                  <td><strong id="val-morbi-sim">6.32 m</strong> (Central thalweg gauge)</td>
                   <td><span class="badge-metric">Within Documented Channel Bounds</span></td>
                 </tr>
                 <tr>
                   <td><strong>Morbi Urban Street Inundation</strong></td>
                   <td>≈ 6.1 m sustained (~20 ft) / 3.7–9.1m initial surge</td>
-                  <td><strong>6.32 m</strong> (Central Morbi gauge)</td>
-                  <td><span class="badge-metric" style="color: var(--accent-emerald);">3.6% Relative Error (High Agreement)</span></td>
+                  <td><strong id="val-morbi-street-sim">6.32 m</strong> (Central Morbi gauge)</td>
+                  <td><span class="badge-metric" id="val-morbi-err" style="color: var(--accent-emerald);">3.6% Relative Error (High Agreement)</span></td>
                 </tr>
                 <tr>
                   <td><strong>Wave Front Arrival (Morbi)</strong></td>
