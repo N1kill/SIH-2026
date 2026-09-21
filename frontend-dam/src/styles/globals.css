@@ -1,0 +1,107 @@
+/**
+ * PRALAYA Design System — Globals & Reset
+ */
+
+@import './variables.css';
+@import './typography.css';
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  background-color: var(--bg-canvas);
+  color: var(--text-primary);
+  scroll-behavior: auto; /* Handled smoothly by our scroll controllers */
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  min-height: 100vh;
+  overflow-x: clip;
+  position: relative;
+  background: var(--bg-canvas);
+}
+
+/* Atmospheric mist texture and subtle grain */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background-image: 
+    radial-gradient(ellipse at 80% 20%, rgba(62, 92, 69, 0.08) 0%, transparent 60%),
+    radial-gradient(ellipse at 20% 80%, rgba(16, 25, 23, 0.9) 0%, transparent 70%);
+  z-index: 0;
+}
+
+/* Custom Sleek Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-canvas-deep);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(167, 182, 169, 0.22);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(167, 182, 169, 0.45);
+}
+
+/* Text Selection */
+::selection {
+  background: var(--accent-moss);
+  color: var(--text-bright);
+}
+
+/* Links & Buttons Reset */
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  font-family: inherit;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: inherit;
+}
+
+/* Utility Containers */
+.container {
+  width: 100%;
+  max-width: var(--container-max-width);
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: var(--container-gutter);
+  padding-right: var(--container-gutter);
+}
+
+/* Subtle border lines */
+.hairline-divider {
+  width: 100%;
+  height: 1px;
+  background: var(--border-subtle);
+  border: none;
+}
+
+/* Screen reader only utility */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

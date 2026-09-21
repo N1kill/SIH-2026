@@ -1,0 +1,191 @@
+/**
+ * PRALAYA — Scene 01: The Calm (Hero) Styles
+ */
+
+.hero-scene-container {
+  position: relative;
+  /* 240vh scroll track gives a continuous, deliberate scroll journey */
+  height: 240vh;
+  background-color: var(--bg-canvas);
+}
+
+.hero-scene-sticky {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  width: 100%;
+  overflow: hidden;
+  background-color: var(--bg-canvas);
+  display: flex;
+  align-items: center;
+}
+
+/* Atmospheric mist layer over the entire sticky viewport */
+.hero-atmosphere {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: var(--z-mist-layer, 2);
+  background: 
+    radial-gradient(ellipse at 15% 45%, rgba(16, 25, 23, 0.75) 0%, rgba(16, 25, 23, 0.3) 40%, transparent 70%),
+    linear-gradient(to right, rgba(16, 25, 23, 0.8) 0%, rgba(16, 25, 23, 0.2) 35%, transparent 65%),
+    linear-gradient(to top, rgba(16, 25, 23, 0.75) 0%, transparent 20%);
+}
+
+/* Transition to Breach overlay: rises at 75% -> 100% */
+.hero-breach-transition-veil {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 15;
+  background: radial-gradient(circle at 50% 100%, rgba(184, 76, 62, 0.25) 0%, rgba(10, 17, 16, 0.85) 70%);
+  transition: opacity 0.1s linear;
+}
+
+/* Editorial left-aligned Hero Content */
+.hero-content-wrapper {
+  position: absolute;
+  top: 50%;
+  left: var(--container-gutter, 64px);
+  transform: translateY(-50%);
+  z-index: var(--z-content, 10);
+  max-width: min(540px, 42vw);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  pointer-events: none;
+}
+
+.hero-content-wrapper a,
+.hero-content-wrapper button {
+  pointer-events: auto;
+}
+
+.hero-title {
+  font-family: var(--font-serif);
+  font-size: clamp(44px, 5.8vw, 86px);
+  font-weight: 500;
+  line-height: 0.95;
+  letter-spacing: -0.04em;
+  color: var(--text-bright);
+  text-shadow: 0 4px 24px rgba(0, 0, 0, 0.6);
+}
+
+.hero-title em {
+  font-style: italic;
+  font-weight: 400;
+  color: #c9d6cb;
+}
+
+.hero-lede {
+  font-size: clamp(14px, 1.15vw, 16.5px);
+  line-height: 1.7;
+  color: var(--text-secondary);
+  max-width: 440px;
+  font-weight: 400;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.7);
+}
+
+/* Metadata telemetry grid at bottom of hero content */
+.hero-metadata-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px 24px;
+  margin-top: 14px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(167, 182, 169, 0.15);
+  max-width: 440px;
+}
+
+.hero-meta-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.hero-meta-item .meta-k {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.hero-meta-item .meta-v {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-primary);
+  letter-spacing: 0.04em;
+}
+
+/* Pulsing scroll bounce */
+@keyframes scrollBounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(4px);
+  }
+}
+
+.scroll-bounce-arrow {
+  animation: scrollBounce 1.8s ease-in-out infinite;
+}
+
+/* Responsive Breakpoints */
+@media (max-width: 1024px) {
+  .hero-content-wrapper {
+    max-width: 48vw;
+  }
+  .navbar-nav-links {
+    gap: 14px !important;
+  }
+  .navbar-nav-links a {
+    font-size: 10.5px !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .hero-scene-container {
+    height: 190vh;
+  }
+
+  .hero-scene-sticky {
+    flex-direction: column;
+    justify-content: flex-start;
+  }
+
+  .hero-content-wrapper {
+    top: 14%;
+    left: var(--container-gutter, 24px);
+    right: var(--container-gutter, 24px);
+    transform: none;
+    max-width: 90vw;
+  }
+
+  .hero-title {
+    font-size: clamp(36px, 10vw, 54px);
+  }
+
+  .hero-lede {
+    font-size: 14px;
+    max-width: 100%;
+  }
+
+  .hero-metadata-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+    margin-top: 10px;
+    padding-top: 12px;
+  }
+
+  .navbar-coords {
+    display: none !important;
+  }
+
+  .hero-atmosphere {
+    background: 
+      linear-gradient(to bottom, rgba(16, 25, 23, 0.95) 0%, rgba(16, 25, 23, 0.5) 45%, rgba(16, 25, 23, 0.9) 100%);
+  }
+}

@@ -35,3 +35,4 @@ powershell.bat
 powershell.cmd
 scratch/
 docs/
+frontend-dam/*.py
