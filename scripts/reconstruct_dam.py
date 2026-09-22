@@ -160,7 +160,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("action", choices=("collect-imagery", "draft", "validate", "approve"))
     parser.add_argument("--project", default="machhu-ii")
-    parser.add_argument("--evidence", default="data/evidence/machhu-ii/evidence.json")
+    parser.add_argument("--evidence", help="Manifest path; defaults to this project's agent evidence")
     parser.add_argument("--candidate-latitude", type=float)
     parser.add_argument("--candidate-longitude", type=float)
     parser.add_argument("--candidate-length-m", type=float)
@@ -194,7 +194,14 @@ def main():
                 updates[key] = value
         if updates:
             project = Project.model_validate({**project.model_dump(), **updates})
-        output = create_draft(project, ROOT / args.evidence)
+        if args.evidence:
+            evidence = args.evidence
+        else:
+            agent_evidence = ROOT / "data/evidence" / project.dam_id / "agent-evidence.json"
+            evidence = (f"data/evidence/{project.dam_id}/agent-evidence.json"
+                        if agent_evidence.is_file()
+                        else f"data/evidence/{project.dam_id}/evidence.json")
+        output = create_draft(project, ROOT / evidence)
         print(f"Unapproved reconstruction draft: {output}")
     elif args.action == "validate":
         draft = validate_draft(args.project)

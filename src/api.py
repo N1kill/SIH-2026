@@ -11,6 +11,8 @@ from .terrain import build_twin
 from .run_engine import RunManager, RUNS, write_json
 from .results import make_archive
 from .observations import satellite_context
+from .forecast import ForecastRequest, generate_forecast, list_forecasts
+from .replay import REPLAY_SCHEMA_VERSION, RENDERER_VERSION, asset_manifest, frame_index
 
 router = APIRouter()
 manager = RunManager()
@@ -66,6 +68,11 @@ def health():
 @router.get("/api/project")
 def list_projects():
     return [p.model_dump() for p in projects().values()]
+
+
+@router.get("/api/project/{project_id}/assets")
+def project_assets(project_id:str):
+    return asset_manifest(project_for(project_id))
 
 
 @router.get("/api/observations")
@@ -163,6 +170,63 @@ def list_results():
 def result(run_id:str):
     path=run_dir(run_id)/"summary.json"
     return json.loads(path.read_text(encoding="utf-8")) if path.exists() else run_status(run_id)
+
+
+@router.get("/api/simulation/results/{run_id}/metadata")
+def replay_metadata(run_id:str):
+    directory=run_dir(run_id)
+    manifest=directory/"run-manifest.json"
+    if manifest.exists():
+        return json.loads(manifest.read_text(encoding="utf-8"))
+    frames=frame_index(directory)
+    return {"schema_version":"1.0","renderer_version":"legacy","simulation_id":run_id,
+            "legacy":True,"compatibility":"read-only adapter","frames":frames}
+
+
+@router.get("/api/simulation/results/{run_id}/assets")
+def replay_assets(run_id:str):
+    directory=run_dir(run_id);path=directory/"assets.json"
+    if path.exists():return json.loads(path.read_text(encoding="utf-8"))
+    inputs=directory/"inputs.json"
+    if not inputs.exists():raise HTTPException(404,"Replay asset manifest unavailable")
+    project=Project.model_validate(json.loads(inputs.read_text(encoding="utf-8"))["project"])
+    result=asset_manifest(project)
+    result["legacy_adapter"]=True
+    return result
+
+
+@router.post("/api/simulation/results/{run_id}/forecasts")
+def create_forecast(run_id:str,request:ForecastRequest):
+    directory=run_dir(run_id)
+    if not (directory/"summary.json").exists():
+        raise HTTPException(409,"Forecasting requires a completed run")
+    try:return generate_forecast(directory,request)
+    except ValueError as exc:raise HTTPException(422,str(exc))
+
+
+@router.get("/api/simulation/results/{run_id}/forecasts")
+def forecasts(run_id:str):
+    return list_forecasts(run_dir(run_id))
+
+
+@router.get("/api/simulation/results/{run_id}/forecasts/{vintage_id}")
+def forecast_vintage(run_id:str,vintage_id:str,trajectory:str="p50"):
+    if not re.fullmatch(r"[0-9T._+-]{10,80}-[a-f0-9]{8}",vintage_id):
+        raise HTTPException(404,"Invalid forecast vintage")
+    if not re.fullmatch(r"p10|p50|p90|member:[0-9]+",trajectory):
+        raise HTTPException(422,"Trajectory must be p10, p50, p90, or member:N")
+    path=run_dir(run_id)/"forecasts"/f"{vintage_id}.json"
+    if not path.exists():raise HTTPException(404,"Forecast vintage not found")
+    value=json.loads(path.read_text(encoding="utf-8"))
+    if trajectory.startswith("member:"):
+        index=int(trajectory.split(":",1)[1])
+        if index>=len(value["members"]):raise HTTPException(404,"Ensemble member not found")
+        selected=value["members"][index]["records"]
+    else:
+        percentile=trajectory
+        selected=[{"time_s":row["time_s"],**{key:band[percentile]
+                  for key,band in row.items() if key!="time_s"}} for row in value["bands"]]
+    return {**value,"members":None,"selected_trajectory":trajectory,"selected_records":selected}
 
 
 @router.get("/api/simulation/results/{run_id}/frames/{index}")

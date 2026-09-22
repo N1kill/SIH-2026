@@ -20,6 +20,15 @@ xarray>=2023.1.0
 netCDF4>=1.6.0
 scipy>=1.11.0
 earthengine-api>=0.1.370
+# Optional generic dam-research agent. The core dashboard image intentionally does
+# not install these; use this full requirements file for live agent runs.
+deepagents>=0.7.15,<0.8
+langchain-openai>=1.6,<2
+openai>=3,<4
+langchain-google-genai>=4.4,<5
+google-genai>=2.24,<3
+langchain-ollama>=1,<2
+ollama>=0.6,<1
 fastapi>=0.103.0
 uvicorn>=0.23.0
 websockets>=12.0

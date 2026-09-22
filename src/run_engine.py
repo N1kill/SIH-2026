@@ -14,6 +14,7 @@ from .terrain import load_terrain
 from .flood_routing import FloodRouter
 from .reservoir import StorageElevationCurve, ReservoirState
 from .breach import StructuralMaterial, BreachGeometry, PhysicallyBasedBreachGrowth, weir_outflow_m3s
+from .replay import REPLAY_SCHEMA_VERSION, RENDERER_VERSION, asset_manifest, canonical_hash, frame_index
 
 LOG = logging.getLogger(__name__)
 RUNS = ROOT / "outputs/runs"
@@ -57,12 +58,17 @@ class Run:
         start = time.perf_counter()
         s, p = self.scenario, self.project
         try:
-            write_json(self.directory/"inputs.json", {"project": p.model_dump(), "scenario": s.model_dump()})
+            inputs = {"project": p.model_dump(), "scenario": s.model_dump()}
+            write_json(self.directory/"inputs.json", inputs)
             terrain = load_terrain(p,s.domain_half_width_m,s.grid_size)
             self.update(status="INITIALIZING")
             bed = terrain.origin[2]
             crest = p.crest_elevation_m if p.crest_elevation_m is not None else bed+p.dam_height_m
-            level = p.initial_water_level_m if p.initial_water_level_m is not None else bed+p.dam_height_m*s.initial_level_fraction
+            level = (s.initial_water_level_m if s.initial_water_level_m is not None else
+                     p.initial_water_level_m if p.initial_water_level_m is not None else
+                     bed+p.dam_height_m*s.initial_level_fraction)
+            if level < bed or level > crest + p.dam_height_m*.2:
+                raise ValueError("Initial water level must be between the DEM bed and 20% above dam crest")
             if s.breach_depth_m > p.dam_height_m:
                 raise ValueError("Initial breach depth exceeds dam height")
             if p.dam_length_m and s.max_breach_width_m > p.dam_length_m:
@@ -74,14 +80,40 @@ class Run:
             if p.stage_storage:
                 points = np.array(p.stage_storage)
                 curve = StorageElevationCurve(elevations_m=points[:,0],storages_m3=points[:,1])
-            reservoir = ReservoirState(curve, crest,
-                p.spillway_crest_elevation_m if p.spillway_crest_elevation_m is not None else crest,
-                spillway_width_m=p.spillway_width_m or 0, storage_m3=curve.elevation_to_storage(level))
+            spillway_width = (s.spillway_width_m if s.spillway_width_m is not None
+                              else p.spillway_width_m or 0)
+            spillway_crest = (s.spillway_crest_elevation_m if s.spillway_crest_elevation_m is not None
+                              else p.spillway_crest_elevation_m if p.spillway_crest_elevation_m is not None
+                              else crest)
+            reservoir = ReservoirState(curve, crest, spillway_crest,
+                spillway_width_m=spillway_width, storage_m3=curve.elevation_to_storage(level))
+            replay_assets = asset_manifest(p, bed)
+            write_json(self.directory/"assets.json", replay_assets)
+            replay_spec = replay_assets["specification"]
+            gates = replay_spec.get("gates", [])
+            if gates:
+                widths = [gate["width"]["value"] for gate in gates if gate["width"]["value"] is not None]
+                coeffs = [gate["discharge_coefficient"]["value"] for gate in gates
+                          if gate["discharge_coefficient"]["value"] is not None]
+                max_openings = [gate["maximum_opening"]["value"] for gate in gates
+                                if gate["maximum_opening"]["value"] is not None]
+                reservoir.gate_count = len(gates)
+                reservoir.gate_width_m = float(np.mean(widths)) if widths else 0.0
+                reservoir.gate_discharge_coeff = float(np.mean(coeffs)) if coeffs else 0.62
+                reservoir.gate_opening_m = 0.0
+                reservoir.open_gate_count = 0
+                if len(widths) != len(gates) or len(max_openings) != len(gates):
+                    reservoir.gate_count = 0
             initial = reservoir.storage_m3
             geometry = BreachGeometry(s.breach_width_m, crest-s.breach_depth_m,s.breach_side_slope,p.dam_height_m)
-            breach = PhysicallyBasedBreachGrowth(StructuralMaterial(critical_shear_stress_pa=s.critical_shear_pa,
-                erodibility_coeff=s.erosion_coefficient,ultimate_shear_capacity_pa=s.collapse_shear_pa),
-                geometry,crest,geometry.bottom_elevation_m,bed)
+            material = StructuralMaterial(name=p.dam_type or "unspecified",
+                critical_shear_stress_pa=s.critical_shear_pa,
+                erodibility_coeff=s.erosion_coefficient,ultimate_shear_capacity_pa=s.collapse_shear_pa)
+            breach = PhysicallyBasedBreachGrowth(material,
+                geometry,crest,geometry.bottom_elevation_m,bed,
+                initiation_mode="piping" if s.breach_model == "piping" else s.breach_initiation,
+                piping_diameter_m=s.piping_diameter_m,
+                breach_thickness_m=(p.crest_width_m or max(6.0, p.dam_height_m * .3)))
             router = FloodRouter(terrain,s.manning_n,s.wet_depth_m)
             # Reservoir volume is owned by the lumped reservoir, never counted twice on the routing grid.
             reservoir_domain = terrain.reservoir_mask(p,crest)
@@ -101,25 +133,65 @@ class Run:
                 sph.add_boundary_line((-4,0),(15,-.9))
                 sph.seed_reservoir_block(3,3,(-3,1))
             self.update(status="RUNNING")
+            gate_openings = {gate["gate_id"]: 0.0 for gate in gates}
             while reservoir.time_s < s.duration_s-1e-9:
                 if self.cancel.is_set():
                     raise InterruptedError("Cancelled by user")
                 dt = min(s.dt_s,s.duration_s-reservoir.time_s)
+                gate_states = []
+                if gates:
+                    for gate in gates:
+                        gate_id = gate["gate_id"]
+                        commands = sorted(
+                            (point for point in s.gate_schedule
+                             if point.gate_id in {"all", gate_id}),
+                            key=lambda point: point.time_s,
+                        )
+                        opening = 0.0
+                        for command in commands:
+                            if command.time_s <= reservoir.time_s + 1e-9:
+                                opening = command.opening_m
+                            else:
+                                break
+                        maximum = gate["maximum_opening"]["value"]
+                        if maximum is not None:
+                            opening = min(opening, float(maximum))
+                        if gate["status"] != "available":
+                            opening = 0.0
+                        rate = gate.get("opening_rate", {}).get("value")
+                        previous = gate_openings[gate_id]
+                        if rate is not None:
+                            maximum_change = float(rate) * dt
+                            opening = float(np.clip(opening, previous - maximum_change,
+                                                    previous + maximum_change))
+                        gate_openings[gate_id] = opening
+                        gate_states.append({"gate_id": gate_id, "opening_m": opening,
+                                            "status": "open" if opening > 0 else "closed",
+                                            "command_status": gate["status"],
+                                            "width_m": gate["width"]["value"],
+                                            "discharge_coefficient": gate["discharge_coefficient"]["value"]})
+                    openings = [gate["opening_m"] for gate in gate_states if gate["opening_m"] > 0]
+                    reservoir.open_gate_count = len(openings)
+                    reservoir.gate_opening_m = float(np.mean(openings)) if openings else 0.0
+                    reservoir.gate_states = gate_states
                 tick = time.perf_counter()
-                if s.breach_model == "parametric":
+                if s.breach_model in {"parametric", "prescribed"}:
                     fraction = min(1.,(reservoir.time_s+dt)/s.formation_time_s)
                     geometry.bottom_width_m = s.breach_width_m+(s.max_breach_width_m-s.breach_width_m)*fraction
                     geometry.bottom_elevation_m = crest-s.breach_depth_m-(p.dam_height_m-s.breach_depth_m)*fraction
                     breach.started = True
-                    state = {"status":"prescribed_formation", "shear_stress_pa":None}
+                    state = {"status":"widening", "failure_state":"widening",
+                             "shear_stress_pa":None, "velocity_ms":None,
+                             "eroded_volume_m3": None, "events": []}
                 else:
                     state = breach.step(dt,reservoir.elevation_m)
                 geometry.bottom_width_m = min(geometry.bottom_width_m,s.max_breach_width_m)
                 # Recompute discharge after geometry constraints, before reservoir depletion cap.
                 q = weir_outflow_m3s(geometry,reservoir.elevation_m) if breach.started else 0.
-                record = reservoir.step(dt,inflow,q,include_overtopping=False)
+                record = reservoir.step(dt,inflow,q,include_overtopping=True)
                 total_inflow += inflow*dt
-                discharge = record["breach_outflow_m3s"]+record["spillway_outflow_m3s"]
+                discharge = (record["breach_outflow_m3s"]+record["spillway_outflow_m3s"]+
+                             record["overtopping_outflow_m3s"])
                 timings["reservoir_breach_s"] += time.perf_counter()-tick
                 tick = time.perf_counter()
                 router.step(dt,discharge,self.cancel.is_set)
@@ -140,14 +212,51 @@ class Run:
                     timings["sph_s"] += time.perf_counter()-tick
                     wet = np.flatnonzero(router.depth.ravel()>=s.wet_depth_m)
                     error = initial+total_inflow-reservoir.storage_m3-router.volume
-                    frame = {"protocol_version":1,"type":"simulation_frame","simulation_id":self.id,
+                    hydraulic_head = max(record["elevation_m"]-geometry.bottom_elevation_m,0.)
+                    flow_area = geometry.flow_area_m2(record["elevation_m"])
+                    breach_velocity = record["breach_outflow_m3s"]/max(flow_area,1e-9)
+                    shear = state.get("shear_stress_pa")
+                    erosion_rate = material.erosion_rate(shear) if shear is not None else None
+                    spillway_head = max(record["elevation_m"]-spillway_crest,0.)
+                    overtopping_head = max(record["elevation_m"]-crest,0.)
+                    frame = {"protocol_version":1,"schema_version":REPLAY_SCHEMA_VERSION,
+                        "renderer_version":RENDERER_VERSION,"type":"simulation_frame","simulation_id":self.id,
                         "index":count,"time_s":reservoir.time_s,"progress":reservoir.time_s/s.duration_s,
-                        "reservoir":record,"breach":{"width_m":geometry.bottom_width_m,
+                        "time_region":"history","data_status":"simulated",
+                        "reservoir":{**record,"surface_area_m2":curve.surface_area(record["elevation_m"]),
+                        "level_change_rate_ms":(inflow-discharge)/max(curve.surface_area(record["elevation_m"]),1e-9)},
+                        "breach":{"width_m":geometry.bottom_width_m,
                         "depth_m":crest-geometry.bottom_elevation_m,"invert_m":geometry.bottom_elevation_m,
-                        "area_m2":geometry.flow_area_m2(reservoir.elevation_m),"status":state["status"],
-                        "discharge_m3s":record["breach_outflow_m3s"]},"near_field":near,
+                        "top_width_m":geometry.bottom_width_m+2*geometry.side_slope_h_per_v*(crest-geometry.bottom_elevation_m),
+                        "wetted_top_width_m":geometry.top_width_m(record["elevation_m"]),"area_m2":flow_area,
+                        "hydraulic_head_m":hydraulic_head,"velocity_ms":breach_velocity,
+                        "hydrostatic_pressure_pa":1000*9.81*hydraulic_head,
+                        "hydrostatic_force_per_m_N":.5*1000*9.81*hydraulic_head**2,
+                        "shear_stress_pa":shear,"erosion_rate_ms":erosion_rate,
+                        "critical_shear_pa":material.critical_shear_stress_pa,
+                        "collapse_shear_pa":material.ultimate_shear_capacity_pa,
+                        "material":material.name,"status":state["status"],
+                        "failure_state":state.get("failure_state",state["status"]),
+                        "side_slope_h_per_v":geometry.side_slope_h_per_v,
+                        "eroded_volume_m3":state.get("eroded_volume_m3"),
+                        "piping_diameter_m":state.get("piping_diameter_m"),
+                        "events":state.get("events",[]),
+                        "discharge_m3s":record["breach_outflow_m3s"]},
+                        "spillway":{"configured":spillway_width>0,"width_m":spillway_width or None,
+                        "crest_elevation_m":spillway_crest if spillway_width>0 else None,
+                        "head_m":spillway_head if spillway_width>0 else 0.,
+                        "exit_velocity_ms":reservoir.spillway_exit_velocity_ms() if spillway_width>0 else 0.,
+                        "discharge_m3s":record["spillway_outflow_m3s"],
+                        "gates":gate_states},
+                        "overtopping":{"head_m":overtopping_head,
+                        "discharge_m3s":record["overtopping_outflow_m3s"]},"near_field":near,
                         "downstream":{"indices":wet.tolist(),"depth_m":router.depth.ravel()[wet].round(4).tolist(),
-                        "velocity_ms":router.velocity.ravel()[wet].round(4).tolist()},
+                        "velocity_ms":router.velocity.ravel()[wet].round(4).tolist(),
+                        "inflow_m3s":discharge,"components_m3s":{"breach":record["breach_outflow_m3s"],
+                        "spillway":record["spillway_outflow_m3s"],"overtopping":record["overtopping_outflow_m3s"]}},
+                        "mass_ledger":{"initial_storage_m3":initial,"inflow_volume_m3":total_inflow,
+                        "reservoir_storage_m3":reservoir.storage_m3,"downstream_volume_m3":router.volume,
+                        "residual_m3":error},
                         "metrics":{"max_depth_m":float(router.max_depth.max()),"max_velocity_ms":float(router.max_velocity.max()),
                         "inundated_area_km2":float((router.max_depth>=s.wet_depth_m).sum()*router.dx**2/1e6),
                         "mass_error_m3":error,"downstream_volume_m3":router.volume}}
@@ -162,6 +271,8 @@ class Run:
             exports = export_results(self.directory,terrain,router,p,s)
             edge_wet = bool(np.any(router.max_depth[[0,-1],:]>=s.wet_depth_m) or np.any(router.max_depth[:,[0,-1]]>=s.wet_depth_m))
             self.summary = {**self.status(),"status":"COMPLETE","project":p.model_dump(),"scenario":s.model_dump(),
+                "schema_version":REPLAY_SCHEMA_VERSION,"renderer_version":RENDERER_VERSION,
+                "configuration_hash":canonical_hash(inputs),"asset_manifest_hash":replay_assets["manifest_hash"],
                 "solver":"conservative diffusive-wave screening approximation", "near_field":near["mode"],
                 "validated_against_observations":False,"terrain":terrain.metadata,"metrics":frame["metrics"],
                 "initial_storage_m3":initial,"inflow_volume_m3":total_inflow,"final_storage_m3":reservoir.storage_m3,
@@ -169,10 +280,20 @@ class Run:
                 "boundary_reached":edge_wet,"boundary_condition":"closed domain; no external drainage",
                 "timings":{**timings,"total_s":time.perf_counter()-start},"exports":exports,
                 "limitations":p.assumptions+["No full momentum/shock resolution or independently calibrated roughness.",
-                    "Overtopping disabled: only breach and configured spillway releases routed.",
+                    "Overtopping, breach, and configured spillway releases share one conservative routing boundary.",
                     "SPH is an optional local diagnostic with a separate clock, not a mass-bearing coupled domain.",
                     "Reservoir shoreline is a DEM approximation unless a verified polygon is supplied."]}
             np.savetxt(self.directory/"hydrograph.csv",hydrograph,delimiter=",",header="time_s,discharge_m3s",comments="")
+            write_json(self.directory/"frames.json",frame_index(self.directory))
+            write_json(self.directory/"run-manifest.json",{
+                "schema_version":REPLAY_SCHEMA_VERSION,"renderer_version":RENDERER_VERSION,
+                "simulation_id":self.id,"created_at":self.state["started_at"],
+                "configuration_hash":self.summary["configuration_hash"],
+                "asset_manifest":"assets.json","frame_index":"frames.json",
+                "physics_timestep_s":s.dt_s,"output_interval_s":interval,
+                "deterministic":True,"random_seed":None,
+                "failure_transitions":breach.events,
+            })
             write_json(self.directory/"summary.json",self.summary)
             self.update(status="COMPLETE",progress=1.)
             LOG.info("simulation_complete id=%s seconds=%.2f",self.id,time.perf_counter()-start)

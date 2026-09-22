@@ -1,6 +1,11 @@
 services:
   twin:
     build: .
+    depends_on:
+      ollama-model:
+        condition: service_completed_successfully
+      searxng:
+        condition: service_healthy
     ports:
       - "127.0.0.1:8050:8050"
     volumes:
@@ -8,4 +13,75 @@ services:
       - ./outputs/runs:/app/outputs/runs
     environment:
       EE_PROJECT: ${EE_PROJECT:-}
+      OLLAMA_HOST: http://ollama:11434
+      DAM_RESEARCH_MODEL: ${DAM_RESEARCH_MODEL:-ollama:qwen3:8b}
+      DAM_SEARCH_PROVIDER: ${DAM_SEARCH_PROVIDER:-ollama}
+      OLLAMA_API_KEY: ${OLLAMA_API_KEY:-}
+      SEARXNG_URL: http://searxng:8080
+      DAM_RESEARCH_RATE_LIMIT_DELAY_S: ${DAM_RESEARCH_RATE_LIMIT_DELAY_S:-0}
     restart: unless-stopped
+    networks:
+      - twin-network
+
+  ollama:
+    image: ollama/ollama:0.13.3
+    gpus: all
+    expose:
+      - "11434"
+    volumes:
+      - ollama-models:/root/.ollama
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    restart: unless-stopped
+    networks:
+      - twin-network
+
+  ollama-model:
+    image: ollama/ollama:0.13.3
+    depends_on:
+      ollama:
+        condition: service_healthy
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    entrypoint: ["ollama"]
+    command: ["pull", "qwen3:8b"]
+    networks:
+      - twin-network
+
+  searxng:
+    image: searxng/searxng:2026.9.18-0d6910ae5
+    ports:
+      - "127.0.0.1:8888:8080"
+    volumes:
+      - ./config/searxng/settings.yml:/etc/searxng/settings.yml:ro
+      - searxng-cache:/var/cache/searxng
+    environment:
+      SEARXNG_BASE_URL: http://localhost:8888/
+      SEARXNG_SECRET: ${SEARXNG_SECRET:-inundax-local-only-search-secret}
+      SEARXNG_LIMITER: "false"
+      SEARXNG_PUBLIC_INSTANCE: "false"
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETGID
+      - SETUID
+      - DAC_OVERRIDE
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:8080/ || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    restart: unless-stopped
+    networks:
+      - twin-network
+
+volumes:
+  ollama-models:
+  searxng-cache:
+
+networks:
+  twin-network:

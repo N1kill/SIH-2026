@@ -1,0 +1,98 @@
+import * as THREE from 'three';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {RGBELoader} from 'three/addons/loaders/RGBELoader.js';
+import {KTX2Loader} from 'three/addons/loaders/KTX2Loader.js';
+import {DRACOLoader} from 'three/addons/loaders/DRACOLoader.js';
+import {MeshoptDecoder} from 'three/addons/libs/meshopt_decoder.module.js';
+
+// Portable, metre-scale local scene. Never changes the project's georeferenced terrain.
+export class DamScenePlugin {
+  constructor(renderer) { this.renderer=renderer; this.root=new THREE.Group(); this.gates=new Map(); this.waters=[]; this.time=0; }
+  async load(manifest, baseURL) {
+    this.manifest=manifest;
+    const model=manifest.assets.find(a=>a.role==='model');
+    if(model){
+      this.draco=new DRACOLoader().setDecoderPath('/vendor/addons/libs/draco/gltf/');
+      this.ktx=new KTX2Loader().setTranscoderPath('/vendor/addons/libs/basis/').detectSupport(this.renderer);
+      const loader=new GLTFLoader().setDRACOLoader(this.draco).setKTX2Loader(this.ktx).setMeshoptDecoder(MeshoptDecoder);
+      const gltf=await loader.loadAsync(baseURL+model.filename); this.root.add(gltf.scene);
+      for(const b of manifest.gate_bindings){const node=gltf.scene.getObjectByName(b.node); if(!node)throw Error('Missing gate node '+b.node);this.gates.set(b.gate_id,{node,base:node.position[b.axis],axis:b.axis,max:b.maximum_opening_m});}
+    } else this.assemble(manifest.geometry);
+    this.root.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;}});
+    const env=manifest.assets.find(a=>a.role==='environment');
+    if(env){const hdr=await new RGBELoader().loadAsync(baseURL+env.filename);hdr.mapping=THREE.EquirectangularReflectionMapping;this.environment=hdr;}
+    return this;
+  }
+  concrete() {
+    const c=document.createElement('canvas');c.width=512;c.height=512;const ctx=c.getContext('2d');
+    let seed=927;const rand=()=>{seed=(1664525*seed+1013904223)>>>0;return seed/4294967296;};
+    ctx.fillStyle='#aaa79b';ctx.fillRect(0,0,512,512);
+    for(let i=0;i<22000;i++){const v=100+rand()*90;ctx.fillStyle=`rgba(${v},${v},${v*.94},.17)`;ctx.fillRect(rand()*512,rand()*512,1+rand()*4,1+rand()*5);}
+    for(let i=0;i<190;i++){ctx.fillStyle=`rgba(45,49,40,${rand()*.12})`;ctx.fillRect(rand()*512,rand()*512,rand()*9,30+rand()*250);}
+    ctx.strokeStyle='rgba(45,43,38,.28)';ctx.lineWidth=2;for(let y=0;y<512;y+=128){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(512,y);ctx.stroke();}
+    const map=new THREE.CanvasTexture(c);map.colorSpace=THREE.SRGBColorSpace;map.wrapS=map.wrapT=THREE.RepeatWrapping;map.repeat.set(2,3);map.anisotropy=Math.min(8,this.renderer.capabilities.getMaxAnisotropy());
+    return new THREE.MeshStandardMaterial({map,bumpMap:map,bumpScale:.12,color:0xd4cbb5,roughness:.94});
+  }
+  box(w,h,d,x,y,z,mat,parent=this.root){const o=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);o.position.set(x,y,z);parent.add(o);return o;}
+  rod(a,b,r,mat,parent=this.root){const v=new THREE.Vector3(...b).sub(new THREE.Vector3(...a));const o=new THREE.Mesh(new THREE.CylinderGeometry(r,r,v.length(),6),mat);o.position.copy(new THREE.Vector3(...a).add(new THREE.Vector3(...b)).multiplyScalar(.5));o.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),v.normalize());parent.add(o);return o;}
+  profile(g,z){return g.height_m*Math.pow(1-Math.min(1,Math.max(0,z/g.chute_length_m)),2.15);}
+  sheet(g,x,width,material,offset=0){const positions=[],uv=[],idx=[];for(let j=0;j<=64;j++){const z=j/64*g.chute_length_m;for(let i=0;i<2;i++){positions.push(x+(i-.5)*width,this.profile(g,z)+offset,z);uv.push(i,j/64);}}for(let j=0;j<64;j++){const k=j*2;idx.push(k,k+2,k+1,k+1,k+2,k+3);}const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));geo.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));geo.setIndex(idx);geo.computeVertexNormals();const mesh=new THREE.Mesh(geo,material);this.root.add(mesh);return mesh;}
+  waterMaterial(flow=false){const mat=new THREE.ShaderMaterial({transparent:true,side:THREE.DoubleSide,uniforms:{time:{value:0},release:{value:.65},flow:{value:flow?1:0}},vertexShader:`varying vec2 vUv;varying vec3 world;void main(){vUv=uv;world=(modelMatrix*vec4(position,1.)).xyz;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`,fragmentShader:`uniform float time;uniform float release;uniform float flow;varying vec2 vUv;varying vec3 world;
+      float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
+      float noise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(hash(i),hash(i+vec2(1,0)),f.x),mix(hash(i+vec2(0,1)),hash(i+1.),f.x),f.y);}
+      void main(){vec2 p=world.xz;float n=noise(p*.85-vec2(0,time*2.5))+noise(p*3.3+vec2(time*.8,-time*4.))*.35;float lines=sin(world.x*17.+noise(p*.6)*4.);float foam=flow*clamp(vUv.y*1.3+n*.65-.3,0.,1.)+ (1.-flow)*step(0.,world.z)*smoothstep(.7,1.2,n)*.5;vec3 dark=vec3(.10,.20,.19);vec3 water=mix(dark,vec3(.25,.36,.33),n*.35);water+=pow(max(0.,sin(p.x*.7+p.y*1.1+time)*.5+.5),32.)*.05;vec3 col=mix(water,vec3(.82,.88,.84),foam);col+=flow*lines*.015;gl_FragColor=vec4(col,flow>.5?clamp(release*3.,0.,.97):.98);}`});this.waters.push(mat);return mat;}
+  assemble(g){
+    const concrete=this.concrete(),steel=new THREE.MeshStandardMaterial({color:0x343f40,metalness:.8,roughness:.4}),road=new THREE.MeshStandardMaterial({color:0x535656,roughness:1}),wet=concrete.clone();wet.color.set(0x6b746b);
+    const pitch=g.bay_width_m+g.pier_width_m,W=g.bays*pitch+g.pier_width_m,H=g.height_m,L=g.chute_length_m;
+    this.width=W;
+    // Solid curved gravity section: profile extruded across all bays.
+    const shape=new THREE.Shape();shape.moveTo(-g.deck_width_m,0);shape.lineTo(-g.deck_width_m,H);shape.lineTo(0,H);for(let j=1;j<=64;j++)shape.lineTo(j/64*L,this.profile(g,j/64*L));shape.lineTo(L,-2);shape.lineTo(-g.deck_width_m,-2);
+    const geo=new THREE.ExtrudeGeometry(shape,{depth:W,bevelEnabled:false,steps:1});
+    // shape X -> downstream Z, extrusion Z -> across X; shape Y stays up.
+    geo.applyMatrix4(new THREE.Matrix4().set(0,0,1,-W/2,0,1,0,0,1,0,0,0,0,0,0,1));geo.computeVertexNormals();this.root.add(new THREE.Mesh(geo,concrete));
+    for(let i=0;i<=g.bays;i++){
+      const x=-W/2+g.pier_width_m/2+i*pitch;
+      this.box(g.pier_width_m,H+g.gate_height_m+1,9,x,(H+g.gate_height_m+1)/2,1,concrete);
+      const rib=new THREE.Shape();rib.moveTo(0,H+1);for(let j=1;j<=32;j++)rib.lineTo(j/32*L,this.profile(g,j/32*L)+1.4);rib.lineTo(L,0);rib.lineTo(0,0);
+      const rgeo=new THREE.ExtrudeGeometry(rib,{depth:g.pier_width_m*.42,bevelEnabled:false});rgeo.applyMatrix4(new THREE.Matrix4().set(0,0,1,x-g.pier_width_m*.21,0,1,0,0,1,0,0,0,0,0,0,1));rgeo.computeVertexNormals();this.root.add(new THREE.Mesh(rgeo,concrete));
+      this.box(g.pier_width_m+1,1,10,x,H+g.gate_height_m+1,1,concrete);
+      this.rod([x,H+g.gate_height_m+2,1],[x,H+g.gate_height_m+7,1],.09,steel);this.rod([x,H+g.gate_height_m+7,1],[x+2,H+g.gate_height_m+7,1],.08,steel);
+      this.box(.9,.2,.45,x+2,H+g.gate_height_m+6.9,1,new THREE.MeshStandardMaterial({color:0xd9dbc8,emissive:0x55513b}));
+    }
+    for(let i=0;i<g.bays;i++){
+      const x=-W/2+g.pier_width_m+g.bay_width_m/2+i*pitch;
+      const gate=new THREE.Group();gate.position.set(x,H,1);this.root.add(gate);
+      this.box(g.bay_width_m-.3,g.gate_height_m,.5,0,g.gate_height_m/2,0,steel,gate);
+      for(let y=1;y<g.gate_height_m;y+=1.8)this.box(g.bay_width_m,.22,.6,0,y,.4,steel,gate);
+      this.rod([-g.bay_width_m/2,0,.8],[g.bay_width_m/2,g.gate_height_m,.8],.13,steel,gate);this.rod([g.bay_width_m/2,0,.8],[-g.bay_width_m/2,g.gate_height_m,.8],.13,steel,gate);
+      this.gates.set('gate-'+(i+1),{node:gate,base:H,axis:'y',max:g.gate_height_m});
+      this.box(2,1.3,1.8,x,H+g.gate_height_m+2,1,steel);
+      const sheet=this.sheet(g,x,g.bay_width_m-.35,this.waterMaterial(true),.13);sheet.userData.gateId='gate-'+(i+1);this.gates.get(sheet.userData.gateId).water=sheet;
+      for(const side of [-1,1])this.rod([x+side*g.bay_width_m*.3,H+g.gate_height_m,1],[x+side*g.bay_width_m*.3,H+g.gate_height_m+2,1],.045,steel);
+    }
+    const deckY=H+g.gate_height_m+1.5;
+    this.box(W+6,1,g.deck_width_m,0,deckY,-1,concrete);this.box(W+6,.08,g.deck_width_m-1,0,deckY+.55,-1,road);
+    for(const z of [-1-g.deck_width_m/2,-1+g.deck_width_m/2]){for(let x=-W/2;x<=W/2;x+=2.5)this.rod([x,deckY+.5,z],[x,deckY+1.9,z],.055,steel);for(const y of [deckY+1.1,deckY+1.9])this.rod([-W/2-3,y,z],[W/2+3,y,z],.055,steel);}
+    // Lower inspection catwalk and diagonal support brackets.
+    this.box(W,.25,2.2,0,H*.65,12,steel);for(let x=-W/2;x<=W/2;x+=2.5){this.rod([x,H*.65,13],[x,H*.65+1.2,13],.05,steel);this.rod([x,H*.65,13],[x+2.5,H*.65+1.2,13],.035,steel);}this.rod([-W/2,H*.65+1.2,13],[W/2,H*.65+1.2,13],.06,steel);
+    for(const x of [-W/2-2,W/2+2]){this.box(4,7,L+g.basin_length_m,x,1.5,(L+g.basin_length_m)/2,concrete);this.box(8,H+3,12,x,(H+3)/2,-3,concrete);}
+    this.box(W+12,2,L+g.basin_length_m,0,-2,(L+g.basin_length_m)/2,wet);
+    const basin=new THREE.Mesh(new THREE.PlaneGeometry(W,g.basin_length_m,1,1),this.waterMaterial());basin.rotation.x=-Math.PI/2;basin.position.set(0,.1,L+g.basin_length_m/2);this.root.add(basin);
+    const reservoir=new THREE.Mesh(new THREE.PlaneGeometry(W,100),this.waterMaterial());reservoir.rotation.x=-Math.PI/2;reservoir.position.set(0,H-1,-58);this.root.add(reservoir);
+    // Explicit architectural preview enclosure avoids a floating reservoir slab.
+    for(const x of [-W/2-2,W/2+2])this.box(4,H+1,112,x,(H-3)/2,-53,concrete);
+    this.box(W+8,H+1,4,0,(H-3)/2,-110,concrete);
+    const points=[];let s=13;const random=()=>{s=(s*1664525+1013904223)>>>0;return s/4294967296;};for(let i=0;i<2500;i++)points.push((random()-.5)*(W-5),random()*3,L+random()*12);
+    const pg=new THREE.BufferGeometry();pg.setAttribute('position',new THREE.Float32BufferAttribute(points,3));this.spray=new THREE.Points(pg,new THREE.PointsMaterial({color:0xd8e4df,size:.24,transparent:true,opacity:.25,depthWrite:false}));this.root.add(this.spray);
+  }
+  setPreview(openingFraction){if(!Number.isFinite(openingFraction))throw Error('Preview fraction must be finite');openingFraction=THREE.MathUtils.clamp(openingFraction,0,1);for(const gate of this.gates.values()){gate.node.visible=true;gate.node.position[gate.axis]=gate.base+openingFraction*gate.max;if(gate.water){gate.water.visible=openingFraction>0;gate.water.material.uniforms.release.value=openingFraction;}}if(this.spray)this.spray.visible=openingFraction>0;}
+  applyReplayFrame(frame){
+    // Callers must supply explicit per-gate states. No inference from aggregate discharge.
+    if(!Number.isFinite(frame.time_s))throw Error('Replay time_s must be finite');
+    for(const gate of this.gates.values()){gate.node.visible=false;if(gate.water)gate.water.visible=false;}
+    for(const state of frame.gates??[]){const g=this.gates.get(state.gate_id);if(!g)continue;if(!Number.isFinite(state.opening_m)||state.opening_m<0)throw Error('Invalid opening_m');g.node.visible=true;g.node.position[g.axis]=g.base+Math.min(g.max,state.opening_m);if(g.water)g.water.visible=Number.isFinite(state.discharge_m3s)&&state.discharge_m3s>0;}
+    if(this.spray)this.spray.visible=false;this.update(frame.time_s);
+  }
+  update(time){this.time=time;for(const m of this.waters)m.uniforms.time.value=time;}
+  dispose(){const geos=new Set(),mats=new Set(),textures=new Set();this.root.traverse(o=>{if(o.geometry)geos.add(o.geometry);for(const m of Array.isArray(o.material)?o.material:o.material?[o.material]:[]){mats.add(m);for(const value of Object.values(m))if(value?.isTexture)textures.add(value);}});geos.forEach(g=>g.dispose());mats.forEach(m=>m.dispose());textures.forEach(t=>t.dispose());this.environment?.dispose();this.draco?.dispose();this.ktx?.dispose();this.root.clear();}
+}

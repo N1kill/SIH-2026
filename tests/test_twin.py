@@ -10,7 +10,7 @@ import rasterio
 from rasterio.transform import from_origin
 from fastapi.testclient import TestClient
 from src.project import Project, Scenario
-from src.terrain import Terrain, load_terrain
+from src.terrain import Terrain, build_twin, load_terrain
 from src.flood_routing import FloodRouter
 from src.reservoir import ReservoirState, StorageElevationCurve
 from src.sph_breach import SPHBreachSolver, SPHParams
@@ -69,6 +69,17 @@ class PhysicsTests(unittest.TestCase):
         lon,lat=terrain.geographic(x,z)
         self.assertAlmostEqual(lon,69.01,places=8);self.assertAlmostEqual(lat,22.6,places=8)
 
+    def test_twin_detail_carries_reservoir_mask_for_clipped_water(self):
+        terrain=fixture_terrain()
+        terrain.metadata.update({"cache_key":"test-mask","bounds":[499900,2499800,500100,2500000],
+                                 "origin":[500100,2499900,6],"grid_size":20,"cell_size_m":10})
+        with tempfile.TemporaryDirectory() as directory, patch('src.terrain.ROOT',Path(directory)), \
+                patch('src.terrain.load_terrain',return_value=terrain):
+            payload=build_twin(fixture_project(),half_width=100,size=20)
+        self.assertIn('reservoir_mask',payload['detail'])
+        self.assertEqual(len(payload['detail']['reservoir_mask']),20)
+        self.assertGreater(sum(map(sum,payload['detail']['reservoir_mask'])),0)
+
     def test_runoff_response(self):
         self.assertEqual(runoff_volume(0,75,2),0)
         self.assertGreater(runoff_volume(100,90,2),runoff_volume(100,60,2))
@@ -88,6 +99,20 @@ class PhysicsTests(unittest.TestCase):
             frame=json.loads((run.directory/'frame-0000.json').read_text())
             self.assertEqual(frame['protocol_version'],1)
             self.assertGreater(frame['breach']['discharge_m3s'],0)
+            self.assertIn('hydrostatic_pressure_pa',frame['breach'])
+            self.assertAlmostEqual(frame['downstream']['inflow_m3s'],
+                sum(frame['downstream']['components_m3s'].values()))
+
+    def test_water_level_override_and_overtopping_share_mass_ledger(self):
+        with tempfile.TemporaryDirectory() as directory, patch('src.run_engine.load_terrain',return_value=fixture_terrain()):
+            run=Run(fixture_project(),Scenario(project_id='test',duration_s=1,dt_s=1,
+                output_interval_s=1,initial_water_level_m=17,breach_depth_m=5),directory)
+            run.execute();self.assertEqual(run.status()['status'],'COMPLETE',run.status())
+            frame=json.loads((run.directory/'frame-0000.json').read_text())
+            self.assertGreater(frame['overtopping']['discharge_m3s'],0)
+            components=frame['downstream']['components_m3s']
+            self.assertAlmostEqual(frame['downstream']['inflow_m3s'],sum(components.values()))
+            self.assertLess(abs(run.summary['mass_error_percent']),1e-8)
 
     def test_what_if_breach_width_changes_release(self):
         summaries=[]
@@ -127,6 +152,16 @@ class APITests(unittest.TestCase):
                 self.assertEqual([f['time_s'] for f in frames],sorted(f['time_s'] for f in frames))
                 self.assertGreater(len(frames),1)
                 self.assertEqual(client.get(f'/api/export/{run_id}').status_code,200)
+                self.assertEqual(client.get(f'/api/simulation/results/{run_id}/metadata').status_code,200)
+                self.assertEqual(client.get(f'/api/simulation/results/{run_id}/assets').status_code,200)
+                forecast=client.post(f'/api/simulation/results/{run_id}/forecasts',json={
+                    'horizon_s':3,'ensemble_size':3,'seed':11,'max_workers':2
+                })
+                self.assertEqual(forecast.status_code,200,forecast.text)
+                vintage=forecast.json()['vintage_id']
+                self.assertEqual(client.get(
+                    f'/api/simulation/results/{run_id}/forecasts/{vintage}?trajectory=p90'
+                ).status_code,200)
                 self.assertEqual(client.get('/api/reconstruction/machhu-ii').status_code,200)
                 self.assertEqual(client.get('/api/reconstruction/machhu-ii/preview').status_code,200)
                 self.assertEqual(client.get('/api/simulation/results/bad').status_code,404)

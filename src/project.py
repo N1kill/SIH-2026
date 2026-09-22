@@ -2,7 +2,7 @@
 from pathlib import Path
 import json
 import math
-from typing import Literal
+from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -10,6 +10,63 @@ ROOT = Path(__file__).resolve().parents[1]
 
 class Inputs(BaseModel):
     model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
+
+
+EvidenceStatus = Literal[
+    "surveyed", "official", "derived", "reconstructed", "assumed", "unavailable"
+]
+
+
+class EvidenceValue(Inputs):
+    """A physical value together with the evidence needed to interpret it."""
+
+    value: Any = None
+    unit: str | None = None
+    source_id: str | None = None
+    status: EvidenceStatus = "unavailable"
+    uncertainty: Any = None
+    approved_by: str | None = None
+
+
+class GateSpec(Inputs):
+    gate_id: str = Field(pattern=r"^[a-zA-Z0-9_-]{1,64}$")
+    bay_index: int = Field(ge=0)
+    gate_type: str = "unknown"
+    width: EvidenceValue
+    height: EvidenceValue
+    sill_elevation: EvidenceValue
+    maximum_opening: EvidenceValue
+    opening_rate: EvidenceValue = Field(default_factory=EvidenceValue)
+    discharge_coefficient: EvidenceValue
+    status: Literal["available", "unavailable", "unknown"] = "unknown"
+
+
+class MaterialZoneSpec(Inputs):
+    zone_id: str = Field(pattern=r"^[a-zA-Z0-9_-]{1,64}$")
+    role: Literal["core", "filter", "shell", "drainage", "foundation", "armour", "unknown"]
+    density: EvidenceValue = Field(default_factory=EvidenceValue)
+    cohesion: EvidenceValue = Field(default_factory=EvidenceValue)
+    friction_angle: EvidenceValue = Field(default_factory=EvidenceValue)
+    porosity: EvidenceValue = Field(default_factory=EvidenceValue)
+    critical_shear: EvidenceValue = Field(default_factory=EvidenceValue)
+    erodibility: EvidenceValue = Field(default_factory=EvidenceValue)
+    permeability: EvidenceValue = Field(default_factory=EvidenceValue)
+
+
+class ReplaySpecification(Inputs):
+    """Optional reusable structural contract consumed by the replay renderer."""
+
+    schema_version: str = "2.0"
+    reconstruction_label: str = "reconstructed archetype"
+    crest_elevation: EvidenceValue = Field(default_factory=EvidenceValue)
+    crest_width: EvidenceValue = Field(default_factory=EvidenceValue)
+    upstream_slope: EvidenceValue = Field(default_factory=EvidenceValue)
+    downstream_slope: EvidenceValue = Field(default_factory=EvidenceValue)
+    toe_elevation: EvidenceValue = Field(default_factory=EvidenceValue)
+    spillway_type: EvidenceValue = Field(default_factory=EvidenceValue)
+    stilling_basin_length: EvidenceValue = Field(default_factory=EvidenceValue)
+    gates: list[GateSpec] = Field(default_factory=list)
+    material_zones: list[MaterialZoneSpec] = Field(default_factory=list)
 
 
 class Project(Inputs):
@@ -39,6 +96,7 @@ class Project(Inputs):
     downstream_bearing_deg: float = 330
     catchment_area_km2: float | None = Field(default=None, gt=0)
     stage_storage: list[tuple[float, float]] | None = None
+    replay_specification: ReplaySpecification | None = None
     provenance: list[dict] = Field(default_factory=list)
     assumptions: list[str] = Field(default_factory=list)
 
@@ -76,6 +134,7 @@ class Scenario(Inputs):
     domain_half_width_m: float = Field(default=6000, ge=500, le=30000)
     grid_size: int = Field(default=100, ge=20, le=200)
     initial_level_fraction: float = Field(default=0.9, gt=0, le=1.2)
+    initial_water_level_m: float | None = None
     inflow_m3s: float = Field(default=0, ge=0, le=100000)
     rainfall_mm: float = Field(default=0, ge=0, le=3000)
     curve_number: float = Field(default=75, gt=0, le=100)
@@ -87,12 +146,17 @@ class Scenario(Inputs):
     erosion_coefficient: float = Field(default=4e-5, ge=0, le=0.01)
     critical_shear_pa: float = Field(default=25, ge=0)
     collapse_shear_pa: float = Field(default=4000, gt=0)
-    breach_model: Literal["erosion", "parametric"] = "erosion"
+    breach_model: Literal["erosion", "piping", "parametric", "prescribed"] = "erosion"
+    breach_initiation: Literal["overtopping", "piping", "seeded"] = "seeded"
+    piping_diameter_m: float = Field(default=0.25, gt=0, le=20)
     manning_n: float = Field(default=0.04, ge=0.01, le=0.3)
     wet_depth_m: float = Field(default=0.1, gt=0, le=2)
     risk_depths_m: tuple[float, float, float] = (0.5, 1.5, 3.0)
     risk_velocity_ms: float = Field(default=2, gt=0)
     near_field: Literal["hydraulic", "sph"] = "hydraulic"
+    spillway_width_m: float | None = Field(default=None, gt=0, le=5000)
+    spillway_crest_elevation_m: float | None = None
+    gate_schedule: list["GateSchedulePoint"] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def check_limits(self):
@@ -103,6 +167,17 @@ class Scenario(Inputs):
         if list(self.risk_depths_m) != sorted(self.risk_depths_m) or min(self.risk_depths_m) <= 0:
             raise ValueError("Risk depth thresholds must be positive and increasing")
         return self
+
+
+class GateSchedulePoint(Inputs):
+    """Scenario-local gate command; it never mutates the base project."""
+
+    time_s: float = Field(ge=0, le=86400)
+    gate_id: str = Field(default="all", pattern=r"^[a-zA-Z0-9_-]{1,64}$")
+    opening_m: float = Field(ge=0, le=100)
+
+
+Scenario.model_rebuild()
 
 
 def input_path(value: str) -> Path:

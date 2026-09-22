@@ -163,11 +163,49 @@ class PhysicallyBasedBreachGrowth:
     valley_floor_elevation_m: float = None
     valley_floor_is_default: bool = field(default=False, init=False)
     started: bool = False
+    initiation_mode: str = "seeded"
+    piping_diameter_m: float = 0.25
+    breach_thickness_m: float = 10.0
+    max_bank_retreat_rate_ms: float = 0.25
+    max_invert_lowering_rate_ms: float = 0.10
+    state: str = field(default="intact", init=False)
+    elapsed_s: float = field(default=0.0, init=False)
+    eroded_volume_m3: float = field(default=0.0, init=False)
+    events: list[dict] = field(default_factory=list, init=False)
+    _stable_steps: int = field(default=0, init=False)
 
     def __post_init__(self):
         if self.valley_floor_elevation_m is None:
             self.valley_floor_elevation_m = self.geometry.bottom_elevation_m
             self.valley_floor_is_default = True
+        if self.initiation_mode not in {"overtopping", "piping", "seeded"}:
+            raise ValueError("initiation_mode must be overtopping, piping, or seeded")
+        if self.piping_diameter_m <= 0 or self.breach_thickness_m <= 0:
+            raise ValueError("Piping diameter and breach thickness must be positive")
+
+    def _transition(self, state: str, reason: str, **diagnostics) -> None:
+        if state == self.state:
+            return
+        previous = self.state
+        self.state = state
+        self.events.append({
+            "time_s": self.elapsed_s, "from": previous, "to": state,
+            "reason": reason, **diagnostics,
+        })
+
+    def _should_initiate(self, water_elevation_m: float) -> bool:
+        if self.initiation_mode == "overtopping":
+            return water_elevation_m >= max(
+                self.initiation_elevation_m, self.dam_crest_elevation_m
+            )
+        if self.initiation_mode == "piping":
+            return water_elevation_m > self.geometry.bottom_elevation_m
+        return water_elevation_m >= self.initiation_elevation_m
+
+    def _piping_outflow_m3s(self, water_elevation_m: float) -> float:
+        head = max(water_elevation_m - self.geometry.bottom_elevation_m, 0.0)
+        area = np.pi * (self.piping_diameter_m * 0.5) ** 2
+        return 0.62 * area * np.sqrt(2 * G * head)
 
     def shear_stress_pa(self, water_elevation_m: float, velocity_ms: float) -> float:
         """tau = rho * g * R * S_f, approximated via friction-slope from velocity
@@ -182,29 +220,60 @@ class PhysicallyBasedBreachGrowth:
         return tau
 
     def step(self, dt_s: float, water_elevation_m: float) -> dict:
+        if dt_s <= 0 or not np.isfinite([dt_s, water_elevation_m]).all():
+            raise ValueError("Breach timestep and water elevation must be finite; timestep must be positive")
+        self.elapsed_s += dt_s
         if not self.started:
-            if water_elevation_m < self.initiation_elevation_m:
-                return {"status": "not_initiated", "geometry": self.geometry}
+            if not self._should_initiate(water_elevation_m):
+                return {
+                    "status": "intact", "failure_state": "intact",
+                    "geometry": self.geometry, "outflow_m3s": 0.0,
+                    "eroded_volume_m3": self.eroded_volume_m3,
+                    "events": [],
+                }
             self.started = True
+            self._transition("incipient", f"{self.initiation_mode}_initiation")
 
-        q = weir_outflow_m3s(self.geometry, water_elevation_m)
+        q = (self._piping_outflow_m3s(water_elevation_m)
+             if self.initiation_mode == "piping" and self.state == "incipient"
+             else weir_outflow_m3s(self.geometry, water_elevation_m))
         area = max(self.geometry.flow_area_m2(water_elevation_m), 1e-6)
         velocity = q / area if area > 0 else 0.0
 
         tau = self.shear_stress_pa(water_elevation_m, velocity)
         collapsed = self.material.check_collapse(tau)
+        old_width = self.geometry.bottom_width_m
+        old_bottom = self.geometry.bottom_elevation_m
 
         if collapsed:
             # Instant geotechnical slope failure: widen by one failure-slice
             # increment rather than the slow erosion law.
-            slice_width_m = 2.0
+            slice_width_m = min(2.0, 2 * self.max_bank_retreat_rate_ms * dt_s)
             self.geometry.bottom_width_m += slice_width_m
             deepen_m = 0.0
+            self._transition("mass_failure", "ultimate_shear_exceeded", shear_stress_pa=tau)
         else:
             erosion_rate_ms = self.material.erosion_rate(tau)  # m/s of lateral/vertical retreat
-            widen_m = erosion_rate_ms * dt_s * 2  # both banks
-            deepen_m = erosion_rate_ms * dt_s
+            widen_m = min(erosion_rate_ms, self.max_bank_retreat_rate_ms) * dt_s * 2
+            deepen_m = min(erosion_rate_ms, self.max_invert_lowering_rate_ms) * dt_s
             self.geometry.bottom_width_m += widen_m
+            if erosion_rate_ms > 0:
+                self._stable_steps = 0
+                self._transition("erosion" if self.state == "incipient" else "widening",
+                                 "excess_shear", shear_stress_pa=tau)
+            else:
+                self._stable_steps += 1
+                if self.state not in {"incipient", "final"}:
+                    self._transition("stabilizing", "shear_below_threshold", shear_stress_pa=tau)
+
+        if self.initiation_mode == "piping" and self.state == "incipient":
+            pipe_growth = min(self.material.erosion_rate(tau) * dt_s,
+                              self.max_bank_retreat_rate_ms * dt_s)
+            self.piping_diameter_m += 2 * pipe_growth
+            if self.piping_diameter_m >= max(1.0, old_width):
+                self.geometry.bottom_width_m = max(self.geometry.bottom_width_m,
+                                                   self.piping_diameter_m)
+                self._transition("erosion", "pipe_roof_collapse", pipe_diameter_m=self.piping_diameter_m)
 
         # Breach cannot deepen below the true valley floor / streambed.
         # (Previously this was a no-op `max(x, x)` -- fixed: the bound now
@@ -214,8 +283,20 @@ class PhysicallyBasedBreachGrowth:
         self.geometry.bottom_elevation_m = max(proposed_bottom,
                                                 self.valley_floor_elevation_m)
 
+        width_gain = max(self.geometry.bottom_width_m - old_width, 0.0)
+        depth_gain = max(old_bottom - self.geometry.bottom_elevation_m, 0.0)
+        mean_depth = max(self.dam_crest_elevation_m - (old_bottom + self.geometry.bottom_elevation_m) * 0.5, 0.0)
+        removed = self.breach_thickness_m * (
+            width_gain * mean_depth + depth_gain * max(old_width, self.geometry.bottom_width_m)
+        )
+        self.eroded_volume_m3 += max(removed, 0.0)
+        head = max(water_elevation_m - self.geometry.bottom_elevation_m, 0.0)
+        if self.started and (head <= 0.01 or self._stable_steps >= 5):
+            self._transition("final", "hydraulic_driving_force_exhausted", hydraulic_head_m=head)
+
         return {
-            "status": "collapsed_slice" if collapsed else "eroding",
+            "status": self.state,
+            "failure_state": self.state,
             "shear_stress_pa": tau,
             "velocity_ms": velocity,
             "outflow_m3s": q,
@@ -223,4 +304,7 @@ class PhysicallyBasedBreachGrowth:
             "bottom_elevation_m": self.geometry.bottom_elevation_m,
             "hit_valley_floor": self.geometry.bottom_elevation_m <= self.valley_floor_elevation_m + 1e-9,
             "valley_floor_is_default": self.valley_floor_is_default,
+            "eroded_volume_m3": self.eroded_volume_m3,
+            "piping_diameter_m": self.piping_diameter_m if self.initiation_mode == "piping" else None,
+            "events": self.events[-1:] if self.events and self.events[-1]["time_s"] == self.elapsed_s else [],
         }

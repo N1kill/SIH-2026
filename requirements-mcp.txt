@@ -1,0 +1,2 @@
+# Optional local asset connector; the simulation service does not import this SDK.
+mcp==1.26.0

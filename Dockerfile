@@ -11,9 +11,10 @@ WORKDIR /app
 RUN apt-get update \
     && apt-get install -y --no-install-recommends libexpat1 \
     && rm -rf /var/lib/apt/lists/*
-COPY requirements-core.txt ./
-RUN pip install --no-cache-dir -r requirements-core.txt
+COPY requirements-agent.txt requirements-core.txt ./
+RUN pip install --no-cache-dir -r requirements-agent.txt
 COPY src/ src/
+COPY scripts/research_dam.py scripts/research_dam.py
 COPY server.py config.json ./
 COPY --from=frontend /build/outputs/3d/dashboard/ outputs/3d/dashboard/
 EXPOSE 8050

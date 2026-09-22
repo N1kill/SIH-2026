@@ -26,6 +26,34 @@ python scripts\run_demo.py
 Open <http://127.0.0.1:8050>. The demo uses cached local DEM, river, Sentinel-2,
 land-use, and OSM facility data; it does not require internet access after preparation.
 
+The replay is driven by stored solver frames rather than a decorative animation.
+Each frame couples reservoir storage, stage-storage level, breach geometry and
+excess-shear erosion, configured spillway flow, crest overtopping, and conservative
+downstream routing. The dashboard exposes material resistance, roughness, exact
+initial level, and spillway what-if overrides. Values absent from project evidence
+remain visibly unconfigured; they are not silently synthesized.
+
+Replay schema v2 adds explicit `intact`, `incipient`, `erosion`, `mass_failure`,
+`widening`, `stabilizing`, and `final` failure states; immutable run/asset/frame
+manifests; source/configuration hashes; exact frame seeking; and retained deterministic
+forecast vintages. The dashboard separates engineering, operational, and diagnostic
+modes and marks forecast geometry with text plus a dashed treatment, not colour alone.
+
+Relevant API routes are:
+
+- `GET /api/project/{project_id}/assets` for the reusable structural/provenance contract;
+- `GET /api/simulation/results/{run_id}/metadata` and `/assets` for replay manifests;
+- `GET /api/simulation/results/{run_id}/frames/{index}` for exact keyframes;
+- `POST /api/simulation/results/{run_id}/forecasts` for a bounded seeded ensemble;
+- `GET /api/simulation/results/{run_id}/forecasts` and
+  `/forecasts/{vintage_id}?trajectory=p50` for retained vintages and selection.
+
+Forecast reservoir level, breach dimensions, and discharge carry P10/P50/P90 bands.
+Far-field forecast depth, velocity, and arrival bands are generated when the forecast
+request sets `include_far_field: true`. They remain explicitly unavailable when that
+costlier ensemble routing is not requested; they are never filled with synthetic
+precision.
+
 ## Exact workflows
 
 Prepare/validate local terrain:
@@ -68,6 +96,74 @@ No approval was performed automatically. Published water levels have an unstated
 datum and the DEM shoreline differs materially from the reported full-reservoir area;
 both limitations must be reviewed before promotion.
 
+## Generic dam evidence agent
+
+The research agent is not tied to Machhu-II. For an existing project, generate a
+four-track research plan and then run the Deep Agents workflow:
+
+```powershell
+python scripts\research_dam.py plan --project machhu-ii --country India --region Gujarat
+python scripts\research_dam.py run --project machhu-ii --country India --region Gujarat
+python scripts\research_dam.py validate --project machhu-ii
+python scripts\research_dam.py report --project machhu-ii
+```
+
+For a new dam, only an ID and name are required. Country, region, river, coordinates,
+and aliases are optional search hints that reduce ambiguity:
+
+```powershell
+python scripts\research_dam.py run --dam-id sample-dam --name "Sample Dam" `
+  --country India --region "Example State" --river "Example River" `
+  --latitude 20.0 --longitude 75.0 --alias "Local spelling"
+```
+
+Set `OPENAI_API_KEY` in `.env` or the process environment. The default model is
+`openai:gpt-5-mini`; override it with `DAM_RESEARCH_MODEL` or `--model` using a
+LangChain `provider:model` identifier. Search is independent from the coordinator:
+set `DAM_SEARCH_PROVIDER` to `openai`, `google`, `ollama`, or local `searxng`
+(`auto` is the default), and use
+`GEMINI_API_KEY` for Google. For new Google projects, use a currently available
+Gemini model such as `google_genai:gemini-3.6-flash`. The agent delegates identity/geometry,
+reservoir/hydrology, spillway/history, and safety/context research to specialists.
+
+Ollama can run the coordinator and specialists locally. Install Ollama, pull a
+tool-capable model such as `qwen3:8b`, and set:
+
+```text
+DAM_RESEARCH_MODEL=ollama:qwen3:8b
+DAM_SEARCH_PROVIDER=ollama
+OLLAMA_HOST=http://localhost:11434
+OLLAMA_API_KEY=your_ollama_web_search_key
+DAM_RESEARCH_RATE_LIMIT_DELAY_S=0
+```
+
+The local model itself does not require a paid model API key. Ollama's hosted web
+search service requires its own search key. When `DAM_SEARCH_PROVIDER=ollama` has no
+`OLLAMA_API_KEY`, the agent automatically uses the Compose-managed SearXNG service;
+you can also explicitly select `searxng`, `google`, or `openai`.
+
+The dashboard exposes the same workflow under **Web evidence agent**. Select a dam
+and choose **Start research for this dam** to see the current stage, active public-web
+query, elapsed time, sources archived, recent activity, and any provider error. The
+tracker is live only while the API process that started the run remains running.
+
+Ollama runs a bounded search/read/extract/archive sequence for each of the four
+topics. It reads up to three documents per topic, checks quotes against downloaded
+content, and keeps machine-selected passages as discovery evidence. `PARTIAL`
+means the run finished but engineering coverage or source review is outstanding;
+`FAILED` means it validated no evidence in that run. `DAM_RESEARCH_MAX_SECONDS`
+defaults to 600. Reports remain available at `/api/research/report/<project-id>`
+after the run, including source links, exact quotes, coverage and errors.
+
+Outputs are written under `data/evidence/<dam-id>/`: the sparse seed, query plan,
+bounded source artifacts, extracted text, SHA-256 evidence manifest, conflict-aware
+findings, and a candidate project patch. Sources are accepted only when a short exact
+quote is found in the archived page or PDF. Conflicting values are retained and never
+averaged. The agent never edits `data/projects/`; promotion remains a named-human
+review step. `DAM_RESEARCH_RATE_LIMIT_DELAY_S` defaults to 12.5 seconds so the
+workflow can operate within common free-tier quotas; set it to `0` only when the
+selected provider has sufficient paid rate limits.
+
 Run without the UI and validate the mass ledger:
 
 ```powershell
@@ -104,6 +200,16 @@ Docker, when Docker Desktop is running:
 docker compose -f docker-compose.twin.yml build
 docker compose -f docker-compose.twin.yml up
 ```
+
+The Compose stack starts the dashboard, Ollama, local SearXNG search, and a one-shot
+model initializer that pulls `qwen3:8b` into the persistent `ollama-models` volume.
+The first startup downloads roughly 5 GB; later starts reuse the volume. The dashboard
+connects to Ollama at `http://ollama:11434` inside the Compose network; Ollama is not
+bound to a host port, avoiding conflicts with the Windows Ollama desktop service.
+Compose exposes all configured NVIDIA GPUs to Ollama; remove `gpus: all` only on a
+host whose container runtime has no GPU support. Set
+`OLLAMA_API_KEY` only if using Ollama's hosted web-search service. `EE_PROJECT` must
+remain a Google Cloud project ID, never an API key.
 
 ## User-supplied evidence
 

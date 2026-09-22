@@ -43,10 +43,20 @@ docs/
 .env
 .env.*
 !.env.example
+/angular-box.json
+/angular-box*.json
 *service-account*.json
 data/cache/
+# Downloaded research artifacts are retained locally with hashes in the manifest.
+data/evidence/*/sources/
+data/evidence/*/agent-evidence.json
+data/evidence/*/research-findings.json
+data/evidence/*/research-plan.json
+data/evidence/*/research-seed.json
 outputs/runs/
 outputs/3d/dashboard/vendor/
+data/scene-packages/
+data/scene-inbox/
 
 # Ignore large simulation output folders and 3D data json
 outputs/simulation/delft3d_fm/DFM_OUTPUT_*/

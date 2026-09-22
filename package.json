@@ -2,7 +2,7 @@
   "scripts": {
     "build": "node scripts/build_frontend.mjs",
     "start": "python -m uvicorn server:app --host 127.0.0.1 --port 8050",
-    "test": "node --check outputs/3d/dashboard/twin.js"
+    "test": "node --check outputs/3d/dashboard/twin.js && node --check outputs/3d/dashboard/replay-modules.js && node --check outputs/3d/dashboard/dam-scene.js && node --check outputs/3d/dashboard/dam-scene-plugin.js && node --check outputs/3d/dashboard/studio.js"
   },
   "dependencies": {
     "opencode-ai": "^1.18.23",

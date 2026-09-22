@@ -91,7 +91,7 @@ def load_terrain(project: Project, half_width=6000, size=100) -> Terrain:
     outlet = rowcol(transform, ox+math.sin(a)*transform.a*1.5, oy+math.cos(a)*transform.a*1.5)
     if not valid[outlet]:
         raise ValueError("Downstream source cell has NoData")
-    fingerprint = hashlib.sha256(json.dumps(["twin-v2",project.model_dump(), path.stat().st_mtime_ns,
+    fingerprint = hashlib.sha256(json.dumps(["twin-v6",project.model_dump(), path.stat().st_mtime_ns,
                                             size, half_width], sort_keys=True).encode()).hexdigest()[:20]
     metadata = {"crs": crs, "bounds": list(bounds), "origin": [ox, oy, bed], "grid_size": size,
                 "cell_size_m": transform.a, "transform": list(transform)[:6], "cache_key": fingerprint,
@@ -118,7 +118,11 @@ def build_twin(project, half_width=6000, size=100):
                "dam_local": [0, 0, 0], "river_lines": []}
     # Near-dam LOD is derived from the source DEM, never upscaled as claimed new survey detail.
     detail=load_terrain(project,min(half_width,1000),min(size,100))
-    payload["detail"]={**detail.metadata,"elevation":detail.elevation.round(3).tolist(),"valid":detail.valid.tolist()}
+    detail_mask_level = max(level, project.maximum_water_level_m or level)
+    payload["detail"]={**detail.metadata,"elevation":detail.elevation.round(3).tolist(),
+                       "valid":detail.valid.tolist(),
+                       "reservoir_mask":detail.reservoir_mask(project, detail_mask_level).tolist(),
+                       "reservoir_mask_level_m":detail_mask_level}
     if project.crest_coordinates:
         payload["crest_local"]=[list(terrain.local(lon,lat,level)) for lon,lat in project.crest_coordinates]
     else:
@@ -141,11 +145,18 @@ def build_twin(project, half_width=6000, size=100):
             if image.crs is None or image.count < 3:
                 raise ValueError("Imagery must have CRS and at least three RGB bands")
             from PIL import Image
-            with WarpedVRT(image, crs=terrain.crs, transform=from_bounds(*terrain.metadata["bounds"],512,512), width=512,height=512) as vrt:
+            with WarpedVRT(image, crs=terrain.crs, transform=from_bounds(*terrain.metadata["bounds"],2048,2048), width=2048,height=2048,
+                           resampling=Resampling.bilinear) as vrt:
                 rgb = vrt.read([1,2,3])
+                source_mask = np.all(vrt.read_masks([1,2,3]) > 0, axis=0)
             if rgb.dtype != np.uint8:
                 raise ValueError("Provide an 8-bit RGB imagery raster; no implicit spectral stretching")
-            Image.fromarray(np.moveaxis(rgb,0,-1)).save(directory / "texture.png")
+            # Some visual COGs do not advertise an explicit nodata value; their
+            # out-of-footprint fill is nevertheless exactly zero in all RGB bands.
+            source_mask &= np.any(rgb != 0, axis=0)
+            rgba = np.dstack((np.moveaxis(rgb,0,-1), source_mask.astype(np.uint8)*255))
+            Image.fromarray(rgba, mode="RGBA").save(directory / "texture.png")
+            payload["imagery_coverage_percent"] = round(float(source_mask.mean()*100), 1)
         payload["texture_url"] = f"/api/terrain/texture/{terrain.metadata['cache_key']}"
     target.write_text(json.dumps(payload, allow_nan=False), encoding="utf-8")
     return payload

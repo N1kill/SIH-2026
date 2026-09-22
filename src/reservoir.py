@@ -90,6 +90,7 @@ class ReservoirState:
     gate_width_m: float = 3.0
     gate_opening_m: float = 0.0
     gate_discharge_coeff: float = 0.62
+    gate_states: list[dict] = field(default_factory=list)
     storage_m3: float = 0.0
     time_s: float = 0.0
 
@@ -106,6 +107,14 @@ class ReservoirState:
         head = max(h - self.spillway_crest_elevation_m, 0.0)
         if head <= 0:
             return 0.0
+        if self.gate_states:
+            return float(sum(
+                float(gate.get("discharge_coefficient") or self.gate_discharge_coeff) *
+                float(gate.get("width_m") or 0.0) * float(gate.get("opening_m") or 0.0) *
+                np.sqrt(2 * 9.81 * head)
+                for gate in self.gate_states
+                if gate.get("command_status") == "available"
+            ))
         if self.gate_count > 0:
             # Free/submerged sluice-gate approximation: Q = Cd A sqrt(2gH).
             # Gate state is explicit, so a rendered closed gate cannot
@@ -121,6 +130,10 @@ class ReservoirState:
         head = max(self.elevation_m - self.spillway_crest_elevation_m, 0.0)
         if head <= 0:
             return 0.0
+        if self.gate_states:
+            area = sum(float(gate.get("width_m") or 0.0) * float(gate.get("opening_m") or 0.0)
+                       for gate in self.gate_states if gate.get("command_status") == "available")
+            return self.spillway_outflow_m3s() / max(area, 1e-6) if area > 0 else 0.0
         if self.gate_count > 0:
             if self.open_gate_count <= 0 or self.gate_opening_m <= 0:
                 return 0.0
