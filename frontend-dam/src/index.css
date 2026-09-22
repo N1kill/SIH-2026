@@ -1,0 +1,4 @@
+/**
+ * Root CSS entry point - delegates to PRALAYA Design System globals
+ */
+@import './styles/globals.css';

@@ -1,0 +1,73 @@
+/**
+ * PRALAYA Design System — Variables & Design Tokens
+ * Atmospheric dark palette inspired by heavy monsoon, alpine reservoir mist,
+ * weathered concrete, and telemetry emergency alerts.
+ */
+
+:root {
+  /* Canvas & Atmospheric Backgrounds */
+  --bg-canvas: #101917;
+  --bg-canvas-deep: #0a1110;
+  --bg-canvas-elevated: #162220;
+  --bg-card: rgba(22, 34, 32, 0.72);
+  --bg-card-hover: rgba(28, 44, 41, 0.85);
+  --bg-card-border: rgba(167, 182, 169, 0.12);
+  --bg-card-border-hover: rgba(167, 182, 169, 0.28);
+
+  /* Primary Editorial & Technical Text */
+  --text-primary: #f0f4ef;
+  --text-secondary: #a7b6a9;
+  --text-muted: #6f7f72;
+  --text-faint: #47544a;
+  --text-bright: #ffffff;
+
+  /* Accent & Telemetry Status Colors */
+  --accent-moss: #3e5c45;
+  --accent-moss-light: #5d8a67;
+  --accent-moss-glow: rgba(62, 92, 69, 0.4);
+  --accent-amber: #b88d2a;
+  --accent-amber-glow: rgba(184, 141, 42, 0.35);
+  --accent-clay: #b84c3e;
+  --accent-clay-glow: rgba(184, 76, 62, 0.4);
+  --accent-cyan: #3fa89b;
+  --accent-cyan-glow: rgba(63, 168, 155, 0.3);
+
+  /* Borders & Rules */
+  --border-faint: rgba(167, 182, 169, 0.1);
+  --border-subtle: rgba(167, 182, 169, 0.18);
+  --border-strong: rgba(167, 182, 169, 0.35);
+  --border-accent: rgba(93, 138, 103, 0.5);
+
+  /* Glassmorphism & Overlays */
+  --glass-bg: rgba(16, 25, 23, 0.78);
+  --glass-border: rgba(167, 182, 169, 0.15);
+  --glass-blur: blur(14px);
+  --glass-blur-deep: blur(24px);
+
+  /* Shadows & Atmospheric Fog */
+  --shadow-elevation-low: 0 4px 12px rgba(0, 0, 0, 0.4);
+  --shadow-elevation-high: 0 16px 40px rgba(0, 0, 0, 0.6);
+  --glow-moss: 0 0 24px rgba(93, 138, 103, 0.25);
+  --glow-amber: 0 0 24px rgba(184, 141, 42, 0.3);
+
+  /* Layout & Spacing */
+  --container-max-width: 1360px;
+  --container-gutter: clamp(20px, 5vw, 64px);
+  --nav-height: 72px;
+
+  /* Z-Index Layering */
+  --z-background: -1;
+  --z-dam-scene: 1;
+  --z-mist-layer: 2;
+  --z-content: 10;
+  --z-hud-overlay: 20;
+  --z-navbar: 100;
+  --z-modal: 1000;
+
+  /* Animation Timings */
+  --ease-smooth: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-out: cubic-bezier(0, 0, 0.2, 1);
+  --transition-fast: 0.2s var(--ease-smooth);
+  --transition-normal: 0.35s var(--ease-smooth);
+  --transition-slow: 0.6s var(--ease-smooth);
+}

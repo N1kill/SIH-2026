@@ -1,0 +1,82 @@
+/**
+ * PRALAYA — Scene 04: Education & Science Styles
+ */
+
+.education-section {
+  position: relative;
+  padding: 120px 0;
+  background: var(--bg-canvas-elevated);
+  border-top: 1px solid var(--border-subtle);
+  overflow: hidden;
+}
+
+.education-header {
+  max-width: 800px;
+  margin-bottom: 54px;
+}
+
+.education-mechanisms-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 24px;
+  margin-top: 36px;
+}
+
+.mechanism-card {
+  background: rgba(16, 25, 23, 0.7);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 30px 26px;
+  backdrop-filter: blur(10px);
+  transition: all 0.3s ease;
+}
+
+.mechanism-card:hover {
+  border-color: var(--accent-moss-light);
+  transform: translateY(-3px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+}
+
+.mechanism-number {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  color: var(--accent-moss-light);
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.mechanism-title {
+  font-family: var(--font-sans);
+  font-size: 19px;
+  font-weight: 600;
+  color: var(--text-bright);
+  margin-bottom: 12px;
+}
+
+.mechanism-desc {
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.65;
+}
+
+/* Historical comparison callout */
+.history-callout {
+  margin-top: 48px;
+  padding: 32px;
+  border-radius: 8px;
+  background: rgba(22, 34, 32, 0.9);
+  border-left: 3px solid var(--accent-amber);
+  border-top: 1px solid var(--border-subtle);
+  border-right: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.history-callout-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 16px;
+}
