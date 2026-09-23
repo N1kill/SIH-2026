@@ -1,10 +1,16 @@
 import { useState, useEffect } from 'react';
-import type { Terrain3DData, FloodProgressionData, SimulationSummary } from '../types/simulation';
+import type {
+  Terrain3DData,
+  FloodProgressionData,
+  SimulationSummary,
+  ProjectHydraulics,
+} from '../types/simulation';
 
 export interface LoadedSimulationState {
   terrain: Terrain3DData | null;
   flood: FloodProgressionData | null;
   summary: SimulationSummary | null;
+  hydraulics: ProjectHydraulics | null;
   loading: boolean;
   error: string | null;
 }
@@ -14,6 +20,7 @@ export function useSimulationData(): LoadedSimulationState {
     terrain: null,
     flood: null,
     summary: null,
+    hydraulics: null,
     loading: true,
     error: null,
   });
@@ -23,20 +30,22 @@ export function useSimulationData(): LoadedSimulationState {
 
     async function loadData() {
       try {
-        const [terrainRes, floodRes, summaryRes] = await Promise.all([
+        const [terrainRes, floodRes, summaryRes, hydraulicsRes] = await Promise.all([
           fetch('/data/terrain_3d_data.json'),
           fetch('/data/flood_progression.json'),
           fetch('/data/simulation_summary.json'),
+          fetch('/data/project_hydraulics.json'),
         ]);
 
-        if (!terrainRes.ok || !floodRes.ok || !summaryRes.ok) {
+        if (!terrainRes.ok || !floodRes.ok || !summaryRes.ok || !hydraulicsRes.ok) {
           throw new Error('Failed to load hydrodynamic GIS files from /data/');
         }
 
-        const [terrain, rawFlood, rawSummary] = await Promise.all([
+        const [terrain, rawFlood, rawSummary, hydraulics] = await Promise.all([
           terrainRes.json(),
           floodRes.json(),
           summaryRes.json(),
+          hydraulicsRes.json(),
         ]);
 
         const flood: FloodProgressionData = Array.isArray(rawFlood)
@@ -68,6 +77,7 @@ export function useSimulationData(): LoadedSimulationState {
             Q_peak_m3s: rawObj.breach_parameters_used?.Q_peak_m3s ?? 6647.0,
             t_f_hours: rawObj.breach_parameters_used?.t_f_hours ?? 2.5,
             dam_height_m: rawObj.breach_parameters_used?.dam_height_m ?? 22.56,
+            V_reservoir_m3: rawObj.breach_parameters_used?.V_reservoir_m3,
           };
         }
 
@@ -76,6 +86,7 @@ export function useSimulationData(): LoadedSimulationState {
             terrain,
             flood,
             summary,
+            hydraulics,
             loading: false,
             error: null,
           });

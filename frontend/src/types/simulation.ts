@@ -4,9 +4,19 @@
  */
 
 export interface Terrain3DData {
-  elevation_grid: number[][];
-  resolution_m: number;
-  extent_m: {
+  elevation_grid?: number[][];
+  normalized_elev?: number[][];
+  resolution_m?: number;
+  grid_size?: number;
+  elev_max_m?: number;
+  elev_min_m?: number;
+  dam_length_m?: number;
+  reservoir_surface_area_m2?: number;
+  reservoir_bounds_m?: {
+    length: number;
+    width: number;
+  };
+  extent_m?: {
     width: number;
     depth: number;
   };
@@ -14,6 +24,16 @@ export interface Terrain3DData {
     x: number;
     z: number;
     elevation: number;
+  };
+  dam_position?: {
+    x: number;
+    y: number;
+    z: number;
+  };
+  morbi_position?: {
+    x: number;
+    y: number;
+    z: number;
   };
 }
 
@@ -36,6 +56,19 @@ export interface FloodProgressionData {
   max_time_hours: number;
 }
 
+export interface ProjectHydraulics {
+  dam_longitude: number;
+  dam_latitude: number;
+  initial_water_level_m: number;
+  maximum_water_level_m: number;
+  reservoir_capacity_m3: number;
+  reservoir_surface_area_m2: number;
+  stage_storage: [number, number][];
+  spillway_configured: boolean;
+  provenance: string;
+  data_status: 'approximate' | 'simulated' | 'measured';
+}
+
 export interface SimulationSummary {
   metadata?: {
     dam_name: string;
@@ -47,6 +80,7 @@ export interface SimulationSummary {
     Q_peak_m3s: number;
     t_f_hours: number;
     dam_height_m: number;
+    V_reservoir_m3?: number;
   };
   hydrodynamic_results: {
     inundated_area_km2: number;
@@ -76,7 +110,15 @@ export interface ShelterInfo {
 }
 
 export interface BreachParameters {
-  breachWidth: number;
+  state: 'intact' | 'breached';
+  type: 'crack' | 'partial' | 'full';
+  gateIndex: number;
+  crackSizeM: number;
+  leakOpeningMm: number;
+  holeWidthM: number;
+  holeHeightM: number;
+  failedGateCount: number;
+  formationTimeHours: number;
   peakDischarge: number;
   damHeight: number;
 }

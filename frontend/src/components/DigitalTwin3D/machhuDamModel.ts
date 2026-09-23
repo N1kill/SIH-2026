@@ -2,7 +2,11 @@ import * as THREE from 'three';
 
 export interface MachhuDamModelOptions {
   damLength?: number;
+  displayedDamLength?: number;
   damHeight?: number;
+  reservoirLength?: number;
+  reservoirWidth?: number;
+  reservoirOutlineM?: [number, number][];
   spillwayWidth?: number;
   numPiers?: number;
   breachWidth?: number;
@@ -14,8 +18,16 @@ export interface MachhuDamModelOptions {
 export interface MachhuDamUserData {
   config: Required<MachhuDamModelOptions>;
   tick: (delta?: number) => void;
-  updateBreachWidth: (width: number) => void;
+  updateGateFailure: (
+    type: 'crack' | 'partial' | 'full',
+    gateIndex: number,
+    failedGateCount: number,
+    crackSizeM: number,
+    holeWidthM: number,
+    holeHeightM: number,
+  ) => void;
   updateDischarge: (q: number) => void;
+  updateHydraulicState: (breachQ: number, spillwayQ: number, reservoirSurfaceY: number) => void;
   updateDamHeight: (h: number) => void;
   setBreachActive: (active: boolean) => void;
 }
@@ -126,8 +138,12 @@ function createProceduralTextures() {
  */
 export function createMachhuDamModel(options: MachhuDamModelOptions = {}): MachhuDamGroup {
   const config: Required<MachhuDamModelOptions> = {
-    damLength: options.damLength || 1940,
+    damLength: options.damLength || 4930,
+    displayedDamLength: options.displayedDamLength ?? options.damLength ?? 4930,
     damHeight: options.damHeight || 22.56,
+    reservoirLength: options.reservoirLength || 6189,
+    reservoirWidth: options.reservoirWidth || 5328,
+    reservoirOutlineM: options.reservoirOutlineM || [],
     spillwayWidth: options.spillwayWidth || 300,
     numPiers: options.numPiers || 18,
     breachWidth: options.breachWidth || 156,
@@ -166,12 +182,6 @@ export function createMachhuDamModel(options: MachhuDamModelOptions = {}): Machh
     roughness: 0.95,
     metalness: 0.05,
     color: 0x8b7355,
-  });
-
-  const erodedSoilMat = new THREE.MeshStandardMaterial({
-    map: textures.riprapTex,
-    roughness: 0.9,
-    color: 0x6e5239,
   });
 
   const reservoirWaterMat = new THREE.MeshStandardMaterial({
@@ -279,73 +289,6 @@ export function createMachhuDamModel(options: MachhuDamModelOptions = {}): Machh
     side: THREE.DoubleSide,
   });
 
-  // 2. Plunge Pool & Boiling Churn Wake Shader
-  const boilUniforms = {
-    uTime: { value: 0 },
-    uSunDir: { value: new THREE.Vector3(0.5, 0.7, -0.4).normalize() },
-    uDeepColor: { value: new THREE.Color(0x0a524a) },
-    uFoamColor: { value: new THREE.Color(0xffffff) },
-    uIntensity: { value: 1.0 },
-  };
-
-  const boilWaterMat = new THREE.ShaderMaterial({
-    uniforms: boilUniforms,
-    vertexShader: `
-      uniform float uTime;
-      varying vec2 vUv;
-      varying vec3 vNormal;
-      varying vec3 vWorldPos;
-      void main() {
-        vUv = uv;
-        vec3 pos = position;
-        float d = length(uv - vec2(0.5, 0.25));
-        float boil = sin(d * 30.0 - uTime * 6.5) * exp(-d * 2.8) * 0.65;
-        pos.y += boil;
-        vec4 worldPos = modelMatrix * vec4(pos, 1.0);
-        vWorldPos = worldPos.xyz;
-        vNormal = normalize(normalMatrix * normal);
-        gl_Position = projectionMatrix * viewMatrix * worldPos;
-      }
-    `,
-    fragmentShader: `
-      uniform float uTime;
-      uniform vec3 uSunDir;
-      uniform vec3 uDeepColor;
-      uniform vec3 uFoamColor;
-      varying vec2 vUv;
-      varying vec3 vNormal;
-      varying vec3 vWorldPos;
-      ${noiseGLSL}
-      void main() {
-        vec2 center = vec2(0.5, 0.2);
-        float d = length(vUv - center);
-        
-        // Concentric expanding boiling waves
-        float waves = sin(d * 32.0 - uTime * 6.0) * 0.5 + 0.5;
-        
-        // Swirling foam eddies
-        vec2 uvRot = vUv - center;
-        float angle = atan(uvRot.y, uvRot.x) + uTime * 1.5;
-        vec2 turbUv = vec2(cos(angle), sin(angle)) * d * 8.0 + vec2(0.0, -uTime * 1.8);
-        float n = fbm(turbUv);
-        
-        float boilFoam = smoothstep(0.35, 0.65, n * 0.7 + waves * 0.45) * exp(-d * 2.2);
-        
-        vec3 viewDir = normalize(cameraPosition - vWorldPos);
-        vec3 halfDir = normalize(uSunDir + viewDir);
-        float spec = pow(max(dot(vNormal, halfDir), 0.0), 32.0);
-        
-        vec3 col = mix(uDeepColor, uFoamColor, boilFoam);
-        col += vec3(spec * 0.6);
-        
-        float alpha = mix(0.92, 0.75, smoothstep(0.3, 0.7, d));
-        gl_FragColor = vec4(col, alpha);
-      }
-    `,
-    transparent: true,
-    side: THREE.DoubleSide,
-  });
-
   const riverWaterMat = new THREE.MeshStandardMaterial({
     color: 0x0d5f57,
     roughness: 0.18,
@@ -382,7 +325,10 @@ export function createMachhuDamModel(options: MachhuDamModelOptions = {}): Machh
     depth: config.spillwayWidth,
     bevelEnabled: false,
   });
-  ogeeGeo.rotateY(Math.PI / 2);
+  // Profile X is downstream distance: map it to +Z. Extrusion maps to
+  // -X, so translate by its width to keep the original lateral placement.
+  ogeeGeo.rotateY(-Math.PI / 2);
+  ogeeGeo.translate(config.spillwayWidth, 0, 0);
   const ogeeMesh = new THREE.Mesh(ogeeGeo, concreteMat);
   ogeeMesh.position.set(-spillwayHalfW, 0, 0);
   ogeeMesh.castShadow = true;
@@ -393,6 +339,10 @@ export function createMachhuDamModel(options: MachhuDamModelOptions = {}): Machh
   const piersGroup = new THREE.Group();
   const gatesGroup = new THREE.Group();
   const spillwayCascadesGroup = new THREE.Group();
+  spillwayCascadesGroup.visible = false;
+  const gateMeshes: THREE.Mesh[] = [];
+  const gateCascadeMeshes: THREE.Mesh[] = [];
+  const gateCenters: number[] = [];
 
   for (let i = 0; i <= config.numPiers; i++) {
     const pierX = -spillwayHalfW + i * pierSpacing;
@@ -413,7 +363,8 @@ export function createMachhuDamModel(options: MachhuDamModelOptions = {}): Machh
       bevelThickness: 0.2,
       bevelSize: 0.2,
     });
-    pierGeo.rotateY(Math.PI / 2);
+    pierGeo.rotateY(-Math.PI / 2);
+    pierGeo.translate(pierWidth, 0, 0);
     const pierMesh = new THREE.Mesh(pierGeo, concreteMat);
     pierMesh.position.set(pierX - pierWidth / 2, 0, 0);
     pierMesh.castShadow = true;
@@ -447,18 +398,151 @@ export function createMachhuDamModel(options: MachhuDamModelOptions = {}): Machh
       gateMesh.position.set(gateX, pierHeight * 0.56, -2.5);
       gateMesh.castShadow = true;
       gatesGroup.add(gateMesh);
+      gateMeshes.push(gateMesh);
+      gateCenters.push(gateX);
 
       // Spillway active cascade water sheet
       const cascadeGeo = new THREE.PlaneGeometry(gateWidth * 0.96, pierHeight * 1.15, 6, 12);
       cascadeGeo.rotateX(Math.PI * 0.34);
       const cascadeMesh = new THREE.Mesh(cascadeGeo, cascadeWaterMat);
       cascadeMesh.position.set(gateX, pierHeight * 0.35, pierDepth * 0.45);
+      cascadeMesh.visible = false;
       spillwayCascadesGroup.add(cascadeMesh);
+      gateCascadeMeshes.push(cascadeMesh);
     }
   }
   spillwayGroup.add(piersGroup);
   spillwayGroup.add(gatesGroup);
   spillwayGroup.add(spillwayCascadesGroup);
+
+  // Gate-local failure visuals. These are deliberately attached to the
+  // concrete spillway assembly; the earthfill flanks are never modified.
+  const gateDamageGroup = new THREE.Group();
+  gateDamageGroup.name = 'Gate_Failure_Visuals';
+  gateDamageGroup.visible = false;
+
+  // Illustrative fractures, not a structural failure prediction. Seed by gate
+  // so the irregular branches remain stable while the timeline advances.
+  const fractureVertices = (gateIndex: number) => {
+    let seed = gateIndex * 2654435761 >>> 0;
+    const random = () => {
+      seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+      return seed / 4294967296;
+    };
+    const vertices: number[] = [];
+    let x = (random() - 0.5) * 0.4;
+    let y = -0.95;
+    for (let i = 0; i < 13; i++) {
+      const nextX = THREE.MathUtils.clamp(x + (random() - 0.5) * 0.42, -0.6, 0.6);
+      const nextY = y + 1.9 / 13;
+      vertices.push(x, y, 0, nextX, nextY, 0);
+      if (i > 1 && i < 11 && random() > 0.48) {
+        let bx = nextX;
+        let by = nextY;
+        const direction = random() > 0.5 ? 1 : -1;
+        const segments = 2 + Math.floor(random() * 3);
+        for (let j = 0; j < segments; j++) {
+          const nx = THREE.MathUtils.clamp(bx + direction * (0.07 + random() * 0.14), -0.95, 0.95);
+          const ny = THREE.MathUtils.clamp(by + (random() - 0.35) * 0.23, -0.95, 0.95);
+          vertices.push(bx, by, 0, nx, ny, 0);
+          bx = nx;
+          by = ny;
+        }
+      }
+      x = nextX;
+      y = nextY;
+    }
+    return vertices;
+  };
+  const crackGeo = new THREE.BufferGeometry();
+  let crackPatternGate = 9;
+  crackGeo.setAttribute('position', new THREE.Float32BufferAttribute(fractureVertices(crackPatternGate), 3));
+  const crackMesh = new THREE.LineSegments(
+    crackGeo,
+    new THREE.LineBasicMaterial({ color: 0x101820, depthTest: false }),
+  );
+  crackMesh.renderOrder = 5;
+  gateDamageGroup.add(crackMesh);
+
+  const holeMesh = new THREE.Mesh(
+    new THREE.CircleGeometry(1, 32),
+    new THREE.MeshBasicMaterial({ color: 0x07111d, side: THREE.DoubleSide, depthTest: false }),
+  );
+  holeMesh.renderOrder = 4;
+  gateDamageGroup.add(holeMesh);
+
+  const failureOutline = new THREE.LineSegments(
+    new THREE.EdgesGeometry(new THREE.BoxGeometry(pierSpacing - pierWidth, pierHeight * 0.78, 0.4)),
+    new THREE.LineBasicMaterial({ color: 0xff8a4c, depthTest: false }),
+  );
+  failureOutline.renderOrder = 4;
+  gateDamageGroup.add(failureOutline);
+  spillwayGroup.add(gateDamageGroup);
+
+  let selectedFailureType: 'crack' | 'partial' | 'full' = 'partial';
+  let selectedGateIndex = 9;
+  let selectedFailedGateCount = 1;
+  let selectedCrackSizeM = 3;
+  let selectedHoleWidthM = 6;
+  let selectedHoleHeightM = 5;
+
+  const applyGateFailure = () => {
+    gateMeshes.forEach((gate) => { gate.visible = true; });
+    gateCascadeMeshes.forEach((cascade) => {
+      cascade.visible = false;
+      cascade.scale.set(1, 1, 1);
+    });
+    crackMesh.visible = false;
+    holeMesh.visible = false;
+    failureOutline.visible = false;
+    gateDamageGroup.visible = config.breachActive;
+    if (!config.breachActive) return;
+
+    const startIndex = THREE.MathUtils.clamp(Math.round(selectedGateIndex) - 1, 0, config.numPiers - 1);
+    const centerX = gateCenters[startIndex];
+    const faceZ = pierDepth * 0.52;
+
+    if (selectedFailureType === 'crack') {
+      if (crackPatternGate !== selectedGateIndex) {
+        crackPatternGate = selectedGateIndex;
+        crackGeo.setAttribute('position', new THREE.Float32BufferAttribute(fractureVertices(crackPatternGate), 3));
+        crackGeo.computeBoundingSphere();
+      }
+      crackMesh.visible = true;
+      crackMesh.position.set(centerX, pierHeight * 0.56, faceZ);
+      crackMesh.scale.setScalar(selectedCrackSizeM / 2);
+      gateCascadeMeshes[startIndex].visible = true;
+      gateCascadeMeshes[startIndex].scale.x = 0.08;
+      return;
+    }
+
+    if (selectedFailureType === 'partial') {
+      holeMesh.visible = true;
+      holeMesh.position.set(centerX, pierHeight * 0.5, faceZ);
+      holeMesh.scale.set(selectedHoleWidthM / 2, selectedHoleHeightM / 2, 1);
+      gateCascadeMeshes[startIndex].visible = true;
+      gateCascadeMeshes[startIndex].scale.set(
+        Math.min(1, selectedHoleWidthM / (pierSpacing - pierWidth)),
+        Math.min(1, selectedHoleHeightM / pierHeight),
+        1,
+      );
+      return;
+    }
+
+    const count = Math.min(selectedFailedGateCount, config.numPiers - startIndex);
+    const endIndex = startIndex + count - 1;
+    for (let index = startIndex; index <= endIndex; index++) {
+      gateMeshes[index].visible = false;
+      gateCascadeMeshes[index].visible = true;
+    }
+    failureOutline.visible = true;
+    failureOutline.position.set(
+      (gateCenters[startIndex] + gateCenters[endIndex]) / 2,
+      pierHeight * 0.5,
+      faceZ,
+    );
+    failureOutline.scale.x = count;
+  };
 
   // Overhead Gantry Walkway & Crest Road
   const deckLength = config.spillwayWidth + pierWidth * 2;
@@ -494,7 +578,8 @@ export function createMachhuDamModel(options: MachhuDamModelOptions = {}): Machh
       bevelThickness: 0.3,
       bevelSize: 0.3,
     });
-    wallGeo.rotateY(Math.PI / 2);
+    wallGeo.rotateY(-Math.PI / 2);
+    wallGeo.translate(3.5, 0, 0);
     const wallMesh = new THREE.Mesh(wallGeo, concreteMat);
     const sign = side === 'left' ? -1 : 1;
     wallMesh.position.set(sign * (spillwayHalfW + (side === 'left' ? 3.5 : 0)), 0, 0);
@@ -537,159 +622,66 @@ export function createMachhuDamModel(options: MachhuDamModelOptions = {}): Machh
   const crestRoadWidth = 7.0;
   const baseWidth = pierDepth * 2.8;
 
-  function createEmbankmentMesh(length: number, material: THREE.Material) {
+  function createEmbankmentMesh(length: number, material: THREE.Material, height = config.damHeight) {
     const shape = new THREE.Shape();
     shape.moveTo(-baseWidth * 0.55, 0);
-    shape.lineTo(-crestRoadWidth / 2, config.damHeight);
-    shape.lineTo(crestRoadWidth / 2, config.damHeight);
+    shape.lineTo(-crestRoadWidth / 2, height);
+    shape.lineTo(crestRoadWidth / 2, height);
     shape.lineTo(baseWidth * 0.45, 0);
     shape.closePath();
 
     const extrudeSettings = { steps: 2, depth: length, bevelEnabled: false };
     const geo = new THREE.ExtrudeGeometry(shape, extrudeSettings);
-    geo.rotateY(Math.PI / 2);
+    geo.rotateY(-Math.PI / 2);
+    geo.translate(length, 0, 0);
     const mesh = new THREE.Mesh(geo, material);
     mesh.castShadow = true;
     mesh.receiveShadow = true;
     return mesh;
   }
 
-  // Left Flank Embankment (Always intact)
-  const leftFlankLength = (config.damLength - config.spillwayWidth) * 0.48;
-  const leftFlankMesh = createEmbankmentMesh(leftFlankLength, riprapMat);
-  leftFlankMesh.position.set(-spillwayHalfW - 2.5 - leftFlankLength, 0, 0);
-  embankmentGroup.add(leftFlankMesh);
+  const flankGap = spillwayHalfW + 2.5;
+  // A display crop, not a rescaling or a change to the physical dam length.
+  const displayedLength = Math.min(config.damLength, config.displayedDamLength);
+  const damLeftEdge = -displayedLength / 2;
+  const damRightEdge = displayedLength / 2;
+  const intactEmbankmentGroup = new THREE.Group();
+  intactEmbankmentGroup.name = 'Intact_Earthfill_Flanks';
+  const leftFlankMesh = createEmbankmentMesh(-flankGap - damLeftEdge, riprapMat);
+  leftFlankMesh.position.set(damLeftEdge, 0, 0);
+  intactEmbankmentGroup.add(leftFlankMesh);
+  const intactRightFlankMesh = createEmbankmentMesh(damRightEdge - flankGap, riprapMat);
+  intactRightFlankMesh.position.set(flankGap, 0, 0);
+  intactEmbankmentGroup.add(intactRightFlankMesh);
+  intactEmbankmentGroup.visible = !config.breachActive;
+  embankmentGroup.add(intactEmbankmentGroup);
 
-  // Intact Full Right Embankment
-  const rightFlankTotalLength = (config.damLength - config.spillwayWidth) * 0.52;
-  const intactRightFlankMesh = createEmbankmentMesh(rightFlankTotalLength, riprapMat);
-  intactRightFlankMesh.position.set(spillwayHalfW + 2.5, 0, 0);
-  intactRightFlankMesh.visible = !config.breachActive;
-  embankmentGroup.add(intactRightFlankMesh);
-
-  // Broken Right Flank Group (Only visible when breach is active)
-  const brokenRightFlankGroup = new THREE.Group();
-  brokenRightFlankGroup.name = 'Broken_Right_Flank';
-  brokenRightFlankGroup.visible = config.breachActive;
-
-  const breachStartX = spillwayHalfW + 2.5 + 80.0;
-  let currentBreachWidth = config.breachWidth;
-
-  const rightFlankA_Length = 80.0;
-  const rightFlankA = createEmbankmentMesh(rightFlankA_Length, riprapMat);
-  rightFlankA.position.set(spillwayHalfW + 2.5, 0, 0);
-  brokenRightFlankGroup.add(rightFlankA);
-
-  const rightFlankB_Length = Math.max(10, rightFlankTotalLength - rightFlankA_Length - currentBreachWidth);
-  const rightFlankB = createEmbankmentMesh(rightFlankB_Length, riprapMat);
-  rightFlankB.position.set(breachStartX + currentBreachWidth, 0, 0);
-  brokenRightFlankGroup.add(rightFlankB);
-
-  embankmentGroup.add(brokenRightFlankGroup);
   root.add(embankmentGroup);
 
-  // 3. Catastrophic Breach Cavity & Violent Cataract
-  const breachGroup = new THREE.Group();
-  breachGroup.name = 'Breach_Gorge_And_Torrent';
-  breachGroup.visible = config.breachActive;
-
-  const breachErosionGroup = new THREE.Group();
-  const erosionGeo = new THREE.BoxGeometry(8.0, config.damHeight * 0.9, baseWidth * 0.85);
-  const leftErodedEdge = new THREE.Mesh(erosionGeo, erodedSoilMat);
-  leftErodedEdge.position.set(breachStartX + 4.0, (config.damHeight * 0.9) / 2, 0);
-  leftErodedEdge.rotation.z = 0.22;
-  breachErosionGroup.add(leftErodedEdge);
-
-  const rightErodedEdge = new THREE.Mesh(erosionGeo, erodedSoilMat);
-  rightErodedEdge.position.set(breachStartX + currentBreachWidth - 4.0, (config.damHeight * 0.9) / 2, 0);
-  rightErodedEdge.rotation.z = -0.22;
-  breachErosionGroup.add(rightErodedEdge);
-  breachGroup.add(breachErosionGroup);
-
-  // 3D Curved Cascading Water Cataract (Curving from reservoir over eroded crest down to river)
-  const cataractCurve = new THREE.CatmullRomCurve3([
-    new THREE.Vector3(0, config.damHeight * 0.88, -20.0),
-    new THREE.Vector3(0, config.damHeight * 0.85, -8.0),
-    new THREE.Vector3(0, config.damHeight * 0.68, 6.0),
-    new THREE.Vector3(0, config.damHeight * 0.35, 24.0),
-    new THREE.Vector3(0, 1.8, 50.0),
-    new THREE.Vector3(0, 0.5, 80.0),
-  ]);
-  const curvePts = cataractCurve.getPoints(24);
-  const cataractWidth = currentBreachWidth * 0.94;
-  const breachCascadeGeo = new THREE.PlaneGeometry(cataractWidth, 1, 16, 24);
-  const cascadePos = breachCascadeGeo.attributes.position;
-  for (let row = 0; row <= 24; row++) {
-    const pt = curvePts[row];
-    const widthExp = 1.0 + (row / 24) * 0.35;
-    for (let col = 0; col <= 16; col++) {
-      const u = (col / 16 - 0.5) * cataractWidth * widthExp;
-      const idx = row * 17 + col;
-      const arch = Math.cos((col / 16 - 0.5) * Math.PI) * 1.8;
-      cascadePos.setXYZ(idx, u, pt.y + arch, pt.z);
-    }
-  }
-  breachCascadeGeo.computeVertexNormals();
-  const breachCascadeMesh = new THREE.Mesh(breachCascadeGeo, cascadeWaterMat);
-  breachCascadeMesh.position.set(breachStartX + currentBreachWidth / 2, 0, 0);
-  breachGroup.add(breachCascadeMesh);
-
-  // Plunge Pool & Boiling Churn Wake into River
-  const plungePoolGeo = new THREE.PlaneGeometry(currentBreachWidth * 1.6, 95.0, 32, 32);
-  plungePoolGeo.rotateX(-Math.PI / 2);
-  const plungePoolMesh = new THREE.Mesh(plungePoolGeo, boilWaterMat);
-  plungePoolMesh.position.set(breachStartX + currentBreachWidth / 2, 0.7, 68.0);
-  breachGroup.add(plungePoolMesh);
-
-  // Aeration Spray Mist Particles (1,200 particles)
-  const particleCount = 1200;
-  const particlePositions = new Float32Array(particleCount * 3);
-  interface Vel {
-    vx: number;
-    vy: number;
-    vz: number;
-    baseY: number;
-  }
-  const particleVelocities: Vel[] = [];
-
-  for (let i = 0; i < particleCount; i++) {
-    const px = breachStartX + (Math.random() * 0.9 + 0.05) * currentBreachWidth;
-    const py = Math.random() * (config.damHeight * 0.85);
-    const pz = 10.0 + Math.random() * 65.0;
-    particlePositions[i * 3] = px;
-    particlePositions[i * 3 + 1] = py;
-    particlePositions[i * 3 + 2] = pz;
-
-    particleVelocities.push({
-      vx: (Math.random() - 0.5) * 6.0,
-      vy: Math.random() * 8.0 + 2.0,
-      vz: Math.random() * 26.0 + 10.0,
-      baseY: config.damHeight * 0.85,
+  // 4. Upstream reservoir clipped to the evidence-backed shoreline. The
+  // rectangle is retained only as an explicit fallback for another project
+  // that has not supplied an outline.
+  let reservoirGeo: THREE.BufferGeometry;
+  if (config.reservoirOutlineM.length >= 3) {
+    const shape = new THREE.Shape();
+    config.reservoirOutlineM.forEach(([x, z], index) => {
+      if (index === 0) shape.moveTo(x, -z);
+      else shape.lineTo(x, -z);
     });
+    shape.closePath();
+    reservoirGeo = new THREE.ShapeGeometry(shape);
+    // Reflect the input before triangulation, then rotate the front face UP.
+    // This preserves the original X/Z shoreline; +PI/2 made the front face
+    // point down and back-face culling hid all water from above.
+    reservoirGeo.rotateX(-Math.PI / 2);
+  } else {
+    reservoirGeo = new THREE.PlaneGeometry(config.reservoirWidth, config.reservoirLength, 32, 32);
+    reservoirGeo.rotateX(-Math.PI / 2);
+    reservoirGeo.translate(0, 0, -(config.reservoirLength / 2 + 12));
   }
-
-  const particleGeo = new THREE.BufferGeometry();
-  particleGeo.setAttribute('position', new THREE.BufferAttribute(particlePositions, 3));
-
-  const particleMat = new THREE.PointsMaterial({
-    map: textures.sprayTex,
-    color: 0xffffff,
-    size: 10.0,
-    transparent: true,
-    opacity: 0.6,
-    blending: THREE.AdditiveBlending,
-    depthWrite: false,
-  });
-  const sprayParticles = new THREE.Points(particleGeo, particleMat);
-  breachGroup.add(sprayParticles);
-
-  root.add(breachGroup);
-
-  // 4. Upstream Reservoir Water Expanse (Directly behind the dam wall)
-  const reservoirGeo = new THREE.PlaneGeometry(config.damLength * 1.4, 900.0, 32, 32);
-  reservoirGeo.rotateX(-Math.PI / 2);
   const reservoirMesh = new THREE.Mesh(reservoirGeo, reservoirWaterMat);
-  reservoirMesh.position.set(0, config.damHeight * 0.85, -450.0);
+  let reservoirSurfaceY = config.damHeight * 0.85;
+  reservoirMesh.position.set(0, reservoirSurfaceY, 0);
   reservoirMesh.receiveShadow = true;
   root.add(reservoirMesh);
 
@@ -698,6 +690,7 @@ export function createMachhuDamModel(options: MachhuDamModelOptions = {}): Machh
   riverGeo.rotateX(-Math.PI / 2);
   const riverMesh = new THREE.Mesh(riverGeo, riverWaterMat);
   riverMesh.position.set(50.0, 0.35, 780.0);
+  riverMesh.visible = false;
   riverMesh.receiveShadow = true;
   root.add(riverMesh);
 
@@ -745,51 +738,45 @@ export function createMachhuDamModel(options: MachhuDamModelOptions = {}): Machh
       textures.waterTex.offset.y -= delta * 3.8;
       textures.waterTex.offset.x += Math.sin(timeElapsed * 4.0) * 0.005;
 
-      const pos = particleGeo.attributes.position.array as Float32Array;
-      for (let i = 0; i < particleCount; i++) {
-        const v = particleVelocities[i];
-        pos[i * 3] += v.vx * delta;
-        pos[i * 3 + 1] += v.vy * delta;
-        pos[i * 3 + 2] += v.vz * delta;
-
-        if (pos[i * 3 + 1] <= 0.5 || pos[i * 3 + 2] > 95.0) {
-          pos[i * 3] = breachStartX + (Math.random() * 0.9 + 0.05) * currentBreachWidth;
-          pos[i * 3 + 1] = Math.random() * 6.0 + 2.0;
-          pos[i * 3 + 2] = 25.0 + Math.random() * 15.0;
-        }
-      }
-      particleGeo.attributes.position.needsUpdate = true;
-
-      reservoirMesh.position.y = config.damHeight * 0.85 + Math.sin(timeElapsed * 1.5) * 0.15;
+      reservoirMesh.position.y = reservoirSurfaceY + Math.sin(timeElapsed * 1.5) * 0.03;
       cascadeWaterMat.uniforms.uTime.value = timeElapsed;
-      boilWaterMat.uniforms.uTime.value = timeElapsed;
     },
 
-    updateBreachWidth: (newWidth: number) => {
-      currentBreachWidth = Math.max(40, Math.min(320, newWidth));
-      config.breachWidth = currentBreachWidth;
-
-      rightErodedEdge.position.x = breachStartX + currentBreachWidth - 4.0;
-      breachCascadeMesh.scale.x = currentBreachWidth / 156.0;
-      breachCascadeMesh.position.x = breachStartX + currentBreachWidth / 2;
-      plungePoolMesh.scale.x = currentBreachWidth / 156.0;
-      plungePoolMesh.position.x = breachStartX + currentBreachWidth / 2;
-      rightFlankB.position.x = breachStartX + currentBreachWidth;
+    updateGateFailure: (
+      type,
+      gateIndex,
+      failedGateCount,
+      crackSizeM,
+      holeWidthM,
+      holeHeightM,
+    ) => {
+      selectedFailureType = type;
+      selectedGateIndex = THREE.MathUtils.clamp(Math.round(gateIndex), 1, config.numPiers);
+      selectedFailedGateCount = THREE.MathUtils.clamp(
+        Math.round(failedGateCount),
+        1,
+        config.numPiers - selectedGateIndex + 1,
+      );
+      selectedCrackSizeM = THREE.MathUtils.clamp(crackSizeM, 0.25, 8);
+      selectedHoleWidthM = THREE.MathUtils.clamp(holeWidthM, 0.5, pierSpacing - pierWidth);
+      selectedHoleHeightM = THREE.MathUtils.clamp(holeHeightM, 0.5, pierHeight * 0.8);
+      applyGateFailure();
     },
 
     updateDischarge: (newQ: number) => {
       config.peakDischarge = newQ;
-      const ratio = Math.max(0.3, Math.min(2.5, newQ / 6647));
+      const ratio = Math.max(0, Math.min(2.5, newQ / 6647));
 
       cascadeWaterMat.uniforms.uIntensity.value = ratio;
-      boilWaterMat.uniforms.uIntensity.value = ratio;
-      particleMat.size = 2.5 * ratio;
-
-      for (let i = 0; i < particleCount; i++) {
-        particleVelocities[i].vz = (Math.random() * 22.0 + 8.0) * ratio;
-      }
 
       riverMesh.scale.y = 0.04 * (1.0 + (ratio - 1.0) * 0.5);
+    },
+
+    updateHydraulicState: (breachQ: number, spillwayQ: number, nextReservoirSurfaceY: number) => {
+      root.userData.updateDischarge(breachQ);
+      spillwayCascadesGroup.visible = breachQ + spillwayQ > 0.01;
+      riverMesh.visible = breachQ + spillwayQ > 0.01;
+      reservoirSurfaceY = THREE.MathUtils.clamp(nextReservoirSurfaceY, 0.4, config.damHeight - 0.4);
     },
 
     updateDamHeight: (newH: number) => {
@@ -799,9 +786,8 @@ export function createMachhuDamModel(options: MachhuDamModelOptions = {}): Machh
 
     setBreachActive: (active: boolean) => {
       config.breachActive = active;
-      intactRightFlankMesh.visible = !active;
-      brokenRightFlankGroup.visible = active;
-      breachGroup.visible = active;
+      intactEmbankmentGroup.visible = true;
+      applyGateFailure();
     },
   };
 

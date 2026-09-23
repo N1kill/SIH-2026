@@ -85,6 +85,48 @@ html, body {
   display: block;
 }
 
+.movement-hint {
+  position: absolute;
+  left: 24px;
+  bottom: 92px;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 11px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.78);
+  color: var(--text-secondary);
+  font-size: 10px;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  pointer-events: none;
+  backdrop-filter: blur(12px);
+}
+
+.movement-hint-title {
+  color: var(--text-cyan);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+
+.movement-hint kbd {
+  display: inline-flex;
+  min-width: 18px;
+  height: 18px;
+  align-items: center;
+  justify-content: center;
+  margin-right: 2px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  border-radius: 4px;
+  background: rgba(30, 41, 59, 0.9);
+  color: var(--text-primary);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+}
+
 .leaflet-map-canvas {
   width: 100%;
   height: 100%;
@@ -253,6 +295,112 @@ html, body {
   pointer-events: auto;
 }
 
+.hydraulic-status-panel {
+  position: absolute;
+  top: 24px;
+  left: 338px;
+  z-index: 100;
+  width: min(390px, calc(100vw - 700px));
+  min-width: 330px;
+  padding: 16px 18px;
+  border: 1px solid rgba(56, 189, 248, 0.24);
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.86);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.46);
+  color: var(--text-primary);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  pointer-events: none;
+}
+
+.hydraulic-panel-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.hydraulic-eyebrow {
+  display: block;
+  margin-bottom: 3px;
+  color: var(--text-cyan);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+}
+
+.hydraulic-panel-header h2 {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.2;
+}
+
+.hydraulic-state {
+  padding: 4px 7px;
+  border: 1px solid;
+  border-radius: 5px;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+}
+
+.hydraulic-state.is-contained {
+  border-color: rgba(52, 211, 153, 0.45);
+  background: rgba(16, 185, 129, 0.16);
+  color: #6ee7b7;
+}
+
+.hydraulic-state.is-release {
+  border-color: rgba(251, 146, 60, 0.5);
+  background: rgba(249, 115, 22, 0.18);
+  color: #fdba74;
+}
+
+.hydraulic-metrics {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 8px;
+  background: rgba(148, 163, 184, 0.12);
+}
+
+.hydraulic-metrics > div {
+  min-width: 0;
+  padding: 8px 9px;
+  background: rgba(15, 23, 42, 0.94);
+}
+
+.hydraulic-metrics dt {
+  margin-bottom: 3px;
+  color: #aebbd0;
+  font-size: 9px;
+}
+
+.hydraulic-metrics dd {
+  margin: 0;
+  color: #f8fafc;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.hydraulic-provenance {
+  margin: 10px 0 0;
+  color: #bdc8d8;
+  font-size: 9px;
+  line-height: 1.45;
+}
+
+.hydraulic-provenance strong {
+  color: #fbbf24;
+}
+
 .breach-params-card .card-header {
   margin-bottom: 16px;
 }
@@ -326,6 +474,244 @@ html, body {
   transform: scale(1.18);
 }
 
+/* Compact 3D scenario controls */
+.breach-params-card {
+  top: 20px;
+  left: 20px;
+  width: 318px;
+  max-height: calc(100dvh - 132px);
+  padding: 14px 16px;
+  overflow-y: auto;
+  background: rgba(13, 23, 36, 0.9);
+}
+
+.breach-params-card .compact-card-header {
+  margin-bottom: 10px;
+}
+
+.panel-eyebrow {
+  display: block;
+  margin-bottom: 2px;
+  color: var(--text-cyan);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+}
+
+.state-switch,
+.breach-type-switch {
+  display: grid;
+  gap: 4px;
+  padding: 3px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 8px;
+  background: rgba(2, 8, 23, 0.42);
+}
+
+.state-switch {
+  grid-template-columns: 1fr 1fr;
+  margin-bottom: 12px;
+}
+
+.breach-type-switch {
+  grid-template-columns: repeat(3, 1fr);
+  margin-bottom: 14px;
+}
+
+.state-switch button,
+.breach-type-switch button {
+  min-height: 34px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: #b8c3d3;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.state-switch button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.state-switch button.active.intact {
+  border-color: rgba(52, 211, 153, 0.48);
+  background: rgba(16, 185, 129, 0.16);
+  color: #6ee7b7;
+}
+
+.state-switch button.active.breached,
+.breach-type-switch button.active {
+  border-color: rgba(251, 146, 60, 0.48);
+  background: rgba(249, 115, 22, 0.16);
+  color: #fdba74;
+}
+
+.breach-controls-body fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.breach-controls-body legend {
+  margin-bottom: 6px;
+  color: #cbd5e1;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.breach-location-note {
+  margin: -6px 0 12px;
+  color: #9eacc0;
+  font-size: 9px;
+  line-height: 1.4;
+}
+
+.breach-controls-body.is-disabled {
+  opacity: 0.46;
+}
+
+.breach-params-card .param-control {
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.breach-params-card .param-label-row {
+  font-size: 10.5px;
+}
+
+.breach-params-card .param-val {
+  max-width: 58%;
+  color: #f8fafc;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.advanced-breach-controls {
+  margin-top: 2px;
+  border-top: 1px solid rgba(148, 163, 184, 0.16);
+}
+
+.advanced-breach-controls summary {
+  padding: 10px 0 8px;
+  color: #cbd5e1;
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.intact-helper {
+  margin: 9px 0 0;
+  color: #aebbd0;
+  font-size: 9px;
+  line-height: 1.4;
+}
+
+.state-switch button:focus-visible,
+.breach-type-switch button:focus-visible,
+.advanced-breach-controls summary:focus-visible,
+.hud-slider:focus-visible,
+.hydraulic-expand-button:focus-visible {
+  outline: 2px solid #f8fafc;
+  outline-offset: 2px;
+}
+
+.hydraulic-status-panel {
+  top: 20px;
+  left: 354px;
+  width: 430px;
+  min-width: 0;
+  padding: 10px 12px;
+  pointer-events: auto;
+}
+
+.hydraulic-summary-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) auto auto;
+  align-items: center;
+  gap: 14px;
+}
+
+.hydraulic-summary-row strong {
+  display: block;
+  color: #f8fafc;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+}
+
+.hydraulic-quick-metrics {
+  display: flex;
+  gap: 14px;
+}
+
+.hydraulic-quick-metrics span {
+  color: #f8fafc;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.hydraulic-quick-metrics small {
+  display: block;
+  margin-bottom: 2px;
+  color: #9eacc0;
+  font-family: inherit;
+  font-size: 8px;
+  letter-spacing: 0.08em;
+}
+
+.hydraulic-expand-button {
+  display: flex;
+  min-height: 32px;
+  align-items: center;
+  gap: 4px;
+  padding: 0 8px;
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  border-radius: 6px;
+  background: rgba(56, 189, 248, 0.1);
+  color: #7dd3fc;
+  font-size: 9px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.hydraulic-details {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(148, 163, 184, 0.16);
+}
+
+.scene-scale-badge {
+  position: absolute;
+  right: 24px;
+  bottom: 92px;
+  z-index: 90;
+  display: flex;
+  gap: 10px;
+  padding: 7px 10px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 7px;
+  background: rgba(15, 23, 42, 0.78);
+  color: #b8c3d3;
+  font-size: 8px;
+  letter-spacing: 0.06em;
+  pointer-events: none;
+  backdrop-filter: blur(10px);
+}
+
+.scene-scale-badge strong {
+  color: #f8fafc;
+  font-family: 'JetBrains Mono', monospace;
+}
+
 /* Floating Distance Label for Morbi (Matching Image 1) */
 .morbi-distance-label {
   position: absolute;
@@ -359,6 +745,37 @@ html, body {
   gap: 5px;
 }
 
+.dam-state-readout {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid;
+  border-radius: 8px;
+  font-size: 10.5px;
+  font-weight: 700;
+}
+
+.dam-state-readout.is-intact {
+  border-color: rgba(52, 211, 153, 0.45);
+  background: rgba(16, 185, 129, 0.16);
+  color: #6ee7b7;
+}
+
+.dam-state-readout.is-breached {
+  border-color: rgba(251, 146, 60, 0.5);
+  background: rgba(249, 115, 22, 0.18);
+  color: #fdba74;
+}
+
+.camera-dock-divider {
+  width: 100%;
+  height: 1px;
+  margin: 3px 0;
+  background: rgba(255, 255, 255, 0.15);
+}
+
 .cam-btn {
   display: flex;
   align-items: center;
@@ -384,6 +801,45 @@ html, body {
   background: rgba(34, 211, 238, 0.16);
   border-color: rgba(34, 211, 238, 0.4);
   color: var(--accent-cyan);
+}
+
+.cam-btn:focus-visible,
+.tab-pill-btn:focus-visible,
+.toggle-chip:focus-visible {
+  outline: 2px solid #f8fafc;
+  outline-offset: 2px;
+}
+
+@media (max-width: 1050px) {
+  .hydraulic-status-panel {
+    top: auto;
+    right: 16px;
+    bottom: 92px;
+    left: auto;
+    width: 350px;
+    min-width: 0;
+  }
+}
+
+@media (max-width: 700px) {
+  .hydraulic-status-panel {
+    display: none;
+  }
+
+  .movement-hint {
+    left: 12px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .brand-chip-dot {
+    animation: none;
+  }
+
+  .cam-btn,
+  .hud-slider::-webkit-slider-thumb {
+    transition: none;
+  }
 }
 
 /* ═══ 2D Floating HUD Cards (Matching Image 2) ═══ */

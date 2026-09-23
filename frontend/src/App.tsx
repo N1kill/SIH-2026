@@ -8,13 +8,21 @@ import { GisMap2D } from './components/GisMap2D/GisMap2D';
 import { TimelinePlayer } from './components/TimelinePlayer/TimelinePlayer';
 
 export const App: React.FC = () => {
-  const { terrain, flood, summary, loading, error } = useSimulationData();
+  const { terrain, flood, summary, hydraulics, loading, error } = useSimulationData();
   const timeline = useTimelineController(24.0);
 
   const [activeTab, setActiveTab] = useState<ViewMode>('3d');
 
   const [breachParams, setBreachParams] = useState<BreachParameters>({
-    breachWidth: 156,
+    state: 'intact',
+    type: 'partial',
+    gateIndex: 9,
+    crackSizeM: 3,
+    leakOpeningMm: 12,
+    holeWidthM: 6,
+    holeHeightM: 5,
+    failedGateCount: 1,
+    formationTimeHours: 2.5,
     peakDischarge: 6647,
     damHeight: 22.56,
   });
@@ -43,7 +51,7 @@ export const App: React.FC = () => {
     );
   }
 
-  if (error || !terrain || !flood || !summary) {
+  if (error || !terrain || !flood || !summary || !hydraulics) {
     return (
       <div className="loading-fullscreen">
         <div className="loader-msg" style={{ color: '#ef4444' }}>
@@ -71,6 +79,7 @@ export const App: React.FC = () => {
             breachParams={breachParams}
             onBreachParamsChange={handleBreachParamsChange}
             currentTime={timeline.currentTime}
+            hydraulics={hydraulics}
           />
         ) : (
           <GisMap2D

@@ -1,5 +1,39 @@
 # SIH-2026 Pipeline Development Progress
 
+## 2026-09-23 — React 3D Twin hydraulic-state correction
+
+- Corrected the React twin's 1:1 scene placement: the approximate reservoir footprint
+  now lies entirely upstream, the dam foundation corridor no longer intersects the
+  coarse DEM, and the 4,930 m dam / 22.56 m height remain in metre scene units.
+- Changed the default timeline state to an intact dam with no decorative spillway or
+  breach release. Release visibility is now driven by a volume-limited hydrograph;
+  the unconfigured spillway remains at zero flow.
+- Added stage-storage-based level/storage accounting, cumulative release and an
+  explicit mass residual HUD. Static-replay estimates are labelled and cite the
+  approximate reconstruction inputs rather than being presented as measurements.
+- Replaced the rectangular reservoir plane with the repository's 547-point approved
+  approximate shoreline. Added an explicit intact/breached scenario switch plus
+  gate-only failure position, formation time and discharge-limit controls. Minor
+  failures render thin, seeded irregular fractures, partial failures form gate-face orifices,
+  and full failures remove one or more consecutive gates while both earthfill
+  embankments remain intact.
+- Reduced overlay density with a compact hydraulic summary and expandable ledger,
+  and labelled the full 4,930 m dam, 300 m spillway and 18-gate camera target.
+- Cropped the displayed embankments to a 600 m total structural view and the DEM
+  to a 640 m by 180 m foundation/apron patch, with the display crop labelled and
+  physical dimensions preserved. The breach camera follows the affected gate span.
+- Fixed downward-facing reservoir triangles that were culled from above: reflect
+  shoreline coordinates before triangulation and rotate the resulting face upward.
+  A geometry check verifies upward normals and unchanged upstream placement;
+  a desktop browser capture confirms visible water behind the intact gates.
+- Corrected extruded cross-section orientation for the spillway, piers, training
+  walls and earthfill: the vertical spillway face now faces upstream (-Z), and
+  its descending chute meets the downstream (+Z) apron. Browser review confirms
+  the corrected chute. Replaced radial web-shaped cracks with stable, irregular
+  branching line geometry seeded by the selected gate.
+- Frontend production build and scoped source lint pass. Headless-browser visual QA
+  confirms the intact default and close spillway framing.
+
 ## 2026-09-22 — scene connector milestone; visual acceptance still open
 
 - Added official-SDK MCP stdio connector with list/read/validate/import tools and
