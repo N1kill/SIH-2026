@@ -8,21 +8,24 @@ interface MonitoringGaugesCardProps {
 export const MonitoringGaugesCard: React.FC<MonitoringGaugesCardProps> = ({ summary }) => {
   const hr = summary.hydrodynamic_results;
 
+  const depth = (value: number | null) => value == null ? 'Not sampled' : `${value.toFixed(1)}m`;
+  const arrival = (value: number | null) => value == null ? 'Not sampled' : `T+${value.toFixed(2)}h`;
+
   const gauges = [
     {
       location: 'Dam Toe',
-      depth: `${hr.max_depths.dam_toe_m.toFixed(1)}m`,
-      time: `T+0`,
+      depth: depth(hr.max_depths.dam_toe_m),
+      time: arrival(hr.flood_arrival_times.dam_toe_hrs),
     },
     {
       location: 'Morbi',
-      depth: `${hr.max_depths.morbi_city_m.toFixed(1)}m`,
-      time: `T+4.5h`,
+      depth: depth(hr.max_depths.morbi_city_m),
+      time: arrival(hr.flood_arrival_times.morbi_city_hrs),
     },
     {
       location: 'Lilapar',
-      depth: `${hr.max_depths.lilapar_m.toFixed(1)}m`,
-      time: `T+9h`,
+      depth: depth(hr.max_depths.lilapar_m),
+      time: arrival(hr.flood_arrival_times.lilapar_hrs),
     },
   ];
 

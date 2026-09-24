@@ -1,15 +1,22 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import L from 'leaflet';
+import type { GeoJsonObject } from 'geojson';
 import 'leaflet/dist/leaflet.css';
-import type { FloodProgressionData, SimulationSummary, ShelterInfo } from '../../types/simulation';
+import type {
+  FloodProgressionData,
+  SimulationMapData,
+  SimulationSummary,
+  ShelterInfo,
+} from '../../types/simulation';
 import { FloodStatsCard } from './FloodStatsCard';
 import { MonitoringGaugesCard } from './MonitoringGaugesCard';
 import { HydrographCard } from './HydrographCard';
-import { SafeSheltersCard, SHELTERS } from './SafeSheltersCard';
+import { SafeSheltersCard } from './SafeSheltersCard';
 
 interface GisMap2DProps {
   floodData: FloodProgressionData;
   summary: SimulationSummary;
+  mapData: SimulationMapData;
   currentTime: number;
   layers: {
     flood: boolean;
@@ -19,287 +26,216 @@ interface GisMap2DProps {
   };
 }
 
+function asGeoJson(value: unknown): GeoJsonObject {
+  return value as GeoJsonObject;
+}
+
+function escapeHtml(value: string) {
+  return value.replace(/[&<>'"]/g, (char) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;',
+  })[char] ?? char);
+}
+
 export const GisMap2D: React.FC<GisMap2DProps> = ({
   floodData,
   summary,
+  mapData,
   currentTime,
   layers,
 }) => {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<L.Map | null>(null);
-
   const contourGroupRef = useRef<L.LayerGroup | null>(null);
-  const evacGroupRef = useRef<L.LayerGroup | null>(null);
+  const riskGroupRef = useRef<L.LayerGroup | null>(null);
   const shelterGroupRef = useRef<L.LayerGroup | null>(null);
   const routeGroupRef = useRef<L.LayerGroup | null>(null);
 
-  // Initialize Leaflet Map
+  const facilities = useMemo<ShelterInfo[]>(() => mapData.facilities.features
+    .filter((feature) => feature.geometry.type === 'Point')
+    .map((feature, index) => {
+      const coordinates = feature.geometry.coordinates as [number, number];
+      const properties = feature.properties;
+      return {
+        id: String(properties.id ?? index),
+        name: String(properties.name ?? `Facility ${index + 1}`),
+        type: String(properties.amenity ?? 'facility'),
+        coords: [coordinates[1], coordinates[0]],
+        elevation_m: typeof properties.elevation_m === 'number' ? properties.elevation_m : null,
+        distance_to_flood_m: typeof properties.distance_to_flood_m === 'number'
+          ? properties.distance_to_flood_m : null,
+        depth_m: typeof properties.depth_m === 'number' ? properties.depth_m : null,
+        status: String(properties.screening_status ?? 'OUTSIDE_MODEL') as ShelterInfo['status'],
+      };
+    }), [mapData.facilities]);
+
   useEffect(() => {
     if (!mapContainerRef.current) return;
-
+    const dam = summary.project;
+    const center: L.LatLngExpression = dam ? [dam.latitude, dam.longitude] : [22.7667, 70.8661];
     const map = L.map(mapContainerRef.current, {
-      center: [22.865, 70.840],
+      center,
       zoom: 12,
       zoomControl: false,
       attributionControl: false,
     });
     mapRef.current = map;
-
-    // Zoom control top-right
     L.control.zoom({ position: 'topright' }).addTo(map);
-
-    // World Imagery Satellite Tiles
     L.tileLayer(
       'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-      {
-        maxZoom: 18,
-      }
+      { maxZoom: 18 }
     ).addTo(map);
-
-    // Scale Bar bottom-right (matches Image 2)
     L.control.scale({ imperial: false, position: 'bottomright' }).addTo(map);
+    const paneOrder = [
+      ['candidateRefuges', 350],
+      ['floodExtent', 410],
+      ['priorityZones', 420],
+      ['evacuationRoutes', 430],
+      ['facilityMarkers', 440],
+    ] as const;
+    paneOrder.forEach(([name, zIndex]) => {
+      map.createPane(name);
+      const pane = map.getPane(name);
+      if (pane) pane.style.zIndex = String(zIndex);
+    });
 
-    // 1. Machhu-2 Dam Pin (Matching Image 2)
     const damIcon = L.divIcon({
       className: '',
-      html: `
-        <div class="dam-marker-pin">
-          <div class="dam-pulse-core"></div>
-          <div class="dam-label-tag">Machhu-2</div>
-        </div>
-      `,
-      iconSize: [90, 36],
-      iconAnchor: [45, 10],
+      html: `<div class="dam-marker-pin"><div class="dam-pulse-core"></div><div class="dam-label-tag">${escapeHtml(dam?.dam_name ?? 'Dam')}</div></div>`,
+      iconSize: [110, 36],
+      iconAnchor: [55, 10],
     });
-    L.marker([22.758, 70.887], { icon: damIcon }).addTo(map);
+    L.marker(center, { icon: damIcon }).addTo(map);
 
-    // 2. Morbi City Pin (Matching Image 2)
-    const morbiIcon = L.divIcon({
-      className: '',
-      html: `<div class="city-label-tag">🏙️ Morbi</div>`,
-      iconSize: [80, 28],
-      iconAnchor: [40, 14],
-    });
-    L.marker([22.818, 70.835], { icon: morbiIcon }).addTo(map);
-
-    // Layer Groups
     const contourGroup = L.layerGroup().addTo(map);
-    contourGroupRef.current = contourGroup;
-
-    const evacGroup = L.layerGroup().addTo(map);
-    evacGroupRef.current = evacGroup;
-
+    const riskGroup = L.layerGroup().addTo(map);
     const shelterGroup = L.layerGroup().addTo(map);
-    shelterGroupRef.current = shelterGroup;
-
     const routeGroup = L.layerGroup().addTo(map);
+    contourGroupRef.current = contourGroup;
+    riskGroupRef.current = riskGroup;
+    shelterGroupRef.current = shelterGroup;
     routeGroupRef.current = routeGroup;
 
-    // Build Evacuation Zone (Morbi core)
-    const evacPolygon: [number, number][] = [
-      [22.835, 70.825],
-      [22.838, 70.845],
-      [22.812, 70.852],
-      [22.805, 70.832],
-      [22.815, 70.820],
-    ];
-    L.polygon(evacPolygon, {
-      color: '#ef4444',
-      weight: 2,
-      dashArray: '6, 6',
-      fillColor: 'rgba(239, 68, 68, 0.22)',
-      fillOpacity: 1,
-    }).addTo(evacGroup);
+    L.geoJSON(asGeoJson(mapData.safeZones), {
+      pane: 'candidateRefuges',
+      style: { color: '#10b981', weight: 1.5, dashArray: '4, 4',
+        fillColor: '#10b981', fillOpacity: 0.1 },
+    }).bindPopup('Facility-centered candidate refuge — not an official safety designation')
+      .addTo(shelterGroup);
 
-    // Build Shelters & Safe Ridge (>52m MSL)
-    const ridgePolygon: [number, number][] = [
-      [22.825, 70.865],
-      [22.855, 70.885],
-      [22.885, 70.898],
-      [22.915, 70.910],
-      [22.910, 70.925],
-      [22.870, 70.915],
-      [22.835, 70.890],
-      [22.815, 70.875],
-    ];
-    L.polygon(ridgePolygon, {
-      color: '#10b981',
-      weight: 2,
-      dashArray: '4, 4',
-      fillColor: 'rgba(16, 185, 129, 0.14)',
-      fillOpacity: 1,
-    }).addTo(shelterGroup);
+    L.geoJSON(asGeoJson(mapData.evacuationRoutes), {
+      pane: 'evacuationRoutes',
+      style: { color: '#fbbf24', weight: 4, opacity: 0.95, dashArray: '8, 5' },
+    }).bindPopup('Verified evacuation route').addTo(routeGroup);
 
-    SHELTERS.forEach((s) => {
-      const sIcon = L.divIcon({
-        className: '',
-        html: `
-          <div class="shelter-pin-badge">
-            <span>🛡️</span>
-            <span>${s.name.split(' ')[1] || s.name}</span>
-          </div>
-        `,
-        iconSize: [110, 24],
-        iconAnchor: [55, 12],
-      });
-      L.marker(s.coords, { icon: sIcon }).addTo(shelterGroup);
+    facilities.forEach((facility) => {
+      const color = facility.status === 'CANDIDATE' ? '#10b981'
+        : facility.status === 'EXPOSED' ? '#ef4444' : '#f59e0b';
+      L.circleMarker(facility.coords, {
+        pane: 'facilityMarkers',
+        radius: 5,
+        color: '#0f172a',
+        weight: 2,
+        fillColor: color,
+        fillOpacity: 0.95,
+      })
+        .bindTooltip(escapeHtml(facility.name), { direction: 'top' })
+        .bindPopup(`<strong>${escapeHtml(facility.name)}</strong><br>${facility.status.replace('_', ' ')}<br>Candidate facility; not a designated shelter.`)
+        .addTo(shelterGroup);
     });
 
-    // Fit bounds
-    map.fitBounds([
-      [22.750, 70.810],
-      [22.915, 70.925],
-    ], { padding: [30, 30] });
+    const focusFeatures = mapData.riskZones.features.length
+      ? mapData.riskZones.features : mapData.safeZones.features;
+    const boundsLayer = L.geoJSON(asGeoJson({
+      type: 'FeatureCollection',
+      features: focusFeatures,
+    }));
+    const bounds = boundsLayer.getBounds();
+    if (bounds.isValid()) map.fitBounds(bounds, { padding: [80, 80], maxZoom: 14 });
 
-    return () => {
-      map.remove();
-    };
-  }, []);
+    return () => { map.remove(); mapRef.current = null; };
+  }, [facilities, mapData, summary.project]);
 
-  // Update Concentric Contours on Time Change
   useEffect(() => {
     const group = contourGroupRef.current;
-    if (!group || !layers.flood) {
-      group?.clearLayers();
-      return;
-    }
-
+    if (!group || !layers.flood || currentTime <= 0) { group?.clearLayers(); return; }
     group.clearLayers();
-
-    const steps = floodData.steps;
-    const activeSteps = steps.filter((s) => s.time_hours <= currentTime && s.polygon && s.polygon.length > 0);
-    if (activeSteps.length === 0) return;
-
-    const milestones = [1.0, 3.0, 6.0, 12.0, 24.0];
-    const stepsToDraw: typeof activeSteps = [];
-
-    milestones.forEach((mTime) => {
-      if (mTime <= currentTime) {
-        let closest = null;
-        let minDiff = 999;
-        activeSteps.forEach((s) => {
-          const diff = Math.abs(s.time_hours - mTime);
-          if (diff < minDiff && diff < 1.5) {
-            minDiff = diff;
-            closest = s;
-          }
-        });
-        if (closest && !stepsToDraw.includes(closest)) {
-          stepsToDraw.push(closest);
-        }
-      }
-    });
-
-    const latest = activeSteps[activeSteps.length - 1];
-    if (!stepsToDraw.includes(latest)) {
-      stepsToDraw.push(latest);
-    }
-
-    stepsToDraw.sort((a, b) => b.time_hours - a.time_hours);
-    const numBands = stepsToDraw.length;
-
-    stepsToDraw.forEach((step, idx) => {
-      const norm = numBands > 1 ? idx / (numBands - 1) : 0;
-
-      let fillColor = '#38bdf8';
-      let strokeColor = '#22d3ee';
-      let weight = 2.5;
-      let fillOpacity = 0.38;
-
-      if (idx === 0) {
-        // Outermost advancing wavefront (Image 2 T+1hr cyan)
-        fillColor = '#38bdf8';
-        strokeColor = '#22d3ee';
-        weight = 2.5;
-        fillOpacity = 0.38;
-      } else if (norm < 0.4) {
-        fillColor = '#0284c7';
-        strokeColor = '#38bdf8';
-        weight = 1.8;
-        fillOpacity = 0.55;
-      } else if (norm < 0.75) {
-        fillColor = '#0e4194';
-        strokeColor = '#0ea5e9';
-        weight = 1.5;
-        fillOpacity = 0.72;
-      } else {
-        // Deepest midnight navy pool (Image 2 T+24hr)
-        fillColor = '#08235a';
-        strokeColor = '#1d4ed8';
-        weight = 1.5;
-        fillOpacity = 0.88;
-      }
-
-      const geoJsonFeature = {
-        type: 'Feature' as const,
-        geometry: {
-          type: 'Polygon' as const,
-          coordinates: step.polygon!,
-        },
-        properties: {},
-      };
-
-      const poly = L.geoJSON(geoJsonFeature, {
-        style: {
-          fillColor,
-          fillOpacity,
-          color: strokeColor,
-          weight,
-          opacity: 0.95,
-        },
-      });
-
-      group.addLayer(poly);
-
-      // Milestone time pin (Image 2: T+1hr, T+3hr, T+6hr, T+12hr, T+24hr)
-      if (step.lead_coords) {
-        const lat = Array.isArray(step.lead_coords) ? step.lead_coords[0] : step.lead_coords.lat;
-        const lng = Array.isArray(step.lead_coords) ? step.lead_coords[1] : step.lead_coords.lng;
-        if (lat != null && lng != null) {
-          const timeStr = `T+${Math.round(step.time_hours)}hr`;
-          const pin = L.divIcon({
-            className: '',
-            html: `<div class="contour-label">${timeStr}</div>`,
-            iconSize: [44, 18],
-            iconAnchor: [22, 9],
-          });
-          group.addLayer(L.marker([lat, lng], { icon: pin }));
-        }
-      }
-    });
+    const active = floodData.steps.filter((step) => step.time_hours <= currentTime && step.features.length);
+    if (!active.length) return;
+    const latest = active[active.length - 1];
+    const featureCollection = { type: 'FeatureCollection', features: latest.features };
+    L.geoJSON(asGeoJson(featureCollection), {
+      pane: 'floodExtent',
+      style: { fillColor: '#0284c7', fillOpacity: 0.5, color: '#22d3ee', weight: 2 },
+    }).bindPopup(
+      `T+${latest.time_hours.toFixed(2)} h<br>` +
+      `${latest.inundated_area_km2.toFixed(3)} km² inundated<br>` +
+      `Maximum depth so far: ${latest.max_depth_m.toFixed(2)} m`
+    ).addTo(group);
   }, [currentTime, floodData, layers.flood]);
 
-  // Layer toggle visibility
   useEffect(() => {
-    if (!mapRef.current) return;
+    const group = riskGroupRef.current;
+    if (!group) return;
+    group.clearLayers();
+    if (!layers.evacuation || currentTime <= 0) return;
+    const elapsedSeconds = currentTime * 3600;
+    const arrivedFeatures = mapData.riskZones.features.filter((feature) => {
+      const arrival = feature.properties.earliest_arrival_s;
+      return typeof arrival === 'number' && arrival <= elapsedSeconds;
+    });
+    L.geoJSON(asGeoJson({ type: 'FeatureCollection', features: arrivedFeatures }), {
+      pane: 'priorityZones',
+      style: (feature) => {
+        const category = Number(feature?.properties?.category ?? 1);
+        const colors = ['#38bdf8', '#facc15', '#f97316', '#ef4444'];
+        return { color: colors[Math.max(0, category - 1)], weight: 1.5,
+          fillColor: colors[Math.max(0, category - 1)], fillOpacity: 0.18 };
+      },
+      onEachFeature: (feature, layer) => layer.bindPopup(
+        `<strong>${escapeHtml(String(feature.properties?.risk ?? 'Hazard zone'))}</strong><br>` +
+        `Max depth: ${Number(feature.properties?.maximum_depth_m ?? 0).toFixed(2)} m<br>` +
+        `Earliest arrival: ${(Number(feature.properties?.earliest_arrival_s) / 60).toFixed(1)} min`
+      ),
+    }).addTo(group);
+  }, [currentTime, layers.evacuation, mapData.riskZones]);
+
+  useEffect(() => {
     const map = mapRef.current;
+    if (!map) return;
+    const visibility: Array<[L.LayerGroup | null, boolean]> = [
+      [riskGroupRef.current, layers.evacuation && currentTime > 0],
+      [shelterGroupRef.current, layers.shelters],
+      [routeGroupRef.current, layers.routes],
+    ];
+    visibility.forEach(([group, visible]) => {
+      if (!group) return;
+      if (visible && !map.hasLayer(group)) map.addLayer(group);
+      if (!visible && map.hasLayer(group)) map.removeLayer(group);
+    });
+  }, [currentTime, layers]);
 
-    if (evacGroupRef.current) {
-      if (layers.evacuation && !map.hasLayer(evacGroupRef.current)) map.addLayer(evacGroupRef.current);
-      if (!layers.evacuation && map.hasLayer(evacGroupRef.current)) map.removeLayer(evacGroupRef.current);
-    }
-    if (shelterGroupRef.current) {
-      if (layers.shelters && !map.hasLayer(shelterGroupRef.current)) map.addLayer(shelterGroupRef.current);
-      if (!layers.shelters && map.hasLayer(shelterGroupRef.current)) map.removeLayer(shelterGroupRef.current);
-    }
-  }, [layers]);
-
-  const handleSelectShelter = (s: ShelterInfo) => {
-    if (mapRef.current) {
-      mapRef.current.flyTo(s.coords, 14, { duration: 1.2 });
-    }
+  const handleSelectShelter = (facility: ShelterInfo) => {
+    mapRef.current?.flyTo(facility.coords, 15, { duration: 1.2 });
   };
 
   return (
     <div className="gis-map-container">
       <div ref={mapContainerRef} className="leaflet-map-canvas" />
-
-      {/* Floating Left Column HUD Cards (Matching Image 2) */}
+      <div className="map-provenance" role="status">
+        <strong>SIMULATED</strong>
+        <span>Cumulative extent ≥0.1 m · run {floodData.simulation_id.slice(0, 8)}</span>
+      </div>
       <aside className="hud-column" id="hud-panels">
         <FloodStatsCard summary={summary} />
         <MonitoringGaugesCard summary={summary} />
-        <HydrographCard summary={summary} currentTime={currentTime} />
-        <SafeSheltersCard onSelectShelter={handleSelectShelter} />
+        <HydrographCard floodData={floodData} currentTime={currentTime} />
+        <SafeSheltersCard
+          facilities={facilities}
+          zoneStatus={mapData.safeZones.status}
+          setbackM={mapData.safeZones.setback_m}
+          routeStatus={mapData.evacuationRoutes.status}
+          onSelectShelter={handleSelectShelter}
+        />
       </aside>
     </div>
   );

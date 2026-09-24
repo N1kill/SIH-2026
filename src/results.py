@@ -9,6 +9,68 @@ from rasterio.warp import transform_geom, reproject, Resampling
 from .project import input_path
 
 
+def _mask_features(mask, terrain, properties):
+    """Polygonize a model-grid mask and return WGS84 GeoJSON features."""
+    features = []
+    if not np.any(mask):
+        return features
+    for geom, value in shapes(mask.astype(np.uint8), mask=mask,
+                              transform=terrain.transform):
+        if int(value) != 1:
+            continue
+        features.append({
+            "type": "Feature",
+            "geometry": transform_geom(terrain.crs, "EPSG:4326", geom),
+            "properties": dict(properties),
+        })
+    return features
+
+
+def _export_flood_progression(directory, terrain, scenario):
+    """Convert stored simulated wet cells into time-indexed map polygons."""
+    steps = []
+    shape = terrain.elevation.shape
+    reached = np.zeros(shape, dtype=bool)
+    for path in sorted(directory.glob("frame-*.json")):
+        frame = json.loads(path.read_text(encoding="utf-8"))
+        wet = np.zeros(shape, dtype=bool)
+        indices = np.asarray(frame["downstream"]["indices"], dtype=np.int64)
+        if len(indices):
+            wet.ravel()[indices] = True
+        reached |= wet
+        metrics = frame["metrics"]
+        steps.append({
+            "frame_index": frame["index"],
+            "time_s": frame["time_s"],
+            "time_hours": frame["time_s"] / 3600,
+            "inundated_area_km2": metrics["inundated_area_km2"],
+            "max_depth_m": metrics["max_depth_m"],
+            "max_velocity_ms": metrics["max_velocity_ms"],
+            "discharge_m3s": frame["downstream"]["inflow_m3s"],
+            "features": _mask_features(reached, terrain, {
+                "frame_index": frame["index"],
+                "time_s": frame["time_s"],
+                "time_hours": frame["time_s"] / 3600,
+                "data_status": "simulated",
+                "extent_basis": "cumulative cells reaching the wet-depth threshold by this time",
+                "wet_depth_threshold_m": scenario.wet_depth_m,
+            }),
+        })
+    result = {
+        "simulation_id": directory.name,
+        "data_status": "simulated",
+        "model": "conservative diffusive-wave screening approximation",
+        "crs": "EPSG:4326",
+        "total_steps": len(steps),
+        "max_time_hours": max((step["time_hours"] for step in steps), default=0),
+        "steps": steps,
+    }
+    (directory / "flood_progression.json").write_text(
+        json.dumps(result, allow_nan=False), encoding="utf-8"
+    )
+    return result
+
+
 def export_results(directory, terrain, router, project, scenario):
     risk = np.zeros_like(router.depth,dtype=np.uint8)
     wet = router.max_depth>=scenario.wet_depth_m
@@ -53,7 +115,14 @@ def export_results(directory, terrain, router, project, scenario):
             coords = ET.SubElement(ET.SubElement(boundary,ns+"LinearRing"),ns+"coordinates")
             coords.text = " ".join(f"{x},{y},0" for x,y in ring)
     ET.ElementTree(kml).write(directory/"risk_zones.kml",encoding="utf-8",xml_declaration=True)
+    from scipy.ndimage import distance_transform_edt
+    distance = (distance_transform_edt(~wet)*router.dx if wet.any()
+                else np.full(wet.shape, np.inf, dtype=float))
+    setback_m = max(250.0, 2 * router.dx)
+    screened_dry = terrain.valid & ~wet & (distance >= setback_m)
     facilities = {"type":"FeatureCollection","features":[],"status":"unavailable: supply facilities_path GeoJSON; no invented shelters"}
+    safe_zone_features = []
+    zone_radius_m = max(250.0, 2 * router.dx)
     if project.facilities_path:
         import geopandas as gpd
         data = gpd.read_file(input_path(project.facilities_path))
@@ -61,28 +130,91 @@ def export_results(directory, terrain, router, project, scenario):
             raise ValueError("Facility data requires CRS metadata")
         data = data.to_crs(terrain.crs)
         from pyproj import Transformer
-        from scipy.ndimage import distance_transform_edt
-        distance = distance_transform_edt(~wet)*router.dx
         to_geo = Transformer.from_crs(terrain.crs,4326,always_xy=True)
-        facilities["status"] = "screened candidates; capacity/accessibility/safety require field verification"
+        facilities["status"] = "screened facility candidates; capacity/accessibility/safety require field verification"
+        facilities["simulation_id"] = directory.name
+        facilities["setback_m"] = setback_m
         for index,row in data.iterrows():
             point = row.geometry.representative_point()
             r,c = rasterio.transform.rowcol(terrain.transform,point.x,point.y)
             covered = 0<=r<risk.shape[0] and 0<=c<risk.shape[1] and terrain.valid[r,c]
             lon,lat = to_geo.transform(point.x,point.y)
             dry = bool(covered and not wet[r,c])
+            flood_distance = float(distance[r,c]) if covered and wet.any() else None
+            if not covered:
+                screening_status = "OUTSIDE_MODEL"
+            elif not dry:
+                screening_status = "EXPOSED"
+            elif not wet.any():
+                screening_status = "CANDIDATE"
+            elif flood_distance is not None and flood_distance >= setback_m:
+                screening_status = "CANDIDATE"
+            else:
+                screening_status = "BUFFER"
+            if screening_status == "CANDIDATE":
+                rows, cols = np.ogrid[:risk.shape[0], :risk.shape[1]]
+                radius_cells = zone_radius_m / router.dx
+                local_zone = ((rows-r)**2 + (cols-c)**2 <= radius_cells**2) & screened_dry
+                safe_zone_features.extend(_mask_features(local_zone, terrain, {
+                    "classification": "facility_centered_candidate_refuge",
+                    "facility_name": str(row.get("name", f"Facility {index}")),
+                    "facility_index": str(index),
+                    "candidate_only": True,
+                    "minimum_setback_m": setback_m,
+                    "screening_radius_m": zone_radius_m,
+                    "distance_to_flood_m": flood_distance,
+                    "basis": "Supplied facility outside maximum simulated inundation and model-grid setback",
+                    "limitations": "Not an officially designated safe zone; access, capacity, structural safety, and other hazards require field verification",
+                }))
             facilities["features"].append({"type":"Feature","geometry":{"type":"Point","coordinates":[lon,lat]},
                 "properties":{"name":str(row.get("name",f"Facility {index}")),"candidate_only":True,
                 "amenity":str(row.get("amenity","unknown")),
+                "screening_status":screening_status,
                 "local_x_m":point.x-terrain.origin[0],"local_z_m":terrain.origin[1]-point.y,
                 "elevation_m":float(terrain.elevation[r,c]) if covered else None,
                 "outside_simulated_inundation":dry if covered else None,"covered_by_model":bool(covered),
                 "depth_m":float(router.max_depth[r,c]) if covered else None,
-                "distance_to_flood_m":float(distance[r,c]) if covered and wet.any() else None,
+                "distance_to_flood_m":flood_distance,
                 "arrival_time_s":float(router.arrival[r,c]) if covered and router.arrival[r,c]>=0 else None,
                 "capacity":None,"road_access_verified":False}})
     (directory/"shelters.geojson").write_text(json.dumps(facilities),encoding="utf-8")
-    outputs = [f"{name}.tif" for name in rasters]+["risk_zones.geojson","risk_zones.kml","shelters.geojson"]
+    safe_zones = {
+        "type": "FeatureCollection",
+        "features": safe_zone_features,
+        "status": ("facility-centered model-screened candidate refuges; not official safety designations"
+                   if safe_zone_features else
+                   "unavailable: no supplied facility passed the simulated flood-setback screen"),
+        "simulation_id": directory.name,
+        "setback_m": setback_m,
+        "screening_radius_m": zone_radius_m,
+        "wet_depth_threshold_m": scenario.wet_depth_m,
+    }
+    (directory / "safe_zones.geojson").write_text(
+        json.dumps(safe_zones, allow_nan=False), encoding="utf-8"
+    )
+    evacuation_routes = {
+        "type": "FeatureCollection",
+        "features": [],
+        "simulation_id": directory.name,
+        "status": "unavailable: no verified routable road network is supplied",
+        "relationship_to_priority_zones": (
+            "Priority zones are simulated hazard areas. No evacuation path has been "
+            "inferred through or around them."
+        ),
+        "requirements": [
+            "georeferenced routable road network",
+            "current closure and passability status",
+            "verified refuge destinations",
+        ],
+    }
+    (directory / "evacuation_routes.geojson").write_text(
+        json.dumps(evacuation_routes, allow_nan=False), encoding="utf-8"
+    )
+    _export_flood_progression(directory, terrain, scenario)
+    outputs = [f"{name}.tif" for name in rasters]+[
+        "risk_zones.geojson", "risk_zones.kml", "safe_zones.geojson",
+        "shelters.geojson", "evacuation_routes.geojson", "flood_progression.json"
+    ]
     try:
         import geopandas as gpd
         if features:

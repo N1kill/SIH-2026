@@ -38,22 +38,50 @@ export interface Terrain3DData {
 }
 
 export interface FloodStep {
-  step: number;
+  frame_index: number;
+  time_s: number;
   time_hours: number;
-  reach_name: string;
-  water_depth_dam_toe_m: number;
-  water_depth_morbi_m: number;
-  lead_distance_km: number;
   inundated_area_km2: number;
-  peak_discharge_m3s: number;
-  polygon?: [number, number][][];
-  lead_coords?: [number, number] | { lat: number; lng: number };
+  max_depth_m: number;
+  max_velocity_ms: number;
+  discharge_m3s: number;
+  features: GeoJsonFeature[];
 }
 
 export interface FloodProgressionData {
+  simulation_id: string;
+  data_status: 'simulated';
+  model: string;
+  crs: 'EPSG:4326';
   steps: FloodStep[];
   total_steps: number;
   max_time_hours: number;
+}
+
+export interface GeoJsonFeature {
+  type: 'Feature';
+  geometry: {
+    type: string;
+    coordinates: unknown;
+  };
+  properties: Record<string, unknown>;
+}
+
+export interface GeoJsonFeatureCollection {
+  type: 'FeatureCollection';
+  features: GeoJsonFeature[];
+  status?: string;
+  simulation_id?: string;
+  setback_m?: number;
+  screening_radius_m?: number;
+  thresholds?: Record<string, unknown>;
+}
+
+export interface SimulationMapData {
+  riskZones: GeoJsonFeatureCollection;
+  safeZones: GeoJsonFeatureCollection;
+  facilities: GeoJsonFeatureCollection;
+  evacuationRoutes: GeoJsonFeatureCollection;
 }
 
 export interface ProjectHydraulics {
@@ -70,6 +98,17 @@ export interface ProjectHydraulics {
 }
 
 export interface SimulationSummary {
+  simulation_id?: string;
+  status?: string;
+  solver?: string;
+  boundary_reached?: boolean;
+  boundary_condition?: string;
+  project?: {
+    dam_id: string;
+    dam_name: string;
+    latitude: number;
+    longitude: number;
+  };
   metadata?: {
     dam_name: string;
     river: string;
@@ -87,26 +126,27 @@ export interface SimulationSummary {
     max_flood_depth_m: number;
     peak_velocity_ms: number;
     flood_arrival_times: {
-      dam_toe_hrs: number;
-      morbi_city_hrs: number;
-      lilapar_hrs: number;
+      dam_toe_hrs: number | null;
+      morbi_city_hrs: number | null;
+      lilapar_hrs: number | null;
     };
     max_depths: {
-      dam_toe_m: number;
-      morbi_city_m: number;
-      lilapar_m: number;
+      dam_toe_m: number | null;
+      morbi_city_m: number | null;
+      lilapar_m: number | null;
     };
   };
 }
 
 export interface ShelterInfo {
-  id: number;
+  id: string;
   name: string;
   type: string;
   coords: [number, number];
-  elevation_m: number;
-  capacity: number;
-  status: 'SAFE' | 'CRITICAL' | 'MONITORED';
+  elevation_m: number | null;
+  distance_to_flood_m: number | null;
+  depth_m: number | null;
+  status: 'CANDIDATE' | 'BUFFER' | 'EXPOSED' | 'OUTSIDE_MODEL';
 }
 
 export interface BreachParameters {

@@ -25,6 +25,14 @@ export const FloodStatsCard: React.FC<FloodStatsCardProps> = ({ summary }) => {
         <span className="stat-name">Peak Velocity:</span>
         <span className="stat-val">{hr.peak_velocity_ms.toFixed(1)} m/s</span>
       </div>
+      {summary.boundary_reached && (
+        <div className="evac-notice" role="status">
+          <div className="evac-notice-title">EXTENT TRUNCATED AT MODEL BOUNDARY</div>
+          <div className="evac-notice-desc">
+            Floodwater reached the simulation edge. Area and downstream extent are minimum estimates.
+          </div>
+        </div>
+      )}
     </div>
   );
 };

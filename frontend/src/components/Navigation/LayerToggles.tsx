@@ -8,9 +8,10 @@ interface LayerTogglesProps {
     routes: boolean;
   };
   onToggle: (layer: 'flood' | 'evacuation' | 'shelters' | 'routes') => void;
+  routesAvailable: boolean;
 }
 
-export const LayerToggles: React.FC<LayerTogglesProps> = ({ layers, onToggle }) => {
+export const LayerToggles: React.FC<LayerTogglesProps> = ({ layers, onToggle, routesAvailable }) => {
   return (
     <div className="layer-toggles">
       <button
@@ -31,14 +32,17 @@ export const LayerToggles: React.FC<LayerTogglesProps> = ({ layers, onToggle }) 
         data-layer="shelters"
         onClick={() => onToggle('shelters')}
       >
-        <span>🛡️</span> Safe Shelters
+        <span>🛡️</span> Candidate Refuges
       </button>
       <button
         className={`toggle-chip ${layers.routes ? 'active' : ''}`}
         data-layer="routes"
+        disabled={!routesAvailable}
+        aria-disabled={!routesAvailable}
+        title={routesAvailable ? 'Toggle verified evacuation routes' : 'Unavailable: no verified routable road network'}
         onClick={() => onToggle('routes')}
       >
-        <span>↗️</span> Evac Routes
+        <span>↗️</span> {routesAvailable ? 'Evac Routes' : 'Routes unavailable'}
       </button>
     </div>
   );

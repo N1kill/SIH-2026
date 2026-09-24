@@ -1,5 +1,37 @@
 # SIH-2026 Pipeline Development Progress
 
+## 2026-09-24 — simulation-backed 2D operations map
+
+- Corrected a breach-routing datum error: when an evidence-backed dam crest is
+  configured, the breach-floor lower bound now comes from crest minus structural
+  height rather than the DEM surface cell at the dam. Machhu-II now uses the
+  published 63.70 m top-of-dam level from the stored Gujarat project record.
+- Regenerated the 24-hour run on a 30 km-wide 200×200 domain (`2c53591b...`).
+  The modeled flood now spreads laterally (1.2 km median wet width, 4.65 km
+  maximum) instead of tracing one or two river cells. It reaches the domain edge,
+  so the dashboard explicitly labels its 22.365 km² footprint as truncated.
+- Replaced the React map's static flood polygons, hand-drawn evacuation/ridge zones,
+  invented shelter capacities, and fixed arrival values with artifacts from completed
+  simulation runs.
+- Each run now exports cumulative WGS84 flood-progression polygons, hazard zones,
+  facility-centered candidate-refuge zones, route-availability status, and facility
+  classifications tied to the run ID. Broad dry model cells are no longer presented
+  as safe areas.
+- The 2D timeline and hydrograph consume simulated frame times and discharge. Missing
+  city gauges remain explicitly unavailable instead of receiving demo defaults.
+- Candidate facilities are screened against maximum modeled inundation and a
+  grid-aware setback, while the UI states that they are not designated shelters and
+  that access, capacity, and structural safety require field verification.
+- Added API and regression coverage for the new map artifacts. Full Python tests,
+  React production build, scoped source lint, and desktop browser verification pass.
+- Completed a 24-hour severe-breach screening run (`a653774b...`) with 97
+  15-minute frames. The run stayed inside the modeled boundary and produced a
+  1.656 km² maximum inundation footprint; it remains an uncalibrated screening
+  simulation, not an operational forecast.
+- Evacuation routes are now explicitly unavailable and disabled in the interface
+  because no verified routable road network, passability feed, or verified refuge
+  destinations are supplied. Priority zones remain simulated hazard areas only.
+
 ## 2026-09-23 — React 3D Twin hydraulic-state correction
 
 - Corrected the React twin's 1:1 scene placement: the approximate reservoir footprint

@@ -8,8 +8,8 @@ import { GisMap2D } from './components/GisMap2D/GisMap2D';
 import { TimelinePlayer } from './components/TimelinePlayer/TimelinePlayer';
 
 export const App: React.FC = () => {
-  const { terrain, flood, summary, hydraulics, loading, error } = useSimulationData();
-  const timeline = useTimelineController(24.0);
+  const { terrain, flood, summary, hydraulics, mapData, loading, error } = useSimulationData();
+  const timeline = useTimelineController(flood?.max_time_hours ?? 1);
 
   const [activeTab, setActiveTab] = useState<ViewMode>('3d');
 
@@ -31,7 +31,7 @@ export const App: React.FC = () => {
     flood: true,
     evacuation: true,
     shelters: true,
-    routes: true,
+    routes: false,
   });
 
   const handleToggleLayer = (layer: 'flood' | 'evacuation' | 'shelters' | 'routes') => {
@@ -51,7 +51,7 @@ export const App: React.FC = () => {
     );
   }
 
-  if (error || !terrain || !flood || !summary || !hydraulics) {
+  if (error || !terrain || !flood || !summary || !hydraulics || !mapData) {
     return (
       <div className="loading-fullscreen">
         <div className="loader-msg" style={{ color: '#ef4444' }}>
@@ -69,6 +69,7 @@ export const App: React.FC = () => {
         onSelectTab={setActiveTab}
         layers={layers}
         onToggleLayer={handleToggleLayer}
+        routesAvailable={mapData.evacuationRoutes.features.length > 0}
       />
 
       {/* Main View Area */}
@@ -87,6 +88,7 @@ export const App: React.FC = () => {
             summary={summary}
             currentTime={timeline.currentTime}
             layers={layers}
+            mapData={mapData}
           />
         )}
       </main>

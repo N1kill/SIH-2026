@@ -1,84 +1,72 @@
 import React from 'react';
 import type { ShelterInfo } from '../../types/simulation';
 
-export const SHELTERS: ShelterInfo[] = [
-  {
-    id: 1,
-    name: 'Morbi East Ridge Shelter 1',
-    type: 'Safe High Ground',
-    coords: [22.868, 70.875],
-    elevation_m: 56.4,
-    capacity: 25000,
-    status: 'SAFE',
-  },
-  {
-    id: 2,
-    name: 'Morbi South-East Relief Complex',
-    type: 'Govt Complex',
-    coords: [22.845, 70.865],
-    elevation_m: 54.2,
-    capacity: 18000,
-    status: 'SAFE',
-  },
-  {
-    id: 3,
-    name: 'Liliya Ridge Transit Hub',
-    type: 'High Ground Transit',
-    coords: [22.895, 70.885],
-    elevation_m: 58.1,
-    capacity: 12000,
-    status: 'SAFE',
-  },
-];
-
 interface SafeSheltersCardProps {
+  facilities: ShelterInfo[];
+  zoneStatus?: string;
+  setbackM?: number;
+  routeStatus?: string;
   onSelectShelter?: (shelter: ShelterInfo) => void;
 }
 
-export const SafeSheltersCard: React.FC<SafeSheltersCardProps> = ({ onSelectShelter }) => {
+function measurement(value: number | null, unit: string) {
+  return value == null ? 'not available' : `${value.toFixed(1)} ${unit}`;
+}
+
+export const SafeSheltersCard: React.FC<SafeSheltersCardProps> = ({
+  facilities,
+  zoneStatus,
+  setbackM,
+  routeStatus,
+  onSelectShelter,
+}) => {
+  const candidates = facilities.filter((facility) => facility.status === 'CANDIDATE');
   return (
     <div className="hud-card" id="card-shelters">
       <div className="card-header">
-        <div className="card-title">Safe Zones & Shelters</div>
-        <span
-          className="card-badge"
-          style={{
-            background: 'rgba(16,185,129,0.18)',
-            color: '#34d399',
-            borderColor: 'rgba(16,185,129,0.4)',
-          }}
-        >
-          &gt;52m MSL
+        <div className="card-title">Screened Zones & Facilities</div>
+        <span className="card-badge" style={{
+          background: 'rgba(16,185,129,0.18)',
+          color: '#34d399',
+          borderColor: 'rgba(16,185,129,0.4)',
+        }}>
+          {setbackM ? `≥${Math.round(setbackM)} m setback` : 'simulation-screened'}
         </span>
       </div>
 
-      {SHELTERS.map((s) => (
-        <div
-          key={s.id}
+      {candidates.length ? candidates.slice(0, 3).map((facility) => (
+        <button
+          type="button"
+          key={facility.id}
           className="shelter-item"
-          onClick={() => onSelectShelter?.(s)}
-          style={{ cursor: 'pointer' }}
+          onClick={() => onSelectShelter?.(facility)}
+          style={{ cursor: 'pointer', width: '100%', textAlign: 'left' }}
         >
           <div className="shelter-info">
-            <h4>{s.name}</h4>
-            <p>Elevation {s.elevation_m}m · {s.type}</p>
+            <h4>{facility.name}</h4>
+            <p>{facility.type} · elevation {measurement(facility.elevation_m, 'm')}</p>
           </div>
           <div className="shelter-cap">
-            {s.capacity.toLocaleString()}
+            {measurement(facility.distance_to_flood_m, 'm')}
             <br />
-            <span style={{ fontSize: '9px', color: '#94a3b8' }}>capacity</span>
+            <span style={{ fontSize: '9px', color: '#94a3b8' }}>from modeled flood</span>
           </div>
-        </div>
-      ))}
+        </button>
+      )) : (
+        <p className="evac-notice-desc">No supplied facility passes the simulated flood-setback screen.</p>
+      )}
 
-      {/* Priority Evacuation Notice */}
       <div className="evac-notice">
-        <div className="evac-notice-title">
-          <span>🚨</span> CRITICAL EVACUATION ZONE
-        </div>
+        <div className="evac-notice-title">CANDIDATES — NOT DESIGNATED SHELTERS</div>
         <div className="evac-notice-desc">
-          Morbi Urban Core & Riverbanks: <strong>6.82 km²</strong> at immediate risk. Evacuate via
-          East Bypass Corridor to High Ground Shelter 1 before T+4.5h.
+          {zoneStatus || 'Dry-zone screening is unavailable.'} Capacity, access, structural safety,
+          and official designation still require field verification.
+        </div>
+      </div>
+      <div className="evac-notice">
+        <div className="evac-notice-title">EVACUATION ROUTES</div>
+        <div className="evac-notice-desc">
+          {routeStatus || 'Route status is unavailable.'} Priority zones are hazards, not routes.
         </div>
       </div>
     </div>

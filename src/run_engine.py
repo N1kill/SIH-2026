@@ -106,11 +106,13 @@ class Run:
                     reservoir.gate_count = 0
             initial = reservoir.storage_m3
             geometry = BreachGeometry(s.breach_width_m, crest-s.breach_depth_m,s.breach_side_slope,p.dam_height_m)
+            valley_floor = (crest-p.dam_height_m
+                            if p.crest_elevation_m is not None else bed)
             material = StructuralMaterial(name=p.dam_type or "unspecified",
                 critical_shear_stress_pa=s.critical_shear_pa,
                 erodibility_coeff=s.erosion_coefficient,ultimate_shear_capacity_pa=s.collapse_shear_pa)
             breach = PhysicallyBasedBreachGrowth(material,
-                geometry,crest,geometry.bottom_elevation_m,bed,
+                geometry,crest,geometry.bottom_elevation_m,valley_floor,
                 initiation_mode="piping" if s.breach_model == "piping" else s.breach_initiation,
                 piping_diameter_m=s.piping_diameter_m,
                 breach_thickness_m=(p.crest_width_m or max(6.0, p.dam_height_m * .3)))

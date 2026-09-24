@@ -12,6 +12,7 @@ interface TopHeaderProps {
     routes: boolean;
   };
   onToggleLayer: (layer: 'flood' | 'evacuation' | 'shelters' | 'routes') => void;
+  routesAvailable: boolean;
 }
 
 export const TopHeader: React.FC<TopHeaderProps> = ({
@@ -19,6 +20,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
   onSelectTab,
   layers,
   onToggleLayer,
+  routesAvailable,
 }) => {
   return (
     <div className="floating-top-nav">
@@ -30,7 +32,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
       </div>
 
       {activeTab === '2d' && (
-        <LayerToggles layers={layers} onToggle={onToggleLayer} />
+        <LayerToggles layers={layers} onToggle={onToggleLayer} routesAvailable={routesAvailable} />
       )}
 
       {/* View Switcher Pill */}

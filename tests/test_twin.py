@@ -96,6 +96,16 @@ class PhysicsTests(unittest.TestCase):
             self.assertTrue(validate_result(run.directory)['mass_balance_pass'])
             with rasterio.open(run.directory/'depth_max.tif') as raster:
                 self.assertEqual(str(raster.crs),'EPSG:32642');self.assertEqual(raster.shape,(20,20))
+            progression=json.loads((run.directory/'flood_progression.json').read_text())
+            self.assertEqual(progression['data_status'],'simulated')
+            self.assertEqual(progression['total_steps'],run.status()['frame_count'])
+            self.assertEqual(progression['crs'],'EPSG:4326')
+            safe_zones=json.loads((run.directory/'safe_zones.geojson').read_text())
+            self.assertIn('no supplied facility',safe_zones['status'])
+            self.assertGreater(safe_zones['setback_m'],0)
+            routes=json.loads((run.directory/'evacuation_routes.geojson').read_text())
+            self.assertEqual(routes['features'],[])
+            self.assertIn('no verified routable road network',routes['status'])
             frame=json.loads((run.directory/'frame-0000.json').read_text())
             self.assertEqual(frame['protocol_version'],1)
             self.assertGreater(frame['breach']['discharge_m3s'],0)
@@ -113,6 +123,16 @@ class PhysicsTests(unittest.TestCase):
             components=frame['downstream']['components_m3s']
             self.assertAlmostEqual(frame['downstream']['inflow_m3s'],sum(components.values()))
             self.assertLess(abs(run.summary['mass_error_percent']),1e-8)
+
+    def test_documented_crest_uses_structural_height_for_breach_floor(self):
+        project=fixture_project().model_copy(update={'crest_elevation_m':20})
+        with tempfile.TemporaryDirectory() as directory, patch('src.run_engine.load_terrain',return_value=fixture_terrain()):
+            run=Run(project,Scenario(project_id='test',duration_s=1,dt_s=1,
+                output_interval_s=1,breach_depth_m=10),directory)
+            run.execute();self.assertEqual(run.status()['status'],'COMPLETE',run.status())
+            frame=json.loads((run.directory/'frame-0000.json').read_text())
+            self.assertAlmostEqual(frame['breach']['invert_m'],10)
+            self.assertGreater(frame['downstream']['inflow_m3s'],0)
 
     def test_what_if_breach_width_changes_release(self):
         summaries=[]
@@ -154,6 +174,18 @@ class APITests(unittest.TestCase):
                 self.assertEqual(client.get(f'/api/export/{run_id}').status_code,200)
                 self.assertEqual(client.get(f'/api/simulation/results/{run_id}/metadata').status_code,200)
                 self.assertEqual(client.get(f'/api/simulation/results/{run_id}/assets').status_code,200)
+                self.assertEqual(client.get(
+                    f'/api/simulation/results/{run_id}/flood-progression'
+                ).status_code,200)
+                self.assertEqual(client.get(
+                    f'/api/safe-zones?simulation_id={run_id}'
+                ).status_code,200)
+                self.assertEqual(client.get(
+                    f'/api/risk/zones?simulation_id={run_id}'
+                ).status_code,200)
+                self.assertEqual(client.get(
+                    f'/api/evacuation-routes?simulation_id={run_id}'
+                ).status_code,200)
                 forecast=client.post(f'/api/simulation/results/{run_id}/forecasts',json={
                     'horizon_s':3,'ensemble_size':3,'seed':11,'max_workers':2
                 })

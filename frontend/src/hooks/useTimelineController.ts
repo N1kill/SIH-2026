@@ -28,7 +28,7 @@ export function useTimelineController(maxTime = 24.0): TimelineController {
   const [currentTime, setCurrentTime] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [speed, setSpeed] = useState(1);
-  const lastTickRef = useRef(performance.now());
+  const lastTickRef = useRef<number | null>(null);
 
   const play = useCallback(() => setIsPlaying(true), []);
   const pause = useCallback(() => setIsPlaying(false), []);
@@ -61,7 +61,7 @@ export function useTimelineController(maxTime = 24.0): TimelineController {
     let animId: number;
 
     const tick = (now: number) => {
-      const dtSec = (now - lastTickRef.current) / 1000;
+      const dtSec = lastTickRef.current == null ? 0 : (now - lastTickRef.current) / 1000;
       lastTickRef.current = now;
 
       // 1 real second = speed * 1.5 simulation hours

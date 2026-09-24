@@ -11,38 +11,25 @@ import {
   type Plugin,
 } from 'chart.js';
 import { Line } from 'react-chartjs-2';
-import type { SimulationSummary } from '../../types/simulation';
+import type { FloodProgressionData } from '../../types/simulation';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Filler);
 
 interface HydrographCardProps {
-  summary: SimulationSummary;
+  floodData: FloodProgressionData;
   currentTime: number;
 }
 
-export const HydrographCard: React.FC<HydrographCardProps> = ({ summary, currentTime }) => {
-  const bp = summary.breach_parameters_used;
-  const Qp = bp.Q_peak_m3s; // e.g. 6647
-  const tf = bp.t_f_hours;  // e.g. 2.5
-
+export const HydrographCard: React.FC<HydrographCardProps> = ({ floodData, currentTime }) => {
   const { labels, data } = useMemo(() => {
-    const lbls: number[] = [];
-    const pts: number[] = [];
-    for (let t = 0; t <= 24; t += 0.5) {
-      lbls.push(t);
-      let q = 0;
-      if (t <= tf) {
-        q = Qp * (t / tf);
-      } else {
-        q = Qp * Math.exp(-(t - tf) / 6.0);
-      }
-      pts.push(Math.round(q));
-    }
-    return { labels: lbls, data: pts };
-  }, [Qp, tf]);
+    return {
+      labels: floodData.steps.map((step) => step.time_hours),
+      data: floodData.steps.map((step) => step.discharge_m3s),
+    };
+  }, [floodData]);
 
   // Current Q calculation
-  let currentQ = 0;
+  let currentQ = data[0] ?? 0;
   for (let i = 0; i < labels.length - 1; i++) {
     if (currentTime >= labels[i] && currentTime <= labels[i + 1]) {
       const frac = (currentTime - labels[i]) / (labels[i + 1] - labels[i]);
@@ -50,6 +37,7 @@ export const HydrographCard: React.FC<HydrographCardProps> = ({ summary, current
       break;
     }
   }
+  if (labels.length && currentTime >= labels[labels.length - 1]) currentQ = data[data.length - 1];
 
   // Scrubber vertical line plugin
   const scrubberPlugin: Plugin<'line'> = {
@@ -91,10 +79,9 @@ export const HydrographCard: React.FC<HydrographCardProps> = ({ summary, current
   };
 
   const chartData = {
-    labels: labels.map((l) => `${l}h`),
     datasets: [
       {
-        data: data,
+        data: labels.map((x, index) => ({ x, y: data[index] })),
         borderColor: '#0284c7',
         borderWidth: 2,
         backgroundColor: 'rgba(2, 132, 199, 0.18)',
@@ -119,18 +106,26 @@ export const HydrographCard: React.FC<HydrographCardProps> = ({ summary, current
     },
     scales: {
       x: {
+        type: 'linear' as const,
+        min: 0,
+        max: floodData.max_time_hours,
         title: {
           display: true,
           text: 'Time',
           color: '#94a3b8',
           font: { size: 9, family: 'Inter' },
         },
-        ticks: { font: { size: 8, family: 'JetBrains Mono' }, color: '#64748b', maxTicksLimit: 6 },
+        ticks: {
+          font: { size: 8, family: 'JetBrains Mono' },
+          color: '#64748b',
+          maxTicksLimit: 5,
+          callback: (value: string | number) => `${Number(value).toFixed(1)}h`,
+        },
         grid: { color: 'rgba(255, 255, 255, 0.04)' },
       },
       y: {
         min: 0,
-        max: 4000,
+        suggestedMax: Math.max(...data, 1) * 1.1,
         title: {
           display: true,
           text: 'Discharge (m³/s)',

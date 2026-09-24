@@ -163,7 +163,9 @@ def status():
 
 @router.get("/api/simulation/results")
 def list_results():
-    return [json.loads(p.read_text(encoding="utf-8")) for p in sorted(manager.output_root.glob("*/summary.json"),reverse=True)][:50]
+    values = [json.loads(p.read_text(encoding="utf-8"))
+              for p in manager.output_root.glob("*/summary.json")]
+    return sorted(values,key=lambda value:value.get("started_at", ""),reverse=True)[:50]
 
 
 @router.get("/api/simulation/results/{run_id}")
@@ -257,11 +259,35 @@ def risk(simulation_id:str):
     return FileResponse(path,media_type="application/geo+json")
 
 
+@router.get("/api/simulation/results/{run_id}/flood-progression")
+def flood_progression(run_id:str):
+    path=run_dir(run_id)/"flood_progression.json"
+    if not path.exists():
+        raise HTTPException(409,"Flood progression is not available for this run")
+    return FileResponse(path,media_type="application/json")
+
+
+@router.get("/api/safe-zones")
+def safe_zones(simulation_id:str):
+    path=run_dir(simulation_id)/"safe_zones.geojson"
+    if not path.exists():
+        raise HTTPException(409,"Screened dry zones are not available for this run")
+    return FileResponse(path,media_type="application/geo+json")
+
+
 @router.get("/api/shelters")
 def shelters(simulation_id:str):
     path=run_dir(simulation_id)/"shelters.geojson"
     if not path.exists():
         raise HTTPException(409,"Results are not ready")
+    return FileResponse(path,media_type="application/geo+json")
+
+
+@router.get("/api/evacuation-routes")
+def evacuation_routes(simulation_id:str):
+    path=run_dir(simulation_id)/"evacuation_routes.geojson"
+    if not path.exists():
+        raise HTTPException(409,"Evacuation-route status is not available for this run")
     return FileResponse(path,media_type="application/geo+json")
 
 
