@@ -13,18 +13,36 @@ export interface MachhuDamModelOptions {
   peakDischarge?: number;
   scale?: number;
   breachActive?: boolean;
+  breachType?: 'earthen' | 'crack' | 'partial' | 'full';
+  initialBreachWidth?: number;
+  finalBreachWidth?: number;
+  breachDepth?: number;
+  breachSideSlope?: number;
+  /**
+   * Initial reservoir surface height in model metres, measured from the dam
+   * foundation. Supplied by the caller from the published water level and crest
+   * elevation; when omitted the fallback is a display fraction, not a measurement.
+   */
+  initialReservoirSurfaceYM?: number;
 }
 
 export interface MachhuDamUserData {
   config: Required<MachhuDamModelOptions>;
   tick: (delta?: number) => void;
   updateGateFailure: (
-    type: 'crack' | 'partial' | 'full',
+    type: 'earthen' | 'crack' | 'partial' | 'full',
     gateIndex: number,
     failedGateCount: number,
     crackSizeM: number,
     holeWidthM: number,
     holeHeightM: number,
+  ) => void;
+  updateEarthenBreach: (
+    progress: number,
+    initialWidthM: number,
+    finalWidthM: number,
+    breachDepthM: number,
+    sideSlope: number,
   ) => void;
   updateDischarge: (q: number) => void;
   updateHydraulicState: (breachQ: number, spillwayQ: number, reservoirSurfaceY: number) => void;
@@ -150,6 +168,13 @@ export function createMachhuDamModel(options: MachhuDamModelOptions = {}): Machh
     peakDischarge: options.peakDischarge || 6647,
     scale: options.scale || 1.0,
     breachActive: options.breachActive ?? false,
+    breachType: options.breachType || 'earthen',
+    initialBreachWidth: options.initialBreachWidth || 20,
+    finalBreachWidth: options.finalBreachWidth || 150,
+    breachDepth: options.breachDepth || 18,
+    breachSideSlope: options.breachSideSlope || 1.0,
+    // Display fallback only, for callers that do not supply a surveyed datum.
+    initialReservoirSurfaceYM: options.initialReservoirSurfaceYM ?? (options.damHeight || 22.56) * 0.85,
   };
 
   const root = new THREE.Group() as MachhuDamGroup;
@@ -479,7 +504,7 @@ export function createMachhuDamModel(options: MachhuDamModelOptions = {}): Machh
   gateDamageGroup.add(failureOutline);
   spillwayGroup.add(gateDamageGroup);
 
-  let selectedFailureType: 'crack' | 'partial' | 'full' = 'partial';
+  let selectedFailureType: 'earthen' | 'crack' | 'partial' | 'full' = 'earthen';
   let selectedGateIndex = 9;
   let selectedFailedGateCount = 1;
   let selectedCrackSizeM = 3;
@@ -495,8 +520,8 @@ export function createMachhuDamModel(options: MachhuDamModelOptions = {}): Machh
     crackMesh.visible = false;
     holeMesh.visible = false;
     failureOutline.visible = false;
-    gateDamageGroup.visible = config.breachActive;
-    if (!config.breachActive) return;
+    gateDamageGroup.visible = config.breachActive && selectedFailureType !== 'earthen';
+    if (!config.breachActive || selectedFailureType === 'earthen') return;
 
     const startIndex = THREE.MathUtils.clamp(Math.round(selectedGateIndex) - 1, 0, config.numPiers - 1);
     const centerX = gateCenters[startIndex];
@@ -615,14 +640,20 @@ export function createMachhuDamModel(options: MachhuDamModelOptions = {}): Machh
 
   root.add(spillwayGroup);
 
-  // 2. Earthen Embankment Flanks
+  // 2. Earthen Embankment Flanks with Dynamic 3D Trapezoidal Breach Notch
   const embankmentGroup = new THREE.Group();
   embankmentGroup.name = 'Earthen_Embankments';
 
   const crestRoadWidth = 7.0;
   const baseWidth = pierDepth * 2.8;
+  const flankGap = spillwayHalfW + 2.5;
+  const displayedLength = Math.min(config.damLength, config.displayedDamLength);
+  const damLeftEdge = -displayedLength / 2;
+  const damRightEdge = displayedLength / 2;
 
-  function createEmbankmentMesh(length: number, material: THREE.Material, height = config.damHeight) {
+  // Static Left Embankment Flank (Left Static Abutment)
+  function createStaticEmbankmentMesh(startX: number, endX: number, material: THREE.Material, height = config.damHeight) {
+    const length = Math.abs(endX - startX);
     const shape = new THREE.Shape();
     shape.moveTo(-baseWidth * 0.55, 0);
     shape.lineTo(-crestRoadWidth / 2, height);
@@ -635,32 +666,122 @@ export function createMachhuDamModel(options: MachhuDamModelOptions = {}): Machh
     geo.rotateY(-Math.PI / 2);
     geo.translate(length, 0, 0);
     const mesh = new THREE.Mesh(geo, material);
+    mesh.position.set(startX, 0, 0);
     mesh.castShadow = true;
     mesh.receiveShadow = true;
     return mesh;
   }
 
-  const flankGap = spillwayHalfW + 2.5;
-  // A display crop, not a rescaling or a change to the physical dam length.
-  const displayedLength = Math.min(config.damLength, config.displayedDamLength);
-  const damLeftEdge = -displayedLength / 2;
-  const damRightEdge = displayedLength / 2;
-  const intactEmbankmentGroup = new THREE.Group();
-  intactEmbankmentGroup.name = 'Intact_Earthfill_Flanks';
-  const leftFlankMesh = createEmbankmentMesh(-flankGap - damLeftEdge, riprapMat);
-  leftFlankMesh.position.set(damLeftEdge, 0, 0);
-  intactEmbankmentGroup.add(leftFlankMesh);
-  const intactRightFlankMesh = createEmbankmentMesh(damRightEdge - flankGap, riprapMat);
-  intactRightFlankMesh.position.set(flankGap, 0, 0);
-  intactEmbankmentGroup.add(intactRightFlankMesh);
-  intactEmbankmentGroup.visible = !config.breachActive;
-  embankmentGroup.add(intactEmbankmentGroup);
+  const leftFlankMesh = createStaticEmbankmentMesh(damLeftEdge, -flankGap, riprapMat);
+  embankmentGroup.add(leftFlankMesh);
+
+  // Dynamic Right Embankment Flank (Contains Erodible Breach Region: LEFT ABUTMENT | BREACH | RIGHT ABUTMENT)
+  const rightFlankStartX = flankGap;
+  const rightFlankEndX = damRightEdge;
+  const rightFlankLength = rightFlankEndX - rightFlankStartX;
+  const breachCenterX = rightFlankStartX + rightFlankLength * 0.5;
+
+  const segmentsX = 64;
+  const segmentsZ = 16;
+  const breachEmbankmentGeo = new THREE.BufferGeometry();
+  const vertexCount = (segmentsX + 1) * (segmentsZ + 1);
+  const breachPositions = new Float32Array(vertexCount * 3);
+  const breachUvs = new Float32Array(vertexCount * 2);
+  const breachIndices: number[] = [];
+
+  for (let ix = 0; ix < segmentsX; ix++) {
+    for (let iz = 0; iz < segmentsZ; iz++) {
+      const a = ix * (segmentsZ + 1) + iz;
+      const b = (ix + 1) * (segmentsZ + 1) + iz;
+      const c = (ix + 1) * (segmentsZ + 1) + (iz + 1);
+      const d = ix * (segmentsZ + 1) + (iz + 1);
+      breachIndices.push(a, b, d);
+      breachIndices.push(b, c, d);
+    }
+  }
+
+  function computeUnErodedY(zNorm: number, height: number): number {
+    if (zNorm <= 0.35) {
+      return (zNorm / 0.35) * height;
+    } else if (zNorm <= 0.65) {
+      return height;
+    } else {
+      return ((1.0 - zNorm) / 0.35) * height;
+    }
+  }
+
+  let breachProgressState = 0;
+  let breachInitWidthState = 20;
+  let breachFinalWidthState = 150;
+  let breachDepthState = 18;
+  let breachSideSlopeState = 1.0;
+
+  function updateRightEmbankmentBuffer() {
+    let ptrPos = 0;
+    let ptrUv = 0;
+    const height = config.damHeight;
+    const isEarthenBreach = selectedFailureType === 'earthen';
+
+    const p = (config.breachActive && isEarthenBreach) ? breachProgressState : 0;
+    const Y_floor = Math.max(0, height - breachDepthState * p);
+    const W_bot = breachInitWidthState + (breachFinalWidthState - breachInitWidthState) * p;
+    const h_notch = height - Y_floor;
+    const W_top = W_bot + 2.0 * breachSideSlopeState * h_notch;
+
+    for (let ix = 0; ix <= segmentsX; ix++) {
+      const u = ix / segmentsX;
+      const x = rightFlankStartX + u * rightFlankLength;
+      const dx = Math.abs(x - breachCenterX);
+
+      let Y_limit = height;
+      if (p > 0) {
+        if (dx <= W_bot / 2) {
+          Y_limit = Y_floor;
+        } else if (dx <= W_top / 2) {
+          const frac = (dx - W_bot / 2) / (W_top / 2 - W_bot / 2);
+          Y_limit = Y_floor + frac * h_notch;
+        }
+      }
+
+      for (let iz = 0; iz <= segmentsZ; iz++) {
+        const v = iz / segmentsZ;
+        const z = -baseWidth * 0.55 + v * (baseWidth * 1.0);
+        const yProfile = computeUnErodedY(v, height);
+        const yActual = Math.min(yProfile, Y_limit);
+
+        breachPositions[ptrPos++] = x;
+        breachPositions[ptrPos++] = yActual;
+        breachPositions[ptrPos++] = z;
+
+        breachUvs[ptrUv++] = u * 4.0;
+        breachUvs[ptrUv++] = v * 2.0;
+      }
+    }
+
+    breachEmbankmentGeo.setAttribute('position', new THREE.BufferAttribute(breachPositions, 3));
+    breachEmbankmentGeo.setAttribute('uv', new THREE.BufferAttribute(breachUvs, 2));
+    breachEmbankmentGeo.setIndex(breachIndices);
+    breachEmbankmentGeo.computeVertexNormals();
+    breachEmbankmentGeo.attributes.position.needsUpdate = true;
+  }
+
+  updateRightEmbankmentBuffer();
+  const rightFlankMesh = new THREE.Mesh(breachEmbankmentGeo, riprapMat);
+  rightFlankMesh.castShadow = true;
+  rightFlankMesh.receiveShadow = true;
+  embankmentGroup.add(rightFlankMesh);
 
   root.add(embankmentGroup);
 
-  // 4. Upstream reservoir clipped to the evidence-backed shoreline. The
-  // rectangle is retained only as an explicit fallback for another project
-  // that has not supplied an outline.
+  // High-Velocity Breach Cataract Jet Mesh (RESTRICTED strictly to breach width)
+  const breachJetGeo = new THREE.PlaneGeometry(1, 1, 16, 16);
+  breachJetGeo.rotateX(Math.PI * 0.32);
+  const breachJetMesh = new THREE.Mesh(breachJetGeo, cascadeWaterMat);
+  breachJetMesh.position.set(breachCenterX, config.damHeight * 0.45, 8.0);
+  breachJetMesh.visible = false;
+  root.add(breachJetMesh);
+
+  // Upstream reservoir
   let reservoirGeo: THREE.BufferGeometry;
   if (config.reservoirOutlineM.length >= 3) {
     const shape = new THREE.Shape();
@@ -670,9 +791,6 @@ export function createMachhuDamModel(options: MachhuDamModelOptions = {}): Machh
     });
     shape.closePath();
     reservoirGeo = new THREE.ShapeGeometry(shape);
-    // Reflect the input before triangulation, then rotate the front face UP.
-    // This preserves the original X/Z shoreline; +PI/2 made the front face
-    // point down and back-face culling hid all water from above.
     reservoirGeo.rotateX(-Math.PI / 2);
   } else {
     reservoirGeo = new THREE.PlaneGeometry(config.reservoirWidth, config.reservoirLength, 32, 32);
@@ -680,21 +798,26 @@ export function createMachhuDamModel(options: MachhuDamModelOptions = {}): Machh
     reservoirGeo.translate(0, 0, -(config.reservoirLength / 2 + 12));
   }
   const reservoirMesh = new THREE.Mesh(reservoirGeo, reservoirWaterMat);
-  let reservoirSurfaceY = config.damHeight * 0.85;
+  // Datum comes from the caller's published water level and crest elevation; the
+  // mesh footprint is unchanged, only its height above the foundation.
+  let reservoirSurfaceY = config.initialReservoirSurfaceYM;
   reservoirMesh.position.set(0, reservoirSurfaceY, 0);
   reservoirMesh.receiveShadow = true;
   root.add(reservoirMesh);
 
-  // 5. Downstream Machhu River Channel (Spanning from spillway & breach downstream)
-  const riverGeo = new THREE.PlaneGeometry(config.spillwayWidth * 1.4 + 180, 1500.0, 32, 32);
+  // Downstream River Channel (RESTRICTED: Originates at breach toe)
+  const riverGeo = new THREE.PlaneGeometry(240, 1500.0, 32, 32);
   riverGeo.rotateX(-Math.PI / 2);
   const riverMesh = new THREE.Mesh(riverGeo, riverWaterMat);
-  riverMesh.position.set(50.0, 0.35, 780.0);
+  riverMesh.position.set(breachCenterX, 0.35, 780.0);
   riverMesh.visible = false;
   riverMesh.receiveShadow = true;
   root.add(riverMesh);
 
   // 6. 3D Floating Location Pin: Morbi
+  // Dam-local coordinates: the pin sits downstream along the dam's own axis and
+  // rotates with the model, so it marks the downstream direction rather than a
+  // georeferenced position.
   const morbiGroup = new THREE.Group();
   morbiGroup.name = 'Marker_Morbi';
   morbiGroup.position.set(-120.0, 35.0, 2400.0);
@@ -761,33 +884,72 @@ export function createMachhuDamModel(options: MachhuDamModelOptions = {}): Machh
       selectedHoleWidthM = THREE.MathUtils.clamp(holeWidthM, 0.5, pierSpacing - pierWidth);
       selectedHoleHeightM = THREE.MathUtils.clamp(holeHeightM, 0.5, pierHeight * 0.8);
       applyGateFailure();
+      updateRightEmbankmentBuffer();
+    },
+
+    updateEarthenBreach: (
+      progress: number,
+      initialWidthM: number,
+      finalWidthM: number,
+      breachDepthM: number,
+      sideSlope: number,
+    ) => {
+      breachProgressState = THREE.MathUtils.clamp(progress, 0, 1);
+      breachInitWidthState = Math.max(1, initialWidthM);
+      breachFinalWidthState = Math.max(breachInitWidthState, finalWidthM);
+      breachDepthState = THREE.MathUtils.clamp(breachDepthM, 1, config.damHeight);
+      breachSideSlopeState = Math.max(0.1, sideSlope);
+      updateRightEmbankmentBuffer();
+
+      const p = config.breachActive && selectedFailureType === 'earthen' ? breachProgressState : 0;
+      const W_bot = breachInitWidthState + (breachFinalWidthState - breachInitWidthState) * p;
+      const h_notch = breachDepthState * p;
+      const W_top = W_bot + 2.0 * breachSideSlopeState * h_notch;
+
+      breachJetMesh.position.set(breachCenterX, (config.damHeight - h_notch * 0.5) * 0.5, 8.0);
+      breachJetMesh.scale.set(Math.max(W_top * 0.9, 10), Math.max(config.damHeight * 1.2, 10), 1);
     },
 
     updateDischarge: (newQ: number) => {
       config.peakDischarge = newQ;
       const ratio = Math.max(0, Math.min(2.5, newQ / 6647));
-
       cascadeWaterMat.uniforms.uIntensity.value = ratio;
-
       riverMesh.scale.y = 0.04 * (1.0 + (ratio - 1.0) * 0.5);
     },
 
     updateHydraulicState: (breachQ: number, spillwayQ: number, nextReservoirSurfaceY: number) => {
-      root.userData.updateDischarge(breachQ);
-      spillwayCascadesGroup.visible = breachQ + spillwayQ > 0.01;
-      riverMesh.visible = breachQ + spillwayQ > 0.01;
+      root.userData.updateDischarge(breachQ + spillwayQ);
+      const activeQ = breachQ + spillwayQ;
+      const isEarthen = selectedFailureType === 'earthen';
+
+      if (isEarthen && config.breachActive) {
+        breachJetMesh.visible = activeQ > 0.01;
+        spillwayCascadesGroup.visible = spillwayQ > 0.01;
+        riverMesh.position.x = breachCenterX;
+        riverMesh.scale.x = Math.max(0.3, activeQ / 5000);
+      } else {
+        breachJetMesh.visible = false;
+        spillwayCascadesGroup.visible = activeQ > 0.01;
+        riverMesh.position.x = 0;
+        riverMesh.scale.x = 1.0;
+      }
+
+      riverMesh.visible = activeQ > 0.01;
       reservoirSurfaceY = THREE.MathUtils.clamp(nextReservoirSurfaceY, 0.4, config.damHeight - 0.4);
     },
 
     updateDamHeight: (newH: number) => {
       config.damHeight = Math.max(10, Math.min(35, newH));
+      // Scales the whole model vertically, and therefore anything expressed in model
+      // metres. Callers must not scale their own vertical values by the same ratio.
       root.scale.y = config.damHeight / 22.56;
+      updateRightEmbankmentBuffer();
     },
 
     setBreachActive: (active: boolean) => {
       config.breachActive = active;
-      intactEmbankmentGroup.visible = true;
       applyGateFailure();
+      updateRightEmbankmentBuffer();
     },
   };
 

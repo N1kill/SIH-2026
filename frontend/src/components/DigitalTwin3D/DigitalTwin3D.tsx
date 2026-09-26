@@ -12,6 +12,16 @@ import { BreachParametersCard } from './BreachParametersCard';
 import { CameraDock } from './CameraDock';
 import { HydraulicStatusPanel, type HydraulicSnapshot } from './HydraulicStatusPanel';
 import reservoirShorelineRaw from '../../../../data/candidates/machhu-ii/reservoir-shoreline.geojson?raw';
+import {
+  PROJECT,
+  chooseDamFrame,
+  crestLocalPath,
+  damLocalToScene,
+  geoToLocalMetres,
+  reservoirSurfaceYForLevel,
+  type DamFrame,
+  type LocalPoint,
+} from './damFrame';
 
 interface DigitalTwin3DProps {
   terrainData?: Terrain3DData;
@@ -40,13 +50,36 @@ interface ReservoirGeoJSON {
 
 const reservoirShoreline = JSON.parse(reservoirShorelineRaw) as ReservoirGeoJSON;
 
-function reservoirOutlineMeters(hydraulics: ProjectHydraulics): [number, number][] {
+// The shoreline is projected against the project dam reference point, the same
+// reference the dam placement frame uses, so water and dam cannot drift apart.
+function reservoirOutlineMeters(): LocalPoint[] {
   const coordinates = reservoirShoreline.features[0].geometry.coordinates[0];
-  const metresPerLongitudeDegree = 111_320 * Math.cos(THREE.MathUtils.degToRad(hydraulics.dam_latitude));
-  return coordinates.map(([longitude, latitude]) => [
-    (longitude - hydraulics.dam_longitude) * metresPerLongitudeDegree,
-    (latitude - hydraulics.dam_latitude) * 111_320,
-  ]);
+  return coordinates.map(([longitude, latitude]) =>
+    geoToLocalMetres(longitude, latitude, PROJECT.longitude, PROJECT.latitude),
+  );
+}
+
+let cachedDamFrame: DamFrame | null = null;
+
+/**
+ * Placement frame for the procedural dam: the surveyed crest and the measured
+ * shoreline are static project data, so the frame is solved once and reused by the
+ * model placement and by every dam-local camera preset.
+ */
+function damFrame(): DamFrame {
+  if (!cachedDamFrame) {
+    cachedDamFrame = chooseDamFrame(
+      crestLocalPath(),
+      reservoirOutlineMeters(),
+      DISPLAYED_DAM_LENGTH_M,
+    );
+  }
+  return cachedDamFrame;
+}
+
+/** Dam-local (x, z) to scene (x, z) under the solved frame. */
+function toScene(localX: number, localZ: number): { x: number; z: number } {
+  return damLocalToScene(damFrame(), localX, localZ);
 }
 
 function gateFailureCenter(gateIndex: number, failedGateCount = 1): number {
@@ -93,21 +126,41 @@ function hydraulicSnapshot(
   const gateBayWidthM = 300 / 18 - 2.8;
   let openingAreaM2 = 0;
   let dischargeCoefficient = 0.62;
-  if (breachParams.type === 'crack') {
-    // Equivalent open area of a branching crack network.
+  let orificeDischarge = 0;
+
+  if (breachParams.type === 'earthen' || !breachParams.type) {
+    const initW = breachParams.initialBreachWidthM ?? 20;
+    const finalW = breachParams.finalBreachWidthM ?? 150;
+    const sideSlope = breachParams.breachSideSlope ?? 1.0;
+    const maxDepth = breachParams.breachDepthM ?? (breachParams.damHeight * 0.8);
+    const elapsedH = Math.max(currentTimeH, 0);
+    const rawP = THREE.MathUtils.clamp(elapsedH / formationH, 0, 1);
+    const p = rawP * rawP * (3 - 2 * rawP);
+
+    const bBot = initW + (finalW - initW) * p;
+    const invertDepth = maxDepth * p;
+    const breachInvertLevel = breachParams.damHeight - invertDepth;
+    const head = Math.max(hydraulics.initial_water_level_m - breachInvertLevel, 0);
+
+    // Broad-crested trapezoidal weir equation: Q = Cd * (b * H^1.5 + 0.4 * z * H^2.5 * sqrt(2g))
+    const Q_weir = 1.44 * (bBot * Math.pow(head, 1.5) + 0.4 * sideSlope * Math.pow(head, 2.5) * Math.sqrt(2 * 9.80665));
+    openingAreaM2 = head * (bBot + sideSlope * head);
+    orificeDischarge = Q_weir;
+  } else if (breachParams.type === 'crack') {
     openingAreaM2 = breachParams.crackSizeM * (breachParams.leakOpeningMm / 1000) * 2.5;
+    orificeDischarge = dischargeCoefficient * openingAreaM2 * Math.sqrt(2 * 9.80665 * hydraulicHeadM);
   } else if (breachParams.type === 'partial') {
     openingAreaM2 = breachParams.holeWidthM * breachParams.holeHeightM;
     dischargeCoefficient = 0.68;
+    orificeDischarge = dischargeCoefficient * openingAreaM2 * Math.sqrt(2 * 9.80665 * hydraulicHeadM);
   } else {
     openingAreaM2 = gateBayWidthM * Math.min(hydraulicHeadM, 18) * breachParams.failedGateCount;
     dischargeCoefficient = 0.9;
+    orificeDischarge = dischargeCoefficient * openingAreaM2 * Math.sqrt(2 * 9.80665 * hydraulicHeadM);
   }
-  const orificeDischarge = dischargeCoefficient
-    * openingAreaM2
-    * Math.sqrt(2 * 9.80665 * hydraulicHeadM);
+
   const peakQ = breachParams.state === 'breached'
-    ? Math.min(Math.max(breachParams.peakDischarge, 0), orificeDischarge)
+    ? Math.min(Math.max(breachParams.peakDischarge, 0), Math.max(orificeDischarge, 50))
     : 0;
   const elapsedS = Math.max(currentTimeH, 0) * 3600;
   const riseS = formationH * 3600;
@@ -384,22 +437,33 @@ export const DigitalTwin3D: React.FC<DigitalTwin3DProps> = ({
       damHeight: initialBreachParams.damHeight,
       reservoirLength: initialTerrainData?.reservoir_bounds_m?.length ?? RESERVOIR_LENGTH_M,
       reservoirWidth: initialTerrainData?.reservoir_bounds_m?.width ?? RESERVOIR_WIDTH_M,
-      reservoirOutlineM: reservoirOutlineMeters(initialHydraulics),
+      reservoirOutlineM: reservoirOutlineMeters(),
       spillwayWidth: 300,
       numPiers: 18,
       peakDischarge: initialBreachParams.peakDischarge,
       breachActive: false,
+      initialReservoirSurfaceYM: reservoirSurfaceYForLevel(
+        initialHydraulics.initial_water_level_m,
+        initialBreachParams.damHeight,
+      ),
     });
 
-    damModel.position.set(0, 0, 0);
+    // The model is built along a straight local axis. Rotate and translate the whole
+    // group onto the surveyed crest so the wall and the measured water body agree:
+    // a crest-aligned wall leaves no dry gap behind the gates. Solved in damFrame.ts.
+    const frame = damFrame();
+    damModel.rotation.y = frame.angleRad;
+    damModel.position.set(frame.offsetX, 0, frame.offsetZ);
     scene.add(damModel);
 
     damModelRef.current = damModel;
 
     // Start close enough to read the true 22.56 m structural height. A whole-site
     // 1:1 overview necessarily makes a 4.93 km-long earthfill dam look very thin.
-    camera.position.set(35, 155, 360);
-    controls.target.set(0, initialBreachParams.damHeight * 0.45, -45);
+    const initialCamera = toScene(35, 360);
+    const initialTarget = toScene(0, -45);
+    camera.position.set(initialCamera.x, 155, initialCamera.z);
+    controls.target.set(initialTarget.x, initialBreachParams.damHeight * 0.45, initialTarget.z);
     controls.update();
 
     // Animation Render Loop
@@ -511,23 +575,34 @@ export const DigitalTwin3D: React.FC<DigitalTwin3DProps> = ({
   // 3. Drive the visible release from the conservation replay only.
   useEffect(() => {
     if (!damModelRef.current?.userData) return;
-    const [minimumLevel, maximumLevel] = [
-      hydraulics.stage_storage[0][0],
-      hydraulics.maximum_water_level_m,
-    ];
-    const levelFraction = THREE.MathUtils.clamp(
-      (snapshot.reservoirLevelM - minimumLevel) / (maximumLevel - minimumLevel),
-      0,
-      1,
+    // The water surface is the published level above the dam foundation, not a
+    // stretched display fraction: the real operating band is only 2.7 m
+    // (54.584-57.3 m) and mapping it across the full dam height moved the surface
+    // by metres. Uses the configured dam height rather than breachParams.damHeight,
+    // because the model already scales its own geometry with the live height.
+    const reservoirSurfaceY = reservoirSurfaceYForLevel(
+      snapshot.reservoirLevelM,
+      PROJECT.dam_height_m,
     );
-    const reservoirSurfaceY = 0.4 + levelFraction * (breachParams.damHeight * 0.85 - 0.4);
+
+    const formationH = Math.max(breachParams.formationTimeHours || 0.5, 0.01);
+    const rawProgress = THREE.MathUtils.clamp(currentTime / formationH, 0, 1);
+    const smoothProgress = rawProgress * rawProgress * (3 - 2 * rawProgress);
+
     damModelRef.current.userData.setBreachActive(snapshot.breachActive);
+    damModelRef.current.userData.updateEarthenBreach(
+      smoothProgress,
+      breachParams.initialBreachWidthM ?? 20,
+      breachParams.finalBreachWidthM ?? 150,
+      breachParams.breachDepthM ?? (breachParams.damHeight * 0.8),
+      breachParams.breachSideSlope ?? 1.0,
+    );
     damModelRef.current.userData.updateHydraulicState(
       snapshot.breachDischargeM3s,
       snapshot.spillwayDischargeM3s,
       reservoirSurfaceY,
     );
-  }, [snapshot, hydraulics, breachParams.damHeight]);
+  }, [snapshot, hydraulics, breachParams, currentTime]);
 
   // 4. Camera Preset Handler
   const handleCameraSelect = (preset: CameraPreset) => {
@@ -547,34 +622,40 @@ export const DigitalTwin3D: React.FC<DigitalTwin3DProps> = ({
         ? breachParams.holeWidthM
         : breachParams.crackSizeM;
 
+    // Presets stay authored in dam-local coordinates and are mapped onto the solved
+    // frame, so they frame the same structures wherever the crest puts the dam.
+    const setShot = (positionX: number, height: number, positionZ: number, targetX: number, targetY: number, targetZ: number) => {
+      const position = toScene(positionX, positionZ);
+      const target = toScene(targetX, targetZ);
+      camera.position.set(position.x, height, position.z);
+      controls.target.set(target.x, targetY, target.z);
+    };
+
     switch (preset) {
       case 'overview':
-        camera.position.set(displayedDamLength * 0.12, displayedDamLength * 0.55, displayedDamLength * 0.85);
-        controls.target.set(0, h * 0.45, -80);
+        setShot(displayedDamLength * 0.12, displayedDamLength * 0.55, displayedDamLength * 0.85, 0, h * 0.45, -80);
         break;
       case 'spillway':
-        camera.position.set(35, 155, 360);
-        controls.target.set(0, h * 0.45, -45);
+        setShot(35, 155, 360, 0, h * 0.45, -45);
         break;
       case 'breach':
-        camera.position.set(
+        setShot(
           breachX,
           Math.max(h * 1.15, affectedWidth * 0.38),
           THREE.MathUtils.clamp(affectedWidth * 1.8, 30, 320),
+          breachX,
+          h * 0.52,
+          0,
         );
-        controls.target.set(breachX, h * 0.52, 0);
         break;
       case 'downstream':
-        camera.position.set(0, h + 120, 850);
-        controls.target.set(0, h * 0.5, 0);
+        setShot(0, h + 120, 850, 0, h * 0.5, 0);
         break;
       case 'dam-walk':
-        camera.position.set(-damLength * 0.05, h + 2.5, 0);
-        controls.target.set(damLength * 0.05, h + 2.0, 0);
+        setShot(-damLength * 0.05, h + 2.5, 0, damLength * 0.05, h + 2.0, 0);
         break;
       case 'reservoir':
-        camera.position.set(0, h + sceneSpan * 0.35, -sceneSpan * 0.65);
-        controls.target.set(0, h * 0.5, 0);
+        setShot(0, h + sceneSpan * 0.35, -sceneSpan * 0.65, 0, h * 0.5, 0);
         break;
     }
     controls.update();
@@ -596,12 +677,17 @@ export const DigitalTwin3D: React.FC<DigitalTwin3DProps> = ({
         : breachParams.crackSizeM;
     const breachX = gateFailureCenter(breachParams.gateIndex, failedGateCount);
 
-    camera.position.set(
+    const position = toScene(
       breachX,
-      Math.max(breachParams.damHeight * 1.15, affectedWidth * 0.38),
       THREE.MathUtils.clamp(affectedWidth * 1.8, 30, 320),
     );
-    controls.target.set(breachX, breachParams.damHeight * 0.52, 0);
+    const target = toScene(breachX, 0);
+    camera.position.set(
+      position.x,
+      Math.max(breachParams.damHeight * 1.15, affectedWidth * 0.38),
+      position.z,
+    );
+    controls.target.set(target.x, breachParams.damHeight * 0.52, target.z);
     controls.update();
   }, [
     activeCamera,

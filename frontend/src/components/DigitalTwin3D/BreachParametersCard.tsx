@@ -8,9 +8,10 @@ interface BreachParametersCardProps {
 }
 
 const types: Array<{ value: BreachParameters['type']; label: string }> = [
-  { value: 'crack', label: 'Minor cracks' },
-  { value: 'partial', label: 'Gate hole' },
+  { value: 'earthen', label: 'Earthen breach' },
   { value: 'full', label: 'Gate failure' },
+  { value: 'partial', label: 'Gate hole' },
+  { value: 'crack', label: 'Minor cracks' },
 ];
 
 interface RangeControlProps {
@@ -90,31 +91,68 @@ export const BreachParametersCard: React.FC<BreachParametersCardProps> = ({ para
               <button
                 key={item.value}
                 type="button"
-                className={params.type === item.value ? 'active' : ''}
-                aria-pressed={params.type === item.value}
+                className={(params.type || 'earthen') === item.value ? 'active' : ''}
+                aria-pressed={(params.type || 'earthen') === item.value}
                 onClick={() => selectType(item.value)}
               >
                 {item.label}
               </button>
             ))}
           </div>
-          <p className="breach-location-note">
-            Failures apply only to the numbered spillway gates. Both earthfill embankments remain intact.
-          </p>
 
-          <RangeControl
-            id="breach-position"
-            label="Affected gate"
-            min={1}
-            max={18}
-            step={1}
-            value={params.gateIndex}
-            display={`Gate ${params.gateIndex} of 18`}
-            onChange={(gateIndex) => onChange({
-              gateIndex,
-              failedGateCount: Math.min(params.failedGateCount, 19 - gateIndex),
-            })}
-          />
+          {(params.type === 'earthen' || !params.type) && (
+            <>
+              <p className="breach-location-note">
+                Earthen dam embankment erodes dynamically into a 3D trapezoidal breach notch.
+              </p>
+              <RangeControl
+                id="initial-breach-width"
+                label="Initial breach width"
+                min={5}
+                max={50}
+                step={1}
+                value={params.initialBreachWidthM ?? 20}
+                display={`${params.initialBreachWidthM ?? 20} m`}
+                onChange={(initialBreachWidthM) => onChange({ initialBreachWidthM })}
+              />
+              <RangeControl
+                id="final-breach-width"
+                label="Final breach width"
+                min={50}
+                max={300}
+                step={5}
+                value={params.finalBreachWidthM ?? 150}
+                display={`${params.finalBreachWidthM ?? 150} m`}
+                onChange={(finalBreachWidthM) => onChange({ finalBreachWidthM })}
+              />
+              <RangeControl
+                id="breach-depth"
+                label="Breach floor depth"
+                min={2}
+                max={params.damHeight}
+                step={0.5}
+                value={params.breachDepthM ?? (params.damHeight * 0.8)}
+                display={`${(params.breachDepthM ?? (params.damHeight * 0.8)).toFixed(1)} m`}
+                onChange={(breachDepthM) => onChange({ breachDepthM })}
+              />
+            </>
+          )}
+
+          {params.type !== 'earthen' && (
+            <RangeControl
+              id="breach-position"
+              label="Affected gate"
+              min={1}
+              max={18}
+              step={1}
+              value={params.gateIndex}
+              display={`Gate ${params.gateIndex} of 18`}
+              onChange={(gateIndex) => onChange({
+                gateIndex,
+                failedGateCount: Math.min(params.failedGateCount, 19 - gateIndex),
+              })}
+            />
+          )}
 
           {params.type === 'crack' && (
             <>

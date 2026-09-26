@@ -19,10 +19,14 @@ from pydantic import BaseModel, Field
 from src.api import router, manager
 from src.dam_research import DamResearchSeed, EvidenceWorkspace
 from src.dam_research_agent import run_research
-from src.project import projects
+from src.project import projects, Scenario
+from src.run_engine import Run
 
 ROOT=Path(__file__).resolve().parent
+FRONTEND_DIR=ROOT/"frontend/dist"
 DASHBOARD_DIR=ROOT/"outputs/3d/dashboard"
+STATIC_DIR=FRONTEND_DIR if FRONTEND_DIR.is_dir() else DASHBOARD_DIR
+
 
 
 def load_local_env():
@@ -119,6 +123,14 @@ research_tasks:set[asyncio.Task]=set()
 
 @asynccontextmanager
 async def lifespan(app):
+    if not list(manager.output_root.glob("*/summary.json")):
+        try:
+            proj = projects().get("machhu-ii")
+            if proj:
+                run_inst = Run(proj, Scenario(project_id="machhu-ii"))
+                run_inst.execute()
+        except Exception:
+            pass
     yield
     if manager.active:
         manager.active.cancel.set()
@@ -134,7 +146,8 @@ app.include_router(router)
 
 @app.get("/")
 def index():
-    return FileResponse(DASHBOARD_DIR/"twin.html")
+    target = (STATIC_DIR / "index.html") if (STATIC_DIR / "index.html").is_file() else (DASHBOARD_DIR / "twin.html")
+    return FileResponse(target)
 
 
 @app.post("/api/research/start",status_code=202)
@@ -229,7 +242,9 @@ async def dflow_replay(ws:WebSocket):
 
 from src.dam_scene_api import router as dam_scene_router
 app.include_router(dam_scene_router)
-app.mount("/",StaticFiles(directory=str(DASHBOARD_DIR)),name="dashboard")
+if DASHBOARD_DIR.is_dir():
+    app.mount("/3d",StaticFiles(directory=str(DASHBOARD_DIR)),name="legacy_3d")
+app.mount("/",StaticFiles(directory=str(STATIC_DIR),html=True),name="dashboard")
 
 if __name__=="__main__":
     import uvicorn

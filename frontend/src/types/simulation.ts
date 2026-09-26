@@ -151,7 +151,7 @@ export interface ShelterInfo {
 
 export interface BreachParameters {
   state: 'intact' | 'breached';
-  type: 'crack' | 'partial' | 'full';
+  type: 'earthen' | 'crack' | 'partial' | 'full';
   gateIndex: number;
   crackSizeM: number;
   leakOpeningMm: number;
@@ -161,6 +161,10 @@ export interface BreachParameters {
   formationTimeHours: number;
   peakDischarge: number;
   damHeight: number;
+  initialBreachWidthM?: number;
+  finalBreachWidthM?: number;
+  breachDepthM?: number;
+  breachSideSlope?: number;
 }
 
 export type ViewMode = '3d' | '2d';
