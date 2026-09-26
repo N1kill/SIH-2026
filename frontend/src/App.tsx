@@ -15,7 +15,7 @@ export const App: React.FC = () => {
 
   const [breachParams, setBreachParams] = useState<BreachParameters>({
     state: 'intact',
-    type: 'partial',
+    type: 'full',
     gateIndex: 9,
     crackSizeM: 3,
     leakOpeningMm: 12,

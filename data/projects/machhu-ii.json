@@ -8,6 +8,7 @@
     "dam_length_m": 4930.0,
     "crest_width_m": null,
     "crest_elevation_m": 63.7,
+    "dam_elevation_m": 65.68,
     "reservoir_capacity_m3": 87900000.0,
     "reservoir_surface_area_m2": null,
     "initial_water_level_m": 56.41,
@@ -99,6 +100,12 @@
         {
             "source": "config.json and data/raw/dams/nrld_machhu.csv",
             "verified_survey": false
+        },
+        {
+            "source": "operator-provided dataset correction",
+            "measurement": "dam elevation for digital-twin overtopping trigger",
+            "value_m": 65.68,
+            "status": "configured for the delivered scenario; verification source pending"
         },
         {
             "source": "data/raw/evidence/machhu-ii/sources/gujarat-databank.json",

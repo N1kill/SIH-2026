@@ -9,6 +9,8 @@ export interface Terrain3DData {
   resolution_m?: number;
   grid_size?: number;
   elev_max_m?: number;
+  /** Maximum elevation in the loaded terrain product, used for the dam-level trigger. */
+  dam_elevation_m?: number;
   elev_min_m?: number;
   dam_length_m?: number;
   reservoir_surface_area_m2?: number;
@@ -161,6 +163,8 @@ export interface BreachParameters {
   formationTimeHours: number;
   peakDischarge: number;
   damHeight: number;
+  /** Operator-selected reservoir elevation in the project vertical datum. */
+  waterLevelM?: number;
   initialBreachWidthM?: number;
   finalBreachWidthM?: number;
   breachDepthM?: number;

@@ -42,6 +42,7 @@ interface ProjectRecord {
   dam_height_m: number;
   dam_length_m: number;
   crest_elevation_m: number;
+  dam_elevation_m?: number;
   initial_water_level_m: number;
   maximum_water_level_m: number;
   crest_coordinates: [number, number][];
@@ -70,6 +71,12 @@ function parseProject(): ProjectRecord {
 }
 
 export const PROJECT = parseProject();
+
+/** Dataset-defined dam elevation used by the interactive overtopping trigger. */
+export const DATASET_DAM_ELEVATION_M = Number.isFinite(PROJECT.dam_elevation_m)
+  ? PROJECT.dam_elevation_m as number
+  : undefined;
+
 
 /**
  * Elevation of the dam foundation, from the published crest elevation and the
@@ -124,10 +131,22 @@ export function damLocalToScene(frame: DamFrame, localX: number, localZ: number)
   };
 }
 
+/** Convert scene-local metres back into the transformed procedural dam frame. */
+export function sceneToDamLocal(frame: DamFrame, sceneX: number, sceneZ: number): LocalPoint {
+  const x = sceneX - frame.offsetX;
+  const z = sceneZ - frame.offsetZ;
+  const cos = Math.cos(frame.angleRad);
+  const sin = Math.sin(frame.angleRad);
+  return [x * cos - z * sin, x * sin + z * cos];
+}
+
 /** Surface height in model metres for a published reservoir water level. */
-export function reservoirSurfaceYForLevel(levelM: number, modelDamHeightM: number): number {
+export function reservoirSurfaceYForLevel(levelM: number, _modelDamHeightM: number): number {
   const height = Math.max(levelM - FOUNDATION_ELEVATION_M, 0);
-  return Math.min(Math.max(height, 0.4), modelDamHeightM - 0.4);
+  // Do not cap an explicit operator-entered emergency level at the crest. The
+  // interface marks this state as a scenario, while the model must still show
+  // the selected elevation and resulting overtopping.
+  return Math.max(height, 0.4);
 }
 
 function cross(ax: number, az: number, bx: number, bz: number): number {

@@ -2030,14 +2030,16 @@ document.addEventListener("DOMContentLoaded", () => {
     // terrain-sized flood plane.  Live water outside this polygon must come
     // from a real downstream depth grid, which the current backend does not
     // provide yet.
+    // Full upstream basin – extends to the terrain boundary on all sides so
+    // there are no gaps between the water surface and the valley walls.
+    // The near edge meets the upstream dam face at Z ≈ -24.9 (scene units).
     const reservoirShape = new THREE.Shape();
-    reservoirShape.moveTo(-28, 56);
-    reservoirShape.lineTo(28, 56);
-    reservoirShape.lineTo(32, 38);
-    // The near edge meets the upstream face of the dam at Z=-25.
-    reservoirShape.lineTo(24, 24.9);
-    reservoirShape.lineTo(-22, 24.9);
-    reservoirShape.lineTo(-32, 38);
+    reservoirShape.moveTo(-62, 62);   // far-left  corner of terrain
+    reservoirShape.lineTo( 62, 62);   // far-right corner
+    reservoirShape.lineTo( 62, 40);   // right mid
+    reservoirShape.lineTo( 32, 24.9); // right dam shoulder
+    reservoirShape.lineTo(-30, 24.9); // left  dam shoulder
+    reservoirShape.lineTo(-62, 40);   // left  mid
     reservoirShape.closePath();
 
     const reservoirGeo = new THREE.ShapeGeometry(reservoirShape);
@@ -3341,6 +3343,14 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
+    // If the spillway overfill logic has already made the downstream mesh
+    // visible (gates opened due to high water level), don't override it with
+    // the arrival-time logic — let the two paths coexist.
+    const crestElevation = THREE_PHYSICS.reservoirInitialLevel;
+    const isOverfilling =
+      threeSim.waterLevel >= crestElevation - 2;
+    if (isOverfilling && downstreamWaterMesh.visible) return;
+
     const sc =
       PIPELINE_DATA.scenarios[currentScenarioKey] ||
       PIPELINE_DATA.scenarios.base;
@@ -3564,14 +3574,58 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function updateSpillwayFlowVisual() {
     const gateFlowQ = threeSim.spillwayDischarge;
+    // Water-level overfill: when reservoir reaches or exceeds crest the
+    // spillway gates open automatically and water flows downstream.
+    const crestElevation = THREE_PHYSICS.reservoirInitialLevel;
+    const overfillFraction = Math.max(
+      0,
+      Math.min(
+        1,
+        (threeSim.waterLevel - (crestElevation - 2)) / 2.0
+      )
+    );
+    const isOverfilling = overfillFraction > 0;
+
+    // Animate gate leaves: slide up when overfilling.
+    const H_scene = physicalToSceneY(
+      globalElevMin + THREE_PHYSICS.damPhysicalHeight
+    ) - physicalToSceneY(globalElevMin);
+    const damBaseY = physicalToSceneY(terrainElevationAtScene(15, -22));
+    const gateHeight = H_scene * 0.48;
+    const openingCenterY = damBaseY + H_scene * 0.34;
+    const openingTopY = openingCenterY + gateHeight * 0.5;
+    const raisedY = openingTopY + gateHeight * 0.5 + 0.08;
+    for (const gate of spillwayGateLeaves) {
+      const currentFrac = gate.userData.openFraction || 0;
+      const targetFrac = isOverfilling ? overfillFraction : currentFrac;
+      gate.userData.openFraction = targetFrac;
+      gate.position.y = THREE.MathUtils.lerp(
+        openingCenterY,
+        raisedY,
+        gate.userData.openFraction
+      );
+    }
+
     // Keep the received physical release visible after the websocket has
     // completed its fast calculation, rather than tying it to socket state.
-    const visible = gateFlowQ > 0.01;
-    const flowScale = Math.max(0.35, Math.min(1, gateFlowQ / 100));
+    const gateTrigger = gateFlowQ > 0.01 || isOverfilling;
+    const flowScale = isOverfilling
+      ? Math.max(0.35, overfillFraction)
+      : Math.max(0.35, Math.min(1, gateFlowQ / 100));
 
     for (const flow of spillwayFlowMeshes) {
-      flow.visible = visible;
+      flow.visible = gateTrigger;
       flow.scale.x = flowScale;
+    }
+
+    // Show downstream water sheet as soon as gates are releasing.
+    if (downstreamWaterMesh && isOverfilling && !isLiveMode()) {
+      downstreamWaterMesh.visible = true;
+      const spread = Math.max(0.04, overfillFraction * 0.55);
+      downstreamWaterMesh.scale.z = spread;
+      downstreamWaterMesh.position.z = -60 + overfillFraction * 15;
+      downstreamWaterMesh.material.uniforms.uOpacity.value =
+        0.2 + Math.min(0.42, overfillFraction * 0.42);
     }
   }
 
@@ -3615,6 +3669,16 @@ document.addEventListener("DOMContentLoaded", () => {
     calculateHydraulics(dt);
     updateDamBreachVisual();
 
+    // Keep upstream water surface at the current simulated level.
+    if (waterMesh) {
+      waterMesh.visible = true;
+      waterMesh.position.y = physicalToSceneY(threeSim.waterLevel);
+    }
+    if (reservoirMarker) {
+      reservoirMarker.position.y = physicalToSceneY(threeSim.waterLevel) + 0.15;
+    }
+
+    updateSpillwayFlowVisual();
     updateMainParticles(dt);
     updateSprayParticles(dt);
     updateFoamVisual(dt);

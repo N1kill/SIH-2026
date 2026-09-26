@@ -14,11 +14,13 @@ import { HydraulicStatusPanel, type HydraulicSnapshot } from './HydraulicStatusP
 import reservoirShorelineRaw from '../../../../data/candidates/machhu-ii/reservoir-shoreline.geojson?raw';
 import {
   PROJECT,
+  DATASET_DAM_ELEVATION_M,
   chooseDamFrame,
   crestLocalPath,
   damLocalToScene,
   geoToLocalMetres,
   reservoirSurfaceYForLevel,
+  sceneToDamLocal,
   type DamFrame,
   type LocalPoint,
 } from './damFrame';
@@ -82,6 +84,11 @@ function toScene(localX: number, localZ: number): { x: number; z: number } {
   return damLocalToScene(damFrame(), localX, localZ);
 }
 
+function reservoirOutlineInDamFrame(): LocalPoint[] {
+  const frame = damFrame();
+  return reservoirOutlineMeters().map(([x, z]) => sceneToDamLocal(frame, x, z));
+}
+
 function gateFailureCenter(gateIndex: number, failedGateCount = 1): number {
   const gateSpacing = 300 / 18;
   const start = THREE.MathUtils.clamp(Math.round(gateIndex), 1, 18);
@@ -99,7 +106,12 @@ function interpolateStorage(stageStorage: [number, number][], levelM: number): n
       return THREE.MathUtils.lerp(lowerStorage, upperStorage, fraction);
     }
   }
-  return stageStorage[stageStorage.length - 1][1];
+  const [previousLevel, previousStorage] = stageStorage[stageStorage.length - 2];
+  const [lastLevel, lastStorage] = stageStorage[stageStorage.length - 1];
+  const terminalAreaM2 = (lastStorage - previousStorage) / (lastLevel - previousLevel);
+  // The published curve stops at normal maximum level. Extend its final local
+  // slope only while an operator is running an emergency overtopping scenario.
+  return lastStorage + (levelM - lastLevel) * terminalAreaM2;
 }
 
 function interpolateLevel(stageStorage: [number, number][], storageM3: number): number {
@@ -112,15 +124,23 @@ function interpolateLevel(stageStorage: [number, number][], storageM3: number): 
       return THREE.MathUtils.lerp(lowerLevel, upperLevel, fraction);
     }
   }
-  return stageStorage[stageStorage.length - 1][0];
+  const [previousLevel, previousStorage] = stageStorage[stageStorage.length - 2];
+  const [lastLevel, lastStorage] = stageStorage[stageStorage.length - 1];
+  const terminalAreaM2 = (lastStorage - previousStorage) / (lastLevel - previousLevel);
+  return lastLevel + (storageM3 - lastStorage) / terminalAreaM2;
 }
 
 function hydraulicSnapshot(
   currentTimeH: number,
   breachParams: BreachParameters,
   hydraulics: ProjectHydraulics,
+  damElevationM: number,
 ): HydraulicSnapshot {
-  const initialStorage = interpolateStorage(hydraulics.stage_storage, hydraulics.initial_water_level_m);
+  const selectedWaterLevel = breachParams.waterLevelM ?? hydraulics.initial_water_level_m;
+  const containedWaterLevel = Math.min(selectedWaterLevel, damElevationM);
+  const initialStorage = interpolateStorage(hydraulics.stage_storage, containedWaterLevel);
+  const overtoppingHeadM = Math.max(selectedWaterLevel - damElevationM, 0);
+  const overtoppingTriggered = overtoppingHeadM > 0.01;
   const formationH = Math.max(breachParams.formationTimeHours, 0.01);
   const hydraulicHeadM = breachParams.damHeight * 0.85;
   const gateBayWidthM = 300 / 18 - 2.8;
@@ -140,7 +160,7 @@ function hydraulicSnapshot(
     const bBot = initW + (finalW - initW) * p;
     const invertDepth = maxDepth * p;
     const breachInvertLevel = breachParams.damHeight - invertDepth;
-    const head = Math.max(hydraulics.initial_water_level_m - breachInvertLevel, 0);
+    const head = Math.max(selectedWaterLevel - breachInvertLevel, 0);
 
     // Broad-crested trapezoidal weir equation: Q = Cd * (b * H^1.5 + 0.4 * z * H^2.5 * sqrt(2g))
     const Q_weir = 1.44 * (bBot * Math.pow(head, 1.5) + 0.4 * sideSlope * Math.pow(head, 2.5) * Math.sqrt(2 * 9.80665));
@@ -159,9 +179,14 @@ function hydraulicSnapshot(
     orificeDischarge = dischargeCoefficient * openingAreaM2 * Math.sqrt(2 * 9.80665 * hydraulicHeadM);
   }
 
-  const peakQ = breachParams.state === 'breached'
-    ? Math.min(Math.max(breachParams.peakDischarge, 0), Math.max(orificeDischarge, 50))
+  const overtoppingDischarge = overtoppingTriggered
+    ? 1.44 * 20 * Math.pow(overtoppingHeadM, 1.5)
     : 0;
+  const peakQ = overtoppingTriggered
+    ? overtoppingDischarge
+    : breachParams.state === 'breached'
+    ? Math.min(Math.max(breachParams.peakDischarge, 0), Math.max(orificeDischarge, 50))
+    : overtoppingDischarge;
   const elapsedS = Math.max(currentTimeH, 0) * 3600;
   const riseS = formationH * 3600;
   const riseVolume = Math.min(0.5 * peakQ * riseS, initialStorage);
@@ -169,7 +194,12 @@ function hydraulicSnapshot(
 
   let breachQ = 0;
   let releasedVolume = 0;
-  if (elapsedS > 0 && elapsedS <= riseS) {
+  if (overtoppingTriggered) {
+    // Overtopping begins as soon as water passes the crest; do not hold the
+    // downstream display at zero while an arbitrary breach-formation timer runs.
+    breachQ = peakQ;
+    releasedVolume = Math.min(peakQ * elapsedS, initialStorage);
+  } else if (elapsedS > 0 && elapsedS <= riseS) {
     breachQ = peakQ * elapsedS / riseS;
     releasedVolume = 0.5 * peakQ * elapsedS * elapsedS / riseS;
   } else if (elapsedS > riseS) {
@@ -180,17 +210,26 @@ function hydraulicSnapshot(
 
   releasedVolume = Math.min(releasedVolume, initialStorage);
   const reservoirStorage = Math.max(initialStorage - releasedVolume, 0);
-  const reservoirLevel = interpolateLevel(hydraulics.stage_storage, reservoirStorage);
+  const reservoirLevel = overtoppingTriggered
+    ? damElevationM
+    : elapsedS === 0
+      ? containedWaterLevel
+      : interpolateLevel(hydraulics.stage_storage, reservoirStorage);
   const massResidual = initialStorage - reservoirStorage - releasedVolume;
 
   return {
-    breachActive: breachParams.state === 'breached',
+    breachActive: breachParams.state === 'breached' || overtoppingTriggered,
+    overtoppingTriggered,
     releaseActive: breachQ > 0.01,
     breachDischargeM3s: breachQ,
     spillwayDischargeM3s: 0,
     releasedVolumeM3: releasedVolume,
     reservoirStorageM3: reservoirStorage,
     reservoirLevelM: reservoirLevel,
+    // The excess head is the only available stage signal for this interactive
+    // overtopping preview. It is zero at the holding limit and rises monotonically
+    // with the flow-generating water level above it.
+    downstreamStageM: overtoppingHeadM,
     storagePercent: hydraulics.reservoir_capacity_m3 > 0
       ? reservoirStorage / hydraulics.reservoir_capacity_m3 * 100
       : 0,
@@ -274,9 +313,16 @@ export const DigitalTwin3D: React.FC<DigitalTwin3DProps> = ({
   const movementRef = useRef({ forward: false, backward: false, left: false, right: false, boost: false });
 
   const [activeCamera, setActiveCamera] = React.useState<CameraPreset>('spillway');
+  // Read the trigger from the delivered terrain product. Projects that publish a
+  // dam-specific elevation use it; older terrain products fall back to their
+  // declared maximum elevation rather than a Machhu-specific UI constant.
+  const damElevationM = terrainData?.dam_elevation_m
+    ?? DATASET_DAM_ELEVATION_M
+    ?? terrainData?.elev_max_m
+    ?? PROJECT.crest_elevation_m;
   const snapshot = useMemo(
-    () => hydraulicSnapshot(currentTime, breachParams, hydraulics),
-    [currentTime, breachParams, hydraulics],
+    () => hydraulicSnapshot(currentTime, breachParams, hydraulics, damElevationM),
+    [currentTime, breachParams, hydraulics, damElevationM],
   );
   const damLength = terrainData?.dam_length_m ?? DAM_LENGTH_M;
   const displayedDamLength = Math.min(damLength, DISPLAYED_DAM_LENGTH_M);
@@ -437,13 +483,14 @@ export const DigitalTwin3D: React.FC<DigitalTwin3DProps> = ({
       damHeight: initialBreachParams.damHeight,
       reservoirLength: initialTerrainData?.reservoir_bounds_m?.length ?? RESERVOIR_LENGTH_M,
       reservoirWidth: initialTerrainData?.reservoir_bounds_m?.width ?? RESERVOIR_WIDTH_M,
-      reservoirOutlineM: reservoirOutlineMeters(),
+      reservoirOutlineM: reservoirOutlineInDamFrame(),
+      reservoirDamConnectionDepthM: Math.max(0, damFrame().maxWaterGapM),
       spillwayWidth: 300,
       numPiers: 18,
       peakDischarge: initialBreachParams.peakDischarge,
       breachActive: false,
       initialReservoirSurfaceYM: reservoirSurfaceYForLevel(
-        initialHydraulics.initial_water_level_m,
+        initialBreachParams.waterLevelM ?? initialHydraulics.initial_water_level_m,
         initialBreachParams.damHeight,
       ),
     });
@@ -601,6 +648,7 @@ export const DigitalTwin3D: React.FC<DigitalTwin3DProps> = ({
       snapshot.breachDischargeM3s,
       snapshot.spillwayDischargeM3s,
       reservoirSurfaceY,
+      snapshot.downstreamStageM,
     );
   }, [snapshot, hydraulics, breachParams, currentTime]);
 
@@ -720,6 +768,10 @@ export const DigitalTwin3D: React.FC<DigitalTwin3DProps> = ({
       {/* Top-Left Breach Parameters Card (Image 1) */}
       <BreachParametersCard
         params={breachParams}
+        waterLevelMinM={hydraulics.stage_storage[0]?.[0] ?? hydraulics.initial_water_level_m}
+        waterLevelMaxM={damElevationM + 30}
+        overtoppingLevelM={damElevationM}
+        waterLevelM={breachParams.waterLevelM ?? hydraulics.initial_water_level_m}
         onChange={onBreachParamsChange}
       />
 

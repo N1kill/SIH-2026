@@ -7,6 +7,8 @@ export interface MachhuDamModelOptions {
   reservoirLength?: number;
   reservoirWidth?: number;
   reservoirOutlineM?: [number, number][];
+  /** Measured shoreline-to-crest display gap filled by the contiguous water apron. */
+  reservoirDamConnectionDepthM?: number;
   spillwayWidth?: number;
   numPiers?: number;
   breachWidth?: number;
@@ -45,7 +47,12 @@ export interface MachhuDamUserData {
     sideSlope: number,
   ) => void;
   updateDischarge: (q: number) => void;
-  updateHydraulicState: (breachQ: number, spillwayQ: number, reservoirSurfaceY: number) => void;
+  updateHydraulicState: (
+    breachQ: number,
+    spillwayQ: number,
+    reservoirSurfaceY: number,
+    downstreamStageM: number,
+  ) => void;
   updateDamHeight: (h: number) => void;
   setBreachActive: (active: boolean) => void;
 }
@@ -162,6 +169,7 @@ export function createMachhuDamModel(options: MachhuDamModelOptions = {}): Machh
     reservoirLength: options.reservoirLength || 6189,
     reservoirWidth: options.reservoirWidth || 5328,
     reservoirOutlineM: options.reservoirOutlineM || [],
+    reservoirDamConnectionDepthM: options.reservoirDamConnectionDepthM ?? 0,
     spillwayWidth: options.spillwayWidth || 300,
     numPiers: options.numPiers || 18,
     breachWidth: options.breachWidth || 156,
@@ -784,14 +792,48 @@ export function createMachhuDamModel(options: MachhuDamModelOptions = {}): Machh
   // Upstream reservoir
   let reservoirGeo: THREE.BufferGeometry;
   if (config.reservoirOutlineM.length >= 3) {
-    const shape = new THREE.Shape();
-    config.reservoirOutlineM.forEach(([x, z], index) => {
-      if (index === 0) shape.moveTo(x, -z);
-      else shape.lineTo(x, -z);
-    });
-    shape.closePath();
-    reservoirGeo = new THREE.ShapeGeometry(shape);
-    reservoirGeo.rotateX(-Math.PI / 2);
+    // The source shoreline represents the complete reservoir while this view
+    // crops the dam to 600 m. Clip every exposed crop edge so source water cannot
+    // appear around the displayed abutments or downstream of an intact dam.
+    const upstreamDamFaceM = 28;
+    const halfDamLengthM = config.displayedDamLength / 2;
+    const clip = (
+      points: [number, number][],
+      inside: (point: [number, number]) => boolean,
+      intersection: (from: [number, number], to: [number, number]) => [number, number],
+    ) => points.reduce<[number, number][]>((result, point, index) => {
+      const previous = points[(index + points.length - 1) % points.length];
+      const pointInside = inside(point);
+      const previousInside = inside(previous);
+      if (pointInside !== previousInside) result.push(intersection(previous, point));
+      if (pointInside) result.push(point);
+      return result;
+    }, []);
+    const atZ = (boundary: number) => (from: [number, number], to: [number, number]) => {
+      const ratio = (boundary - from[1]) / (to[1] - from[1]);
+      return [from[0] + (to[0] - from[0]) * ratio, boundary] as [number, number];
+    };
+    const atX = (boundary: number) => (from: [number, number], to: [number, number]) => {
+      const ratio = (boundary - from[0]) / (to[0] - from[0]);
+      return [boundary, from[1] + (to[1] - from[1]) * ratio] as [number, number];
+    };
+    let waterOutline = clip(config.reservoirOutlineM, ([, z]) => z <= -upstreamDamFaceM, atZ(-upstreamDamFaceM));
+    waterOutline = clip(waterOutline, ([x]) => x >= -halfDamLengthM, atX(-halfDamLengthM));
+    waterOutline = clip(waterOutline, ([x]) => x <= halfDamLengthM, atX(halfDamLengthM));
+    if (waterOutline.length >= 3) {
+      const clippedShape = new THREE.Shape();
+      waterOutline.forEach(([x, z], index) => {
+        if (index === 0) clippedShape.moveTo(x, -z);
+        else clippedShape.lineTo(x, -z);
+      });
+      clippedShape.closePath();
+      reservoirGeo = new THREE.ShapeGeometry(clippedShape);
+      reservoirGeo.rotateX(-Math.PI / 2);
+    } else {
+      // No measured reservoir area lies within the crop: remain dry rather than
+      // rendering the original, unconstrained footprint beside the dam.
+      reservoirGeo = new THREE.BufferGeometry();
+    }
   } else {
     reservoirGeo = new THREE.PlaneGeometry(config.reservoirWidth, config.reservoirLength, 32, 32);
     reservoirGeo.rotateX(-Math.PI / 2);
@@ -804,6 +846,23 @@ export function createMachhuDamModel(options: MachhuDamModelOptions = {}): Machh
   reservoirMesh.position.set(0, reservoirSurfaceY, 0);
   reservoirMesh.receiveShadow = true;
   root.add(reservoirMesh);
+
+  // The observed shoreline is not a surveyed dam-contact line for this display
+  // crop. Fill only that documented gap so the upstream surface remains
+  // continuous across the full dam, without replacing the measured outline.
+  const connectionDepth = Math.max(0, config.reservoirDamConnectionDepthM);
+  const reservoirConnectionMesh = connectionDepth > 0
+    ? new THREE.Mesh(
+      new THREE.PlaneGeometry(config.displayedDamLength, connectionDepth),
+      reservoirWaterMat,
+    )
+    : null;
+  if (reservoirConnectionMesh) {
+    reservoirConnectionMesh.geometry.rotateX(-Math.PI / 2);
+    reservoirConnectionMesh.position.set(0, reservoirSurfaceY + 0.002, -(connectionDepth / 2 + 28));
+    reservoirConnectionMesh.receiveShadow = true;
+    root.add(reservoirConnectionMesh);
+  }
 
   // Downstream River Channel (RESTRICTED: Originates at breach toe)
   const riverGeo = new THREE.PlaneGeometry(240, 1500.0, 32, 32);
@@ -862,6 +921,9 @@ export function createMachhuDamModel(options: MachhuDamModelOptions = {}): Machh
       textures.waterTex.offset.x += Math.sin(timeElapsed * 4.0) * 0.005;
 
       reservoirMesh.position.y = reservoirSurfaceY + Math.sin(timeElapsed * 1.5) * 0.03;
+      if (reservoirConnectionMesh) {
+        reservoirConnectionMesh.position.y = reservoirSurfaceY + 0.002 + Math.sin(timeElapsed * 1.5) * 0.03;
+      }
       cascadeWaterMat.uniforms.uTime.value = timeElapsed;
     },
 
@@ -914,28 +976,38 @@ export function createMachhuDamModel(options: MachhuDamModelOptions = {}): Machh
       config.peakDischarge = newQ;
       const ratio = Math.max(0, Math.min(2.5, newQ / 6647));
       cascadeWaterMat.uniforms.uIntensity.value = ratio;
-      riverMesh.scale.y = 0.04 * (1.0 + (ratio - 1.0) * 0.5);
     },
 
-    updateHydraulicState: (breachQ: number, spillwayQ: number, nextReservoirSurfaceY: number) => {
+    updateHydraulicState: (
+      breachQ: number,
+      spillwayQ: number,
+      nextReservoirSurfaceY: number,
+      downstreamStageM: number,
+    ) => {
       root.userData.updateDischarge(breachQ + spillwayQ);
       const activeQ = breachQ + spillwayQ;
       const isEarthen = selectedFailureType === 'earthen';
+      const stageM = Math.max(0, downstreamStageM);
 
       if (isEarthen && config.breachActive) {
         breachJetMesh.visible = activeQ > 0.01;
-        spillwayCascadesGroup.visible = spillwayQ > 0.01;
+        spillwayCascadesGroup.visible = activeQ > 0.01;
         riverMesh.position.x = breachCenterX;
-        riverMesh.scale.x = Math.max(0.3, activeQ / 5000);
       } else {
         breachJetMesh.visible = false;
+        // Overtopping/gate failure is centred on the spillway rather than one
+        // of the earthfill flanks.
         spillwayCascadesGroup.visible = activeQ > 0.01;
         riverMesh.position.x = 0;
-        riverMesh.scale.x = 1.0;
       }
 
       riverMesh.visible = activeQ > 0.01;
-      reservoirSurfaceY = THREE.MathUtils.clamp(nextReservoirSurfaceY, 0.4, config.damHeight - 0.4);
+      // The plane is horizontal, so its world Y position—not its scale—is the
+      // visible downstream stage. As excess head grows, the channel both rises
+      // and spreads symmetrically from the central gate array.
+      riverMesh.position.y = 0.35 + stageM;
+      riverMesh.scale.x = 1 + stageM;
+      reservoirSurfaceY = Math.max(nextReservoirSurfaceY, 0.4);
     },
 
     updateDamHeight: (newH: number) => {

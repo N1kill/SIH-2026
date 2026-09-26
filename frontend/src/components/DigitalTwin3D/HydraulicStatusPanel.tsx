@@ -3,12 +3,15 @@ import { ChevronDown, ChevronUp } from 'lucide-react';
 
 export interface HydraulicSnapshot {
   breachActive: boolean;
+  overtoppingTriggered: boolean;
   releaseActive: boolean;
   breachDischargeM3s: number;
   spillwayDischargeM3s: number;
   releasedVolumeM3: number;
   reservoirStorageM3: number;
   reservoirLevelM: number;
+  /** Relative downstream stage above the channel bed for the visual replay. */
+  downstreamStageM: number;
   storagePercent: number;
   massResidualM3: number;
 }
@@ -30,6 +33,8 @@ export const HydraulicStatusPanel: React.FC<HydraulicStatusPanelProps> = ({
   const [expanded, setExpanded] = useState(false);
   const stateLabel = !snapshot.breachActive
     ? 'INTACT · CONTAINED'
+    : snapshot.overtoppingTriggered
+      ? 'OVERTOPPED - RELEASING'
     : snapshot.releaseActive
       ? 'BREACHED · RELEASING'
       : 'BREACHED · NO FLOW';

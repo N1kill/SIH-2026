@@ -4,6 +4,10 @@ import type { BreachParameters } from '../../types/simulation';
 
 interface BreachParametersCardProps {
   params: BreachParameters;
+  waterLevelMinM: number;
+  waterLevelMaxM: number;
+  overtoppingLevelM: number;
+  waterLevelM: number;
   onChange: (newParams: Partial<BreachParameters>) => void;
 }
 
@@ -22,35 +26,57 @@ interface RangeControlProps {
   max: number;
   step: number;
   display: string;
+  threshold?: number;
   onChange: (value: number) => void;
 }
 
 const RangeControl: React.FC<RangeControlProps> = ({
-  id, label, value, min, max, step, display, onChange,
+  id, label, value, min, max, step, display, threshold, onChange,
 }) => {
   const percentage = Math.max(0, Math.min(100, (value - min) / (max - min) * 100));
+  const thresholdPercentage = threshold === undefined
+    ? undefined
+    : Math.max(0, Math.min(100, (threshold - min) / (max - min) * 100));
   return (
     <div className="param-control">
       <div className="param-label-row">
         <label className="param-name" htmlFor={id}>{label}</label>
         <output className="param-val" htmlFor={id}>{display}</output>
       </div>
-      <input
-        id={id}
-        type="range"
-        className="hud-slider"
-        min={min}
-        max={max}
-        step={step}
-        value={value}
-        style={{ '--slider-pct': `${percentage}%` } as React.CSSProperties}
-        onChange={(event) => onChange(Number(event.target.value))}
-      />
+      <div className="range-with-threshold">
+        <input
+          id={id}
+          type="range"
+          className="hud-slider"
+          min={min}
+          max={max}
+          step={step}
+          value={value}
+          style={{ '--slider-pct': `${percentage}%` } as React.CSSProperties}
+          onChange={(event) => onChange(Number(event.target.value))}
+        />
+        {thresholdPercentage !== undefined && (
+          <span
+            className="water-level-threshold"
+            style={{ '--threshold-pct': `${thresholdPercentage}%` } as React.CSSProperties}
+            aria-hidden="true"
+          />
+        )}
+      </div>
     </div>
   );
 };
 
-export const BreachParametersCard: React.FC<BreachParametersCardProps> = ({ params, onChange }) => {
+export const BreachParametersCard: React.FC<BreachParametersCardProps> = ({
+  params, waterLevelMinM, waterLevelMaxM, overtoppingLevelM, waterLevelM, onChange,
+}) => {
+  const updateWaterLevel = (nextLevel: number) => onChange({
+    waterLevelM: nextLevel,
+    state: nextLevel > overtoppingLevelM ? 'breached' : 'intact',
+    // High water exits through the central spillway gate array, never through a
+    // side embankment breach. Gate 9 is the centre gate of the 18-gate model.
+    ...(nextLevel > overtoppingLevelM ? { type: 'full' as const, gateIndex: 9, failedGateCount: 1 } : {}),
+  });
   const selectType = (type: BreachParameters['type']) => {
     onChange({ type });
   };
@@ -82,6 +108,21 @@ export const BreachParametersCard: React.FC<BreachParametersCardProps> = ({ para
           <TriangleAlert size={15} aria-hidden="true" /> Breached
         </button>
       </div>
+
+      <RangeControl
+        id="reservoir-water-level"
+        label="Reservoir water level"
+        min={waterLevelMinM}
+        max={waterLevelMaxM}
+        step={0.05}
+        value={waterLevelM}
+        display={`${waterLevelM.toFixed(2)} m`}
+        threshold={overtoppingLevelM}
+        onChange={updateWaterLevel}
+      />
+      <p className="breach-location-note">
+        Yellow mark: dam elevation from the loaded terrain ({overtoppingLevelM.toFixed(2)} m). Above it the scenario breaches and releases downstream; returning to or below it restores the intact state.
+      </p>
 
       <div className={`breach-controls-body ${params.state === 'intact' ? 'is-disabled' : ''}`}>
         <fieldset disabled={params.state === 'intact'}>

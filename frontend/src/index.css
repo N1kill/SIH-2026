@@ -601,6 +601,29 @@ html, body {
   line-height: 1.4;
 }
 
+.range-with-threshold {
+  position: relative;
+}
+
+.range-with-threshold .hud-slider {
+  position: relative;
+  z-index: 1;
+}
+
+.water-level-threshold {
+  position: absolute;
+  top: 50%;
+  left: var(--threshold-pct);
+  z-index: 2;
+  width: 3px;
+  height: 16px;
+  border-radius: 2px;
+  background: #facc15;
+  box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.8), 0 0 8px rgba(250, 204, 21, 0.7);
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+}
+
 .breach-controls-body.is-disabled {
   opacity: 0.46;
 }

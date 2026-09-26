@@ -1,5 +1,13 @@
 # SIH-2026 Pipeline Development Progress
 
+## 2026-09-26 — controlled overtopping visual scenario
+
+- Restricted the cropped 3D reservoir surface to the upstream side and visible dam span, preventing source-shoreline water from rendering beside the displayed abutments or downstream while the dam is intact.
+- The overtopping trigger is now read from the project/terrain dataset's dam elevation (or its declared maximum elevation for legacy products), rather than a UI constant. A yellow slider marker identifies it; crossing it activates downstream release while the reservoir surface remains capped, and returning to the safe side restores the intact state.
+- Automatic overtopping now uses the central spillway gate failure (gate 9) and its downstream channel instead of a side earthfill breach; the manual elevation entry was removed so the slider is the single water-level control.
+- Linked the downstream water surface to the flow-generating excess head: it now rises and widens from the centred gate channel only after the reservoir passes its holding level. This is an interactive stage proxy, not a calibrated downstream hydraulic solution.
+- Frontend production build and whitespace validation pass. The standalone crest placement checker still fails its pre-existing water-gap threshold and needs a separate reconciliation with the current shoreline/crop assumptions.
+
 ## 2026-09-24 — simulation-backed 2D operations map
 
 - Corrected a breach-routing datum error: when an evidence-backed dam crest is
