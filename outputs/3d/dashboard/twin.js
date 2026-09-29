@@ -5,7 +5,8 @@ import {DamAssetLoader,DamDeformer,Diagnostics,ForecastLayer,HydraulicEffects,Qu
 import {FlowSheet,MaterialLibrary,ReplaySeriesChart,buildDamAssembly,createSkyDome,disposeDamScene} from './dam-scene.js';
 import {DamScenePlugin,fitReferenceGeometry} from './dam-scene-plugin.js';
 import {studyShorelineSource,waterSurfacePositions} from './water-surface.js';
-import {clipReservoirAtDam,foundationHeight,toDamLocal} from './scene-physics.js';
+import {clipReservoirAtDam,foundationHeight,toDamLocal,gateSlabInterval} from './scene-physics.js';
+import {fullReservoirLevel} from './gate-aperture.js';
 
 const $ = id => document.getElementById(id);
 const api = async (path, options) => {
@@ -20,7 +21,7 @@ let breachJet, spillwayJet, overtoppingJet;
 let damParts=[], imageryMeshes=[], projects=[], savedRuns=[], shelterGroup,currentForecast,materialLibrary,sceneMaterials,damAssembly;
 let studyManifest,studyPlugin,studyAssembly,studyFit,studyWaterSource,baseAssetStatus='';
 let displayedBreachWidth=0,displayedWaterLevel=null;
-let foundationSite=null,previewActive=true;
+let foundationSite=null,previewActive=true,previewLevelInfo=null,solverBusy=false;
 let quality,director,deformer,effects,diagnostics,cameraGoal,targetGoal,lastAnimationTime=performance.now();
 const replayClock=new ReplayClock();
 const telemetry=new TelemetryPanel($('metrics'));
@@ -201,12 +202,13 @@ function configureConditionControls(){
   if(!studyPlugin)return;
   $('affectedGate').replaceChildren(...[...studyPlugin.gates.keys()].map((key,i)=>new Option(`Gate ${i+1}`,String(i+1))));
   const g=studyPlugin.geometry;
-  $('gateOpening').max=g.gate_height_m;$('holeHeight').max=g.gate_height_m;$('holeWidth').max=g.bay_width_m-.4;
+  $('gateOpening').max=g.gate_height_m;$('holeHeight').max=g.gate_height_m-.7;$('holeWidth').max=g.bay_width_m-.7;
   $('failedCount').max=g.bays;
 }
 function applyConditionPreview(){
   const c=condition(),g=studyPlugin?.geometry;
   $('breachFields').disabled=c.state==='intact';
+  $('breachFields').hidden=c.state==='intact';
   $('holeWidthControl').hidden=c.type==='full';$('holeHeightControl').hidden=c.type!=='partial';
   $('crackControl').hidden=c.type!=='crack';$('failedCountControl').hidden=c.type!=='full';
   if(g){$('failedCount').max=g.bays-c.gateIndex+1;c.failedGateCount=Math.min(c.failedGateCount,Number($('failedCount').max));$('failedCount').value=c.failedGateCount;}
@@ -215,24 +217,40 @@ function applyConditionPreview(){
   $('gateOpeningValue').textContent=c.gateOpeningM?`${c.gateOpeningM.toFixed(1)} m`:'0.0 m · closed';
   if(!studyPlugin)return;
   playing=false;clearTimeout(replayTimer);previewActive=true;$('showStudy').checked=true;
-  showStudy(0);rebuildDam(0,0);displayedWaterLevel=null;reservoir(terrain.initial_level_m);
+  previewLevelInfo=fullReservoirLevel({...terrain.project,crest_elevation_m:terrain.project.crest_elevation_m??terrain.origin[2]+terrain.project.dam_height_m});
+  showStudy(0);rebuildDam(0,0);displayedWaterLevel=null;reservoir(previewLevelInfo.level);
   for(const jet of [breachJet,spillwayJet,overtoppingJet])if(jet)jet.mesh.visible=false;
   floodMesh?.geometry.setDrawRange(0,0);
   if(particleMesh)particleMesh.geometry.setDrawRange(0,0);
-  studyPlugin.setCondition(c,terrain.initial_level_m);
-  const q=studyPlugin.previewRelease;
-  $('previewFlow').textContent=`${q.toFixed(2)} m³/s`;
-  $('releaseStatus').textContent=q>0?'Release through visible openings':'Reservoir held upstream · no release';
+  studyPlugin.setCondition(c,previewLevelInfo.level-terrain.origin[2]);
+  $('reservoirLevel').textContent=`Full reservoir · ${previewLevelInfo.level.toFixed(2)} m`;
+  $('reservoirLevel').title=previewLevelInfo.source;
   $('conditionMode').textContent='Interactive architectural preview';
   $('timeRegion').textContent='PREVIEW';$('timeRegion').className='time-region';
-  $('physicsStatus').textContent=`${c.state==='intact'?'Intact structure':$('damageType').selectedOptions[0].textContent} · solid dam and terrain contact · gravity 9.81 m/s² · local illustrative flow ${q.toFixed(2)} m³/s`;
+  updateVisualControls();
+  applyViewVisibility();
   viewport.classList.remove('forecast-state');
+}
+function updateVisualControls(){
+  if(!studyPlugin||!previewActive)return;
+  const state=studyPlugin.simulationState,q=studyPlugin.previewRelease??0;
+  $('previewStart').disabled=solverBusy||state==='running';$('previewStart').textContent=state==='paused'?'Resume simulation':'Start visual simulation';
+  $('previewPause').disabled=solverBusy||state!=='running';$('previewReset').disabled=solverBusy||state==='ready';
+  $('visualClock').textContent=`${studyPlugin.time.toFixed(1)} s`;$('visualState').textContent=state.toUpperCase();
+  $('previewFlow').textContent=`${q.toFixed(2)} m³/s`;
+  $('releaseStatus').textContent=state==='ready'?'Ready · no release until Start':state==='paused'?'Paused · water and clock frozen':q>0?'Running · release advancing downstream':'Running · intact dam, no release';
+  $('physicsStatus').textContent=`${state==='ready'?'Ready to start':state==='paused'?'Paused':'Visual simulation running'} · full reservoir ${previewLevelInfo.level.toFixed(2)} m · gravity 9.81 m/s² · local release ${q.toFixed(2)} m³/s`;
 }
 for(const [id,state] of [['intactState','intact'],['breachedState','breached']])$(id).onclick=()=>{
   $('intactState').setAttribute('aria-pressed',String(state==='intact'));$('breachedState').setAttribute('aria-pressed',String(state==='breached'));applyConditionPreview();
 };
 for(const id of ['damageType','affectedGate','failedCount','holeWidth','holeHeight','crackOpening','gateOpening'])$(id).addEventListener('input',applyConditionPreview);
 $('resetCondition').onclick=()=>{$('intactState').setAttribute('aria-pressed','true');$('breachedState').setAttribute('aria-pressed','false');$('gateOpening').value=0;applyConditionPreview();};
+$('previewStart').onclick=()=>{if(!previewActive)applyConditionPreview();studyPlugin?.startSimulation();updateVisualControls();};
+$('previewPause').onclick=()=>{studyPlugin?.pauseSimulation();updateVisualControls();};
+$('previewReset').onclick=()=>{studyPlugin?.resetSimulation();updateVisualControls();};
+$('inspectDamage').onclick=()=>{$('camera').value='damage';cameraView();if(innerWidth<900)viewport.scrollIntoView({block:'center',behavior:quality?.noMotion?'auto':'smooth'});};
+$('camera').add(new Option('Inspect selected gate','damage'));
 async function installStudy(){
   if(!studyManifest||studyPlugin||!$('showStudy').checked)return;
   if(studyManifest.assets.some(asset=>asset.role==='model'))throw new Error('Authored GLB cannot be site-fitted without a surveyed transform');
@@ -359,7 +377,7 @@ function applyViewVisibility() {
   const coverage=terrain.imagery_coverage_percent==null?'imagery unavailable':`imagery coverage ${terrain.imagery_coverage_percent.toFixed(1)}%`;
   if(close){
     scene.background.set(0x14222c);scene.fog.color.set(0x14222c);scene.fog.near=650;scene.fog.far=1800;
-    $('sceneMessage').textContent=`${mode==='diagnostic'?'Diagnostic':'Engineering'} close-up · ${assetManifest?.reconstruction_label||'provenance unavailable'} · 1:1 metre units · diffusive-wave screening replay`;
+    $('sceneMessage').textContent=`${mode==='diagnostic'?'Diagnostic':'Engineering'} close-up · ${assetManifest?.reconstruction_label||'provenance unavailable'} · 1:1 metre units · ${previewActive?'illustrative gravity-flow preview':'diffusive-wave screening replay'}`;
   }else{
     scene.background.set(0x0c1521);scene.fog.color.set(0x0c1521);scene.fog.near=1200;scene.fog.far=7000;
     $('sceneMessage').textContent=`${terrain.crs} · ${terrain.cell_size_m.toFixed(0)} m grid · 1:1 vertical scale · ${coverage} · ${terrain.reconstruction_tier}`;
@@ -369,6 +387,15 @@ function cameraView() {
   if(!terrain||!camera)return;const span=terrain.bounds[2]-terrain.bounds[0],height=terrain.project.dam_height_m;
   const mode=$('camera').value;
   const previousPosition=camera.position.clone(),previousTarget=controls.target.clone();
+  if(mode==='damage'&&studyPlugin){
+    const gate=[...studyPlugin.gates.values()][condition().gateIndex-1],g=studyPlugin.geometry;
+    const y=gate.release?.elevation??g.height_m+g.gate_height_m*.3;
+    studyPlugin.root.updateWorldMatrix(true,false);
+    const target=studyPlugin.root.localToWorld(new THREE.Vector3(gate.x,y,1));
+    const position=studyPlugin.root.localToWorld(new THREE.Vector3(gate.x+4,y+3,29));
+    controls.target.copy(target);camera.position.copy(position);cameraGoal=null;targetGoal=null;
+    applyViewVisibility();controls.update();return;
+  }
   if(mode==='dam'||mode==='crest'){
     const box=new THREE.Box3().setFromObject(damGroup),center=box.getCenter(new THREE.Vector3());
     const extent=box.getSize(new THREE.Vector3()).length()||terrain.project.dam_length_m||1000;
@@ -397,7 +424,7 @@ function resize(){if(!renderer)return;const w=viewport.clientWidth,h=viewport.cl
 export function sceneDiagnostics(){
   if(!studyPlugin||!engineeringWater?.geometry.attributes.position)return {ready:false};
   const g=studyPlugin.geometry,p=engineeringWater.geometry.attributes.position;
-  let reservoirCrossings=0,groundIntersections=0,releaseIntersections=0;
+  let reservoirCrossings=0,groundIntersections=0,releaseIntersections=0,debrisWaterIntersections=0,debrisGroundIntersections=0;
   for(let i=0;i<p.count;i++){
     const local=toDamLocal(p.getX(i),-p.getY(i),studyPlugin.root.rotation.y);
     if(Math.abs(local.x)<studyPlugin.width/2-.01&&local.z>-g.deck_width_m+.01)reservoirCrossings++;
@@ -410,18 +437,52 @@ export function sceneDiagnostics(){
   }
   for(const gate of studyPlugin.gates.values())if(gate.water.visible){
     const p=gate.water.geometry.attributes.position;
-    for(let i=0;i<p.count;i++){const z=p.getZ(i),solid=z<=g.chute_length_m?studyPlugin.profile(g,Math.max(0,z)):0;if(p.getY(i)<solid-.001)releaseIntersections++;}
+    for(let i=0;i<p.count;i++){
+      const z=p.getZ(i),y=p.getY(i),solid=z<=g.chute_length_m?studyPlugin.profile(g,Math.max(0,z)):0;if(y<solid-.001)releaseIntersections++;
+      for(const mesh of studyPlugin.debris){const hit=gateSlabInterval(p.getX(i),z,{position:mesh.position,angle:mesh.rotation.x,width:mesh.userData.width,height:g.gate_height_m});if(hit&&y>hit.bottom+.001&&y<hit.top-.001)debrisWaterIntersections++;}
+    }
+  }
+  for(const mesh of studyPlugin.debris)for(const dy of [-g.gate_height_m/2,g.gate_height_m/2])for(const dz of [-.25,.25]){
+    const c=Math.cos(mesh.rotation.x),s=Math.sin(mesh.rotation.x),y=mesh.position.y+dy*c-dz*s,z=mesh.position.z+dy*s+dz*c;
+    if(y<studyPlugin.profile(g,z)-.001)debrisGroundIntersections++;
+  }
+  const apertures=[];studyPlugin.root.updateWorldMatrix(true,true);
+  for(const [id,gate] of studyPlugin.gates)if(gate.damage){
+    const source=gate.release.sources[Math.floor(gate.release.sources.length/2)];
+    const origin=studyPlugin.root.localToWorld(new THREE.Vector3(gate.x+source.x,source.y,4));
+    const direction=new THREE.Vector3(0,0,-1).transformDirection(studyPlugin.root.matrixWorld);
+    const ray=new THREE.Raycaster(origin,direction,0,4);
+    apertures.push({id,area:gate.release.area,physicalHole:ray.intersectObject(gate.damage,false).length===0});
   }
   return {ready:true,previewActive,condition:condition(),discharge:studyPlugin.previewRelease,
-    reservoirCrossings,groundIntersections,releaseIntersections,
+    simulationState:studyPlugin.simulationState,simulationTime:studyPlugin.time,apertures,
+    fronts:[...studyPlugin.gates.values()].map(gate=>gate.frontDistance??0),
+    reservoirCrossings,groundIntersections,releaseIntersections,debrisWaterIntersections,debrisGroundIntersections,
     gateCount:studyPlugin.gates.size,flowingGates:[...studyPlugin.gates.values()].filter(gate=>gate.water.visible).length,
     debris:studyPlugin.debris.length,foundationElevation:studyFit.groundElevationM,
-    crestElevation:studyFit.crestElevationM,damHeight:terrain.project.dam_height_m};
+    crestElevation:studyFit.crestElevationM,damHeight:terrain.project.dam_height_m,
+    reservoirElevation:previewActive?previewLevelInfo?.level:displayedWaterLevel,sillElevation:studyFit.groundElevationM+g.height_m};
 }
 new ResizeObserver(resize).observe(viewport);
-function animate(now=performance.now()){requestAnimationFrame(animate);if(renderer){const elapsed=now-lastAnimationTime;lastAnimationTime=now;if(cameraGoal&&!quality?.noMotion){camera.position.lerp(cameraGoal,.1);controls.target.lerp(targetGoal,.1);if(camera.position.distanceTo(cameraGoal)<.05){camera.position.copy(cameraGoal);controls.target.copy(targetGoal);cameraGoal=null;}}controls.update();effects?.animate(now,quality?.noMotion);studyPlugin?.update(now*.001);for(const mesh of [waterMesh,engineeringWater])if(mesh?.material?.uniforms?.time)mesh.material.uniforms.time.value=now*.001;renderer.render(scene,camera);quality?.sample(elapsed);diagnostics?.update(latest);}}animate();
+function animate(now=performance.now()){
+  requestAnimationFrame(animate);if(!renderer)return;
+  const elapsed=now-lastAnimationTime;lastAnimationTime=now;
+  if(cameraGoal&&!quality?.noMotion){
+    camera.position.lerp(cameraGoal,.1);controls.target.lerp(targetGoal,.1);
+    if(camera.position.distanceTo(cameraGoal)<.05){camera.position.copy(cameraGoal);controls.target.copy(targetGoal);cameraGoal=null;}
+  }
+  controls.update();
+  if(previewActive){studyPlugin?.advanceSimulation(document.hidden?0:elapsed/1000);updateVisualControls();}
+  else if(!quality?.noMotion)effects?.animate(now,false);
+  if(!quality?.noMotion){const time=previewActive?(studyPlugin?.time??0):now*.001;for(const mesh of [waterMesh,engineeringWater])if(mesh?.material?.uniforms?.time)mesh.material.uniforms.time.value=time;}
+  renderer.render(scene,camera);quality?.sample(elapsed);diagnostics?.update(latest);
+}animate();
 function showFrame(frame) {
   previewActive=false;
+  studyPlugin?.pauseSimulation();$('previewStart').disabled=solverBusy;$('previewStart').textContent='Start visual simulation';$('previewPause').disabled=true;$('previewReset').disabled=true;
+  $('visualState').textContent='SAVED REPLAY';$('visualClock').textContent=`${frame.time_s.toFixed(1)} s`;
+  $('reservoirLevel').textContent=`Replay reservoir · ${frame.reservoir.elevation_m.toFixed(2)} m`;$('reservoirLevel').title='Saved hydraulic model output';
+  applyViewVisibility();
   $('conditionMode').textContent='Saved hydraulic replay · use a condition control to return to preview';
   $('previewFlow').textContent='—';$('releaseStatus').textContent='Replay discharge shown in telemetry';
   viewport.classList.remove('forecast-state');latest=frame;selectedFrame=frame.index;$('timeline').value=frame.index;$('clock').textContent=`${frame.time_s.toFixed(1)} s`;
@@ -477,7 +538,7 @@ async function prepare(values=scenario()) {
 }
 $('scenario').elements.breach_depth_m.addEventListener('input',event=>{event.target.dataset.userSet='true';});
 $('scenario').addEventListener('invalid',event=>event.target.closest('details')?.setAttribute('open',''),true);
-function setBusy(busy){$('start').disabled=busy;$('stop').disabled=!busy;$('project').disabled=busy;$('conditionControls').disabled=busy;}
+function setBusy(busy){solverBusy=busy;$('start').disabled=busy;$('stop').disabled=!busy;$('project').disabled=busy;$('conditionControls').disabled=busy;if(!previewActive)$('previewStart').disabled=busy;updateVisualControls();}
 function connect(id) {
   socket?.close();socket=new WebSocket(`${location.protocol==='https:'?'wss':'ws'}://${location.host}/ws/simulation/${id}`);
   socket.onmessage=async event=>{

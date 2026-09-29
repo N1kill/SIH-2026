@@ -6,11 +6,13 @@
 <main><aside class="scenario-panel"><section class="condition-panel" aria-labelledby="conditionHeading">
 <span class="panel-eyebrow">SCENARIO CONTROL</span><h1 id="conditionHeading">Dam condition</h1>
 <p id="conditionMode" class="field-note" role="status">Interactive architectural preview</p>
+<div class="visual-playback" aria-label="Visual simulation playback"><p id="reservoirLevel">Full reservoir</p><div class="simulation-clock"><span id="visualState">READY</span><output id="visualClock" aria-label="Simulation elapsed time" aria-live="off">0.0 s</output></div><button id="previewStart" type="button" class="primary" disabled>Start visual simulation</button><div class="pair"><button id="previewPause" type="button" disabled>Pause</button><button id="previewReset" type="button" disabled>Reset simulation</button></div></div>
 <fieldset id="conditionControls"><legend class="sr-only">Interactive dam controls</legend>
 <div class="state-switch" role="group" aria-label="Dam condition"><button id="intactState" type="button" aria-pressed="true">Intact</button><button id="breachedState" type="button" aria-pressed="false">Breached</button></div>
 <fieldset id="breachFields" disabled><legend>Breach type</legend>
 <label for="damageType">Failure mode<select id="damageType"><option value="crack">Minor crack</option><option value="partial">Gate hole</option><option value="full">Gate break</option></select></label>
 <label for="affectedGate">Affected gate<select id="affectedGate"><option value="1">Gate 1</option></select></label>
+<button id="inspectDamage" type="button">Inspect selected gate</button>
 <div id="holeWidthControl"><label for="holeWidth">Breach width <output id="holeWidthValue">2.0 m</output><input id="holeWidth" type="range" min="0.1" max="10" step="0.1" value="2"></label></div>
 <div id="holeHeightControl" hidden><label for="holeHeight">Breach height <output id="holeHeightValue">1.0 m</output><input id="holeHeight" type="range" min="0.1" max="8" step="0.1" value="1"></label></div>
 <div id="crackControl"><label for="crackOpening">Crack opening <output id="crackOpeningValue">10 mm</output><input id="crackOpening" type="range" min="1" max="50" step="1" value="10"></label></div>
@@ -19,7 +21,7 @@
 <label for="gateOpening">Undamaged gate opening <output id="gateOpeningValue">0.0 m · closed</output><input id="gateOpening" type="range" min="0" max="9" step="0.1" value="0"></label>
 <button id="resetCondition" type="button">Reset to intact · close gates</button>
 </fieldset>
-<div class="condition-readout"><span id="releaseStatus">Reservoir held upstream</span><strong id="previewFlow">0.00 m³/s</strong><small>Illustrative local release · gravity 9.81 m/s²</small></div>
+<div class="condition-readout"><span id="releaseStatus">Ready · no release until Start</span><strong id="previewFlow">0.00 m³/s</strong><small>Illustrative local release · gravity 9.81 m/s²</small></div>
 <p class="field-note">Template gate geometry; ideal-head discharge uses an assumed 0.62 coefficient. Use the hydraulic scenario below for saved flood results.</p>
 </section><details class="solver-controls"><summary>Hydraulic scenario &amp; saved replay</summary><form id="scenario">
 <label>Dam / project<select id="project" name="project_id"></select></label>
@@ -34,7 +36,7 @@
 <details><summary>Initiation and gate schedule</summary><div class="pair"><label>Pipe seed diameter (m)<input name="piping_diameter_m" type="number" value="0.25" min="0.01" max="20" step="0.01"></label><label>Gate schedule (JSON)<textarea name="gate_schedule" rows="3" placeholder='[{"time_s":0,"gate_id":"all","opening_m":0}]'></textarea></label></div><p class="field-note">Gate commands apply only to structures present in the approved project schema.</p></details>
 <div class="pair"><label>Duration (s)<input name="duration_s" type="number" value="1800" min="1" max="86400"></label><label>Timestep (s)<input name="dt_s" type="number" value="2" min="0.01" max="30" step="0.01"></label></div>
 <details><summary>Resolution and near field</summary><label>Grid cells per side<input name="grid_size" type="number" value="100" min="20" max="200"></label><label>Domain half-width (m)<input name="domain_half_width_m" type="number" value="6000" min="500" max="30000"></label><label>Manning roughness n<input name="manning_n" type="number" value="0.04" min="0.01" max="0.3" step="0.005"></label><label>Near-field mode<select name="near_field"><option value="hydraulic">Hydraulic boundary</option><option value="sph">SPH diagnostic slice (separate clock)</option></select></label></details>
-<button id="start" type="submit" class="primary">Run scenario</button><button id="stop" type="button" disabled>Cancel solver</button>
+<button id="start" type="submit" class="primary">Run flood model</button><button id="stop" type="button" disabled>Cancel solver</button>
 </form></details><p id="status" role="status">Preparing project…</p><progress id="progress" max="1" value="0" aria-label="Simulation progress"></progress>
 <p><a href="/twin/studio.html">Open dam asset studio →</a></p>
 <details><summary>Scientific context and provenance</summary><div id="provenance"></div></details>

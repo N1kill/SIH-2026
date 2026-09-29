@@ -1,5 +1,27 @@
 # SIH-2026 Pipeline Development Progress
 
+## 2026-09-29 — 3D contact boundaries and dam condition controls
+
+- The engineering reference now uses the configured crest and structural height
+  for its foundation datum. A labeled local excavation fits the visual terrain
+  around the foundation, chute and apron; the original DEM and solver inputs are
+  unchanged. Gate sill is derived from template gate height when no project sill
+  is available, rather than being placed at the starting water surface.
+- Reservoir triangles are clipped against the rotated upstream dam face and
+  embankment boundary. Release surfaces follow gravity and solid chute/terrain
+  contact. Broken gate slabs fall under gravity, settle against the chute and
+  act as obstacles to the visual release.
+- Restored Intact/Breached, crack, gate-hole, gate-break, affected-gate, breach-size,
+  failed-gate-count and gate-opening controls. These drive an explicitly labeled
+  architectural preview with ideal-head discharge; saved hydraulic replays remain
+  separate. Reset closes all gates and restores zero release.
+- Moved scene information out of the canvas and made the surrounding panels and
+  timeline wrap within the available width. Added browser checks for closed-gate
+  dryness, terrain/water contact, gate failure/reset and responsive control bounds.
+- The focused JavaScript suite covers clipping, datum fit, gravity, ground contact
+  and rotated gate collision (13 tests). Browser screenshots are generated locally
+  under `.tmp/twin-qa` by `scripts/verify_twin_browser.mjs`.
+
 ## 2026-09-29 — PRALAYA simulation view integration
 
 - The `frontend-dam` landing page now hands off to the existing React 2D GIS

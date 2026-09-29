@@ -44,6 +44,16 @@ test('intact dam leaves the downstream side dry even below reservoir level',()=>
   assert.equal(area(waterSurfacePositions(downstreamOnly,[0,0,0],0)),0);
 });
 
+test('masked high banks still clip water by their actual interpolated elevation',()=>{
+  const bank={grid_size:2,bounds:[0,0,2,2],valid:[[true,true],[true,true]],
+    reservoir_mask:[[true,false],[true,false]],elevation:[[0,10],[0,10]]};
+  const positions=waterSurfacePositions(bank,[0,0,0],1);
+  assert.ok(positions.length>0);
+  for(let i=0;i<positions.length;i+=3)assert.ok(positions[i]<=.600001,'Water enters elevated bank');
+  bank.valid[0][1]=false;
+  assert.equal(waterSurfacePositions(bank,[0,0,0],1).length,0,'Nodata cells cannot form a water bridge');
+});
+
 test('visual shoreline connector remains local, valid-only and separate from source',()=>{
   const dry={grid_size:4,bounds:[-2,-2,2,2],valid:Array.from({length:4},()=>[true,true,true,true]),
     reservoir_mask:Array.from({length:4},()=>[false,false,false,false]),elevation:Array.from({length:4},()=>[0,0,0,0])};

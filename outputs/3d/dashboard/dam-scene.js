@@ -78,8 +78,8 @@ function nearestDistance(stations){let best=stations[0],value=Infinity;for(const
 
 function evidenceValue(value,fallback){return Number.isFinite(value?.value)?value.value:fallback;}
 
-function addRiprap(group,stations,breachDistance,height,materials,elevationAt,crestWidth){
-  const selected=stations.filter((station,index)=>index%3===0&&Math.abs(station.distance-breachDistance)<440);
+function addRiprap(group,stations,breachDistance,height,materials,elevationAt,crestWidth,visualGapM=0){
+  const selected=stations.filter((station,index)=>index%3===0&&Math.abs(station.distance-breachDistance)<440&&Math.abs(station.distance-breachDistance)>visualGapM/2+4);
   if(!selected.length)return;
   const geometry=new THREE.DodecahedronGeometry(1,0),mesh=new THREE.InstancedMesh(geometry,materials.rock,selected.length*2),dummy=new THREE.Object3D();let instance=0;
   for(const station of selected){for(const side of [-1,1]){
@@ -148,7 +148,7 @@ export function buildDamAssembly({terrain,manifest,elevationAt,materials,visualG
   });
   const roadGeometry=new THREE.BufferGeometry();roadGeometry.setAttribute('position',new THREE.Float32BufferAttribute(roadPositions,3));roadGeometry.setAttribute('uv',new THREE.Float32BufferAttribute(roadUv,2));roadGeometry.setIndex(roadIndices);roadGeometry.computeVertexNormals();
   const road=new THREE.Mesh(roadGeometry,materials.crest);road.castShadow=road.receiveShadow=true;road.name=`Crest surface · assumed width ${crestWidth.toFixed(1)} m`;road.userData.deformation=roadMeta;group.add(road);
-  addRiprap(group,stations,breachDistance,height,materials,elevationAt,crestWidth);
+  addRiprap(group,stations,breachDistance,height,materials,elevationAt,crestWidth,visualGapM);
   const structures=buildApprovedSpillway(group,manifest,materials,height);
   const sourceLength=total,dimensionError=project.dam_length_m?Math.abs(sourceLength-project.dam_length_m)/project.dam_length_m:0;
   return {group,deformMeshes:[dam,road],pickables:[dam,road,...structures.objects],breachDistance,height,crest,crestWidth,

@@ -21,5 +21,5 @@ for(const [source,name] of [['build/three.module.js','three.module.js'],['build/
   await copyFile(new URL('../node_modules/three/'+source,import.meta.url),new URL(name,target));
 }
 await cp(new URL('../node_modules/three/examples/jsm/',import.meta.url),new URL('addons/',target),{recursive:true});
-for(const name of ['twin.html','twin.css','twin.js','replay-modules.js','dam-scene.js','water-surface.js','studio.html','studio.js','dam-scene-plugin.js'])await access(new URL('../outputs/3d/dashboard/'+name,import.meta.url));
+for(const name of ['twin.html','twin.css','twin.js','replay-modules.js','dam-scene.js','water-surface.js','scene-physics.js','gate-aperture.js','studio.html','studio.js','dam-scene-plugin.js'])await access(new URL('../outputs/3d/dashboard/'+name,import.meta.url));
 console.log('PRALAYA frontend, /simulation/ 2D operations, and /twin/twin.html 3D twin ready. Serve with uvicorn server:app.');

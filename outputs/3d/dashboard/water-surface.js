@@ -3,24 +3,26 @@
 export function waterSurfacePositions(source,origin,level){
   const n=source.grid_size,b=source.bounds,dx=(b[2]-b[0])/n,dz=(b[3]-b[1])/n;
   const points=[];
-  const vertex=(r,c)=>({
-    x:b[0]+(c+.5)*dx-origin[0],z:origin[1]-(b[3]-(r+.5)*dz),
-    value:source.valid[r][c]&&source.reservoir_mask[r][c]
-      ? Math.min(level-source.elevation[r][c],dx*.5) : -dx*.5,
-  });
-  const edge=(a,b)=>{const t=a.value/(a.value-b.value);return {x:a.x+(b.x-a.x)*t,z:a.z+(b.z-a.z)*t};};
-  const triangle=(vertices)=>{
+  const vertex=(r,c)=>({x:b[0]+(c+.5)*dx-origin[0],z:origin[1]-(b[3]-(r+.5)*dz),height:source.elevation[r][c],mask:source.reservoir_mask[r][c]?1:-1});
+  const clip=(vertices,distance)=>{
     const clipped=[];
-    for(let i=0;i<3;i++){
-      const a=vertices[i],b=vertices[(i+1)%3],insideA=a.value>0,insideB=b.value>0;
+    for(let i=0;i<vertices.length;i++){
+      const a=vertices[i],b=vertices[(i+1)%vertices.length],da=distance(a),db=distance(b),insideA=da>0,insideB=db>0;
       if(insideA)clipped.push(a);
-      if(insideA!==insideB)clipped.push(edge(a,b));
+      if(insideA!==insideB){const t=da/(da-db);clipped.push({x:a.x+(b.x-a.x)*t,z:a.z+(b.z-a.z)*t,height:a.height+(b.height-a.height)*t,mask:a.mask+(b.mask-a.mask)*t});}
     }
+    return clipped;
+  };
+  const triangle=(vertices)=>{
+    // Clip footprint and elevation independently: a masked high bank must not be
+    // treated as an invented low elevation at the edge of a water triangle.
+    const clipped=clip(clip(vertices,p=>p.mask),p=>level-p.height);
     for(let i=1;i<clipped.length-1;i++){
       for(const p of [clipped[0],clipped[i],clipped[i+1]])points.push(p.x,0,p.z);
     }
   };
   for(let r=0;r<n-1;r++)for(let c=0;c<n-1;c++){
+    if(!source.valid[r][c]||!source.valid[r+1][c]||!source.valid[r][c+1]||!source.valid[r+1][c+1])continue;
     const a=vertex(r,c),b=vertex(r+1,c),d=vertex(r,c+1),e=vertex(r+1,c+1);
     triangle([a,b,d]);triangle([d,b,e]);
   }

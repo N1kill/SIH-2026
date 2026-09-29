@@ -21,11 +21,11 @@ export function foundationHeight(x,z,ground,site){
 
 // Gravity trajectory with unilateral contact against the solid chute/ground.
 // Stops when a solid obstacle is above the available hydraulic energy head.
-export function releaseProfile({elevation,speed,length,segments,supportAt,thickness=.04}){
+export function releaseProfile({elevation,speed,length,segments,supportAt,thickness=.04,distances}){
   const points=[],v=Math.max(.05,speed),energy=elevation+v*v/(2*GRAVITY);
   let y=elevation,velocity=v;
-  for(let i=0;i<=segments;i++){
-    const distance=i*length/segments,support=supportAt(distance);
+  for(const distance of distances??Array.from({length:segments+1},(_,i)=>i*length/segments)){
+    const support=supportAt(distance);
     if(!Number.isFinite(support)||support>energy+.001)break;
     const freeFall=elevation-GRAVITY*(distance/v)**2*.5;
     y=Math.max(freeFall,support)+thickness;
@@ -33,6 +33,34 @@ export function releaseProfile({elevation,speed,length,segments,supportAt,thickn
     points.push({distance,y,velocity});
   }
   return points;
+}
+
+export function timedRelease(profile,time){
+  if(time<=0||!profile.length)return [];
+  let arrival=0;const visible=[];
+  for(let i=0;i<profile.length;i++){
+    const point={...profile[i]};
+    if(i)arrival+=(point.distance-profile[i-1].distance)/Math.max(.05,(point.velocity+profile[i-1].velocity)/2);
+    point.arrival=arrival;
+    if(arrival>time){
+      const a=visible.at(-1);if(a){const f=(time-a.arrival)/(arrival-a.arrival);visible.push({distance:a.distance+(point.distance-a.distance)*f,y:a.y+(point.y-a.y)*f,velocity:a.velocity+(point.velocity-a.velocity)*f,arrival:time});}break;
+    }
+    visible.push(point);
+  }
+  return visible;
+}
+
+// Vertical collision interval through a gate slab rotated about its local X axis.
+export function gateSlabInterval(x,z,{position,angle,width,height,thickness=.5}){
+  if(Math.abs(x-position.x)>width/2+1e-7)return null;
+  const c=Math.cos(angle),s=Math.sin(angle),dz=z-position.z;
+  let lower=-Infinity,upper=Infinity;
+  for(const [a,b,extent] of [[c,s*dz,height/2],[-s,c*dz,thickness/2]]){
+    if(Math.abs(a)<1e-8){if(Math.abs(b)>extent+1e-7)return null;continue;}
+    const y1=(-extent-b)/a,y2=(extent-b)/a;
+    lower=Math.max(lower,Math.min(y1,y2));upper=Math.min(upper,Math.max(y1,y2));
+  }
+  return lower<=upper+1e-7?{bottom:position.y+lower,top:position.y+upper}:null;
 }
 
 // Clip complete triangles at the dam's upstream face, including edge crossings.
