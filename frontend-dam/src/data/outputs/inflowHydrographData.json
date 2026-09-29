@@ -1,0 +1,1850 @@
+[
+  {
+    "hour": 0,
+    "datetime": "1979-08-05 00:00:00",
+    "rainfall_mm": 0.18,
+    "runoff_mm": 0.04,
+    "inflow_m3s": 0.0
+  },
+  {
+    "hour": 1,
+    "datetime": "1979-08-05 01:00:00",
+    "rainfall_mm": 0.18,
+    "runoff_mm": 0.04,
+    "inflow_m3s": 0.0
+  },
+  {
+    "hour": 2,
+    "datetime": "1979-08-05 02:00:00",
+    "rainfall_mm": 0.19,
+    "runoff_mm": 0.04,
+    "inflow_m3s": 0.1
+  },
+  {
+    "hour": 3,
+    "datetime": "1979-08-05 03:00:00",
+    "rainfall_mm": 0.23,
+    "runoff_mm": 0.05,
+    "inflow_m3s": 0.1
+  },
+  {
+    "hour": 4,
+    "datetime": "1979-08-05 04:00:00",
+    "rainfall_mm": 0.26,
+    "runoff_mm": 0.06,
+    "inflow_m3s": 0.2
+  },
+  {
+    "hour": 5,
+    "datetime": "1979-08-05 05:00:00",
+    "rainfall_mm": 0.26,
+    "runoff_mm": 0.06,
+    "inflow_m3s": 0.4
+  },
+  {
+    "hour": 6,
+    "datetime": "1979-08-05 06:00:00",
+    "rainfall_mm": 0.31,
+    "runoff_mm": 0.07,
+    "inflow_m3s": 0.7
+  },
+  {
+    "hour": 7,
+    "datetime": "1979-08-05 07:00:00",
+    "rainfall_mm": 0.34,
+    "runoff_mm": 0.08,
+    "inflow_m3s": 1.0
+  },
+  {
+    "hour": 8,
+    "datetime": "1979-08-05 08:00:00",
+    "rainfall_mm": 0.44,
+    "runoff_mm": 0.1,
+    "inflow_m3s": 1.4
+  },
+  {
+    "hour": 9,
+    "datetime": "1979-08-05 09:00:00",
+    "rainfall_mm": 0.55,
+    "runoff_mm": 0.13,
+    "inflow_m3s": 2.0
+  },
+  {
+    "hour": 10,
+    "datetime": "1979-08-05 10:00:00",
+    "rainfall_mm": 0.88,
+    "runoff_mm": 0.2,
+    "inflow_m3s": 2.8
+  },
+  {
+    "hour": 11,
+    "datetime": "1979-08-05 11:00:00",
+    "rainfall_mm": 6.94,
+    "runoff_mm": 1.59,
+    "inflow_m3s": 3.7
+  },
+  {
+    "hour": 12,
+    "datetime": "1979-08-05 12:00:00",
+    "rainfall_mm": 1.77,
+    "runoff_mm": 0.41,
+    "inflow_m3s": 5.4
+  },
+  {
+    "hour": 13,
+    "datetime": "1979-08-05 13:00:00",
+    "rainfall_mm": 0.78,
+    "runoff_mm": 0.18,
+    "inflow_m3s": 7.6
+  },
+  {
+    "hour": 14,
+    "datetime": "1979-08-05 14:00:00",
+    "rainfall_mm": 0.49,
+    "runoff_mm": 0.11,
+    "inflow_m3s": 10.7
+  },
+  {
+    "hour": 15,
+    "datetime": "1979-08-05 15:00:00",
+    "rainfall_mm": 0.36,
+    "runoff_mm": 0.08,
+    "inflow_m3s": 14.3
+  },
+  {
+    "hour": 16,
+    "datetime": "1979-08-05 16:00:00",
+    "rainfall_mm": 0.29,
+    "runoff_mm": 0.07,
+    "inflow_m3s": 18.3
+  },
+  {
+    "hour": 17,
+    "datetime": "1979-08-05 17:00:00",
+    "rainfall_mm": 0.26,
+    "runoff_mm": 0.06,
+    "inflow_m3s": 22.8
+  },
+  {
+    "hour": 18,
+    "datetime": "1979-08-05 18:00:00",
+    "rainfall_mm": 0.23,
+    "runoff_mm": 0.05,
+    "inflow_m3s": 27.8
+  },
+  {
+    "hour": 19,
+    "datetime": "1979-08-05 19:00:00",
+    "rainfall_mm": 0.21,
+    "runoff_mm": 0.05,
+    "inflow_m3s": 33.6
+  },
+  {
+    "hour": 20,
+    "datetime": "1979-08-05 20:00:00",
+    "rainfall_mm": 0.21,
+    "runoff_mm": 0.05,
+    "inflow_m3s": 39.7
+  },
+  {
+    "hour": 21,
+    "datetime": "1979-08-05 21:00:00",
+    "rainfall_mm": 0.19,
+    "runoff_mm": 0.04,
+    "inflow_m3s": 46.4
+  },
+  {
+    "hour": 22,
+    "datetime": "1979-08-05 22:00:00",
+    "rainfall_mm": 0.19,
+    "runoff_mm": 0.04,
+    "inflow_m3s": 53.2
+  },
+  {
+    "hour": 23,
+    "datetime": "1979-08-05 23:00:00",
+    "rainfall_mm": 0.49,
+    "runoff_mm": 0.11,
+    "inflow_m3s": 59.3
+  },
+  {
+    "hour": 24,
+    "datetime": "1979-08-06 00:00:00",
+    "rainfall_mm": 0.12,
+    "runoff_mm": 0.02,
+    "inflow_m3s": 64.9
+  },
+  {
+    "hour": 25,
+    "datetime": "1979-08-06 01:00:00",
+    "rainfall_mm": 0.12,
+    "runoff_mm": 0.02,
+    "inflow_m3s": 69.5
+  },
+  {
+    "hour": 26,
+    "datetime": "1979-08-06 02:00:00",
+    "rainfall_mm": 0.13,
+    "runoff_mm": 0.02,
+    "inflow_m3s": 73.3
+  },
+  {
+    "hour": 27,
+    "datetime": "1979-08-06 03:00:00",
+    "rainfall_mm": 0.15,
+    "runoff_mm": 0.02,
+    "inflow_m3s": 76.1
+  },
+  {
+    "hour": 28,
+    "datetime": "1979-08-06 04:00:00",
+    "rainfall_mm": 0.17,
+    "runoff_mm": 0.02,
+    "inflow_m3s": 78.0
+  },
+  {
+    "hour": 29,
+    "datetime": "1979-08-06 05:00:00",
+    "rainfall_mm": 0.17,
+    "runoff_mm": 0.02,
+    "inflow_m3s": 79.1
+  },
+  {
+    "hour": 30,
+    "datetime": "1979-08-06 06:00:00",
+    "rainfall_mm": 0.21,
+    "runoff_mm": 0.03,
+    "inflow_m3s": 79.5
+  },
+  {
+    "hour": 31,
+    "datetime": "1979-08-06 07:00:00",
+    "rainfall_mm": 0.23,
+    "runoff_mm": 0.03,
+    "inflow_m3s": 79.5
+  },
+  {
+    "hour": 32,
+    "datetime": "1979-08-06 08:00:00",
+    "rainfall_mm": 0.29,
+    "runoff_mm": 0.04,
+    "inflow_m3s": 78.3
+  },
+  {
+    "hour": 33,
+    "datetime": "1979-08-06 09:00:00",
+    "rainfall_mm": 0.37,
+    "runoff_mm": 0.05,
+    "inflow_m3s": 76.7
+  },
+  {
+    "hour": 34,
+    "datetime": "1979-08-06 10:00:00",
+    "rainfall_mm": 0.59,
+    "runoff_mm": 0.08,
+    "inflow_m3s": 74.7
+  },
+  {
+    "hour": 35,
+    "datetime": "1979-08-06 11:00:00",
+    "rainfall_mm": 4.67,
+    "runoff_mm": 0.6,
+    "inflow_m3s": 72.4
+  },
+  {
+    "hour": 36,
+    "datetime": "1979-08-06 12:00:00",
+    "rainfall_mm": 1.19,
+    "runoff_mm": 0.15,
+    "inflow_m3s": 70.0
+  },
+  {
+    "hour": 37,
+    "datetime": "1979-08-06 13:00:00",
+    "rainfall_mm": 0.52,
+    "runoff_mm": 0.07,
+    "inflow_m3s": 67.4
+  },
+  {
+    "hour": 38,
+    "datetime": "1979-08-06 14:00:00",
+    "rainfall_mm": 0.33,
+    "runoff_mm": 0.04,
+    "inflow_m3s": 64.7
+  },
+  {
+    "hour": 39,
+    "datetime": "1979-08-06 15:00:00",
+    "rainfall_mm": 0.24,
+    "runoff_mm": 0.03,
+    "inflow_m3s": 61.8
+  },
+  {
+    "hour": 40,
+    "datetime": "1979-08-06 16:00:00",
+    "rainfall_mm": 0.2,
+    "runoff_mm": 0.03,
+    "inflow_m3s": 58.9
+  },
+  {
+    "hour": 41,
+    "datetime": "1979-08-06 17:00:00",
+    "rainfall_mm": 0.17,
+    "runoff_mm": 0.02,
+    "inflow_m3s": 56.7
+  },
+  {
+    "hour": 42,
+    "datetime": "1979-08-06 18:00:00",
+    "rainfall_mm": 0.15,
+    "runoff_mm": 0.02,
+    "inflow_m3s": 54.8
+  },
+  {
+    "hour": 43,
+    "datetime": "1979-08-06 19:00:00",
+    "rainfall_mm": 0.14,
+    "runoff_mm": 0.02,
+    "inflow_m3s": 53.3
+  },
+  {
+    "hour": 44,
+    "datetime": "1979-08-06 20:00:00",
+    "rainfall_mm": 0.14,
+    "runoff_mm": 0.02,
+    "inflow_m3s": 52.2
+  },
+  {
+    "hour": 45,
+    "datetime": "1979-08-06 21:00:00",
+    "rainfall_mm": 0.13,
+    "runoff_mm": 0.02,
+    "inflow_m3s": 51.8
+  },
+  {
+    "hour": 46,
+    "datetime": "1979-08-06 22:00:00",
+    "rainfall_mm": 0.13,
+    "runoff_mm": 0.02,
+    "inflow_m3s": 51.6
+  },
+  {
+    "hour": 47,
+    "datetime": "1979-08-06 23:00:00",
+    "rainfall_mm": 0.33,
+    "runoff_mm": 0.04,
+    "inflow_m3s": 51.2
+  },
+  {
+    "hour": 48,
+    "datetime": "1979-08-07 00:00:00",
+    "rainfall_mm": 0.31,
+    "runoff_mm": 0.12,
+    "inflow_m3s": 50.9
+  },
+  {
+    "hour": 49,
+    "datetime": "1979-08-07 01:00:00",
+    "rainfall_mm": 0.31,
+    "runoff_mm": 0.12,
+    "inflow_m3s": 50.6
+  },
+  {
+    "hour": 50,
+    "datetime": "1979-08-07 02:00:00",
+    "rainfall_mm": 0.34,
+    "runoff_mm": 0.13,
+    "inflow_m3s": 50.1
+  },
+  {
+    "hour": 51,
+    "datetime": "1979-08-07 03:00:00",
+    "rainfall_mm": 0.39,
+    "runoff_mm": 0.16,
+    "inflow_m3s": 49.4
+  },
+  {
+    "hour": 52,
+    "datetime": "1979-08-07 04:00:00",
+    "rainfall_mm": 0.45,
+    "runoff_mm": 0.18,
+    "inflow_m3s": 48.7
+  },
+  {
+    "hour": 53,
+    "datetime": "1979-08-07 05:00:00",
+    "rainfall_mm": 0.45,
+    "runoff_mm": 0.18,
+    "inflow_m3s": 48.0
+  },
+  {
+    "hour": 54,
+    "datetime": "1979-08-07 06:00:00",
+    "rainfall_mm": 0.53,
+    "runoff_mm": 0.21,
+    "inflow_m3s": 47.3
+  },
+  {
+    "hour": 55,
+    "datetime": "1979-08-07 07:00:00",
+    "rainfall_mm": 0.59,
+    "runoff_mm": 0.23,
+    "inflow_m3s": 46.9
+  },
+  {
+    "hour": 56,
+    "datetime": "1979-08-07 08:00:00",
+    "rainfall_mm": 0.76,
+    "runoff_mm": 0.3,
+    "inflow_m3s": 46.5
+  },
+  {
+    "hour": 57,
+    "datetime": "1979-08-07 09:00:00",
+    "rainfall_mm": 0.95,
+    "runoff_mm": 0.38,
+    "inflow_m3s": 46.5
+  },
+  {
+    "hour": 58,
+    "datetime": "1979-08-07 10:00:00",
+    "rainfall_mm": 1.51,
+    "runoff_mm": 0.6,
+    "inflow_m3s": 46.8
+  },
+  {
+    "hour": 59,
+    "datetime": "1979-08-07 11:00:00",
+    "rainfall_mm": 11.98,
+    "runoff_mm": 4.76,
+    "inflow_m3s": 47.8
+  },
+  {
+    "hour": 60,
+    "datetime": "1979-08-07 12:00:00",
+    "rainfall_mm": 3.05,
+    "runoff_mm": 1.21,
+    "inflow_m3s": 51.0
+  },
+  {
+    "hour": 61,
+    "datetime": "1979-08-07 13:00:00",
+    "rainfall_mm": 1.34,
+    "runoff_mm": 0.53,
+    "inflow_m3s": 55.5
+  },
+  {
+    "hour": 62,
+    "datetime": "1979-08-07 14:00:00",
+    "rainfall_mm": 0.84,
+    "runoff_mm": 0.33,
+    "inflow_m3s": 62.5
+  },
+  {
+    "hour": 63,
+    "datetime": "1979-08-07 15:00:00",
+    "rainfall_mm": 0.62,
+    "runoff_mm": 0.24,
+    "inflow_m3s": 70.8
+  },
+  {
+    "hour": 64,
+    "datetime": "1979-08-07 16:00:00",
+    "rainfall_mm": 0.5,
+    "runoff_mm": 0.2,
+    "inflow_m3s": 80.5
+  },
+  {
+    "hour": 65,
+    "datetime": "1979-08-07 17:00:00",
+    "rainfall_mm": 0.45,
+    "runoff_mm": 0.18,
+    "inflow_m3s": 92.1
+  },
+  {
+    "hour": 66,
+    "datetime": "1979-08-07 18:00:00",
+    "rainfall_mm": 0.39,
+    "runoff_mm": 0.16,
+    "inflow_m3s": 105.2
+  },
+  {
+    "hour": 67,
+    "datetime": "1979-08-07 19:00:00",
+    "rainfall_mm": 0.36,
+    "runoff_mm": 0.14,
+    "inflow_m3s": 120.6
+  },
+  {
+    "hour": 68,
+    "datetime": "1979-08-07 20:00:00",
+    "rainfall_mm": 0.36,
+    "runoff_mm": 0.14,
+    "inflow_m3s": 137.2
+  },
+  {
+    "hour": 69,
+    "datetime": "1979-08-07 21:00:00",
+    "rainfall_mm": 0.34,
+    "runoff_mm": 0.13,
+    "inflow_m3s": 155.9
+  },
+  {
+    "hour": 70,
+    "datetime": "1979-08-07 22:00:00",
+    "rainfall_mm": 0.34,
+    "runoff_mm": 0.13,
+    "inflow_m3s": 174.6
+  },
+  {
+    "hour": 71,
+    "datetime": "1979-08-07 23:00:00",
+    "rainfall_mm": 0.84,
+    "runoff_mm": 0.33,
+    "inflow_m3s": 191.5
+  },
+  {
+    "hour": 72,
+    "datetime": "1979-08-08 00:00:00",
+    "rainfall_mm": 0.22,
+    "runoff_mm": 0.07,
+    "inflow_m3s": 207.0
+  },
+  {
+    "hour": 73,
+    "datetime": "1979-08-08 01:00:00",
+    "rainfall_mm": 0.22,
+    "runoff_mm": 0.07,
+    "inflow_m3s": 219.7
+  },
+  {
+    "hour": 74,
+    "datetime": "1979-08-08 02:00:00",
+    "rainfall_mm": 0.24,
+    "runoff_mm": 0.07,
+    "inflow_m3s": 229.9
+  },
+  {
+    "hour": 75,
+    "datetime": "1979-08-08 03:00:00",
+    "rainfall_mm": 0.28,
+    "runoff_mm": 0.08,
+    "inflow_m3s": 237.5
+  },
+  {
+    "hour": 76,
+    "datetime": "1979-08-08 04:00:00",
+    "rainfall_mm": 0.32,
+    "runoff_mm": 0.1,
+    "inflow_m3s": 242.3
+  },
+  {
+    "hour": 77,
+    "datetime": "1979-08-08 05:00:00",
+    "rainfall_mm": 0.32,
+    "runoff_mm": 0.1,
+    "inflow_m3s": 244.8
+  },
+  {
+    "hour": 78,
+    "datetime": "1979-08-08 06:00:00",
+    "rainfall_mm": 0.39,
+    "runoff_mm": 0.11,
+    "inflow_m3s": 245.5
+  },
+  {
+    "hour": 79,
+    "datetime": "1979-08-08 07:00:00",
+    "rainfall_mm": 0.43,
+    "runoff_mm": 0.13,
+    "inflow_m3s": 244.9
+  },
+  {
+    "hour": 80,
+    "datetime": "1979-08-08 08:00:00",
+    "rainfall_mm": 0.55,
+    "runoff_mm": 0.16,
+    "inflow_m3s": 241.0
+  },
+  {
+    "hour": 81,
+    "datetime": "1979-08-08 09:00:00",
+    "rainfall_mm": 0.69,
+    "runoff_mm": 0.2,
+    "inflow_m3s": 235.9
+  },
+  {
+    "hour": 82,
+    "datetime": "1979-08-08 10:00:00",
+    "rainfall_mm": 1.1,
+    "runoff_mm": 0.32,
+    "inflow_m3s": 229.8
+  },
+  {
+    "hour": 83,
+    "datetime": "1979-08-08 11:00:00",
+    "rainfall_mm": 8.69,
+    "runoff_mm": 2.57,
+    "inflow_m3s": 223.0
+  },
+  {
+    "hour": 84,
+    "datetime": "1979-08-08 12:00:00",
+    "rainfall_mm": 2.21,
+    "runoff_mm": 0.66,
+    "inflow_m3s": 216.3
+  },
+  {
+    "hour": 85,
+    "datetime": "1979-08-08 13:00:00",
+    "rainfall_mm": 0.97,
+    "runoff_mm": 0.29,
+    "inflow_m3s": 209.2
+  },
+  {
+    "hour": 86,
+    "datetime": "1979-08-08 14:00:00",
+    "rainfall_mm": 0.61,
+    "runoff_mm": 0.18,
+    "inflow_m3s": 202.4
+  },
+  {
+    "hour": 87,
+    "datetime": "1979-08-08 15:00:00",
+    "rainfall_mm": 0.45,
+    "runoff_mm": 0.13,
+    "inflow_m3s": 195.0
+  },
+  {
+    "hour": 88,
+    "datetime": "1979-08-08 16:00:00",
+    "rainfall_mm": 0.37,
+    "runoff_mm": 0.11,
+    "inflow_m3s": 187.9
+  },
+  {
+    "hour": 89,
+    "datetime": "1979-08-08 17:00:00",
+    "rainfall_mm": 0.32,
+    "runoff_mm": 0.1,
+    "inflow_m3s": 183.4
+  },
+  {
+    "hour": 90,
+    "datetime": "1979-08-08 18:00:00",
+    "rainfall_mm": 0.28,
+    "runoff_mm": 0.08,
+    "inflow_m3s": 180.0
+  },
+  {
+    "hour": 91,
+    "datetime": "1979-08-08 19:00:00",
+    "rainfall_mm": 0.26,
+    "runoff_mm": 0.08,
+    "inflow_m3s": 178.2
+  },
+  {
+    "hour": 92,
+    "datetime": "1979-08-08 20:00:00",
+    "rainfall_mm": 0.26,
+    "runoff_mm": 0.08,
+    "inflow_m3s": 177.6
+  },
+  {
+    "hour": 93,
+    "datetime": "1979-08-08 21:00:00",
+    "rainfall_mm": 0.24,
+    "runoff_mm": 0.07,
+    "inflow_m3s": 179.4
+  },
+  {
+    "hour": 94,
+    "datetime": "1979-08-08 22:00:00",
+    "rainfall_mm": 0.24,
+    "runoff_mm": 0.07,
+    "inflow_m3s": 181.8
+  },
+  {
+    "hour": 95,
+    "datetime": "1979-08-08 23:00:00",
+    "rainfall_mm": 0.61,
+    "runoff_mm": 0.18,
+    "inflow_m3s": 183.5
+  },
+  {
+    "hour": 96,
+    "datetime": "1979-08-09 00:00:00",
+    "rainfall_mm": 0.08,
+    "runoff_mm": 0.0,
+    "inflow_m3s": 185.3
+  },
+  {
+    "hour": 97,
+    "datetime": "1979-08-09 01:00:00",
+    "rainfall_mm": 0.08,
+    "runoff_mm": 0.0,
+    "inflow_m3s": 186.2
+  },
+  {
+    "hour": 98,
+    "datetime": "1979-08-09 02:00:00",
+    "rainfall_mm": 0.08,
+    "runoff_mm": 0.0,
+    "inflow_m3s": 186.0
+  },
+  {
+    "hour": 99,
+    "datetime": "1979-08-09 03:00:00",
+    "rainfall_mm": 0.1,
+    "runoff_mm": 0.01,
+    "inflow_m3s": 184.6
+  },
+  {
+    "hour": 100,
+    "datetime": "1979-08-09 04:00:00",
+    "rainfall_mm": 0.11,
+    "runoff_mm": 0.01,
+    "inflow_m3s": 182.2
+  },
+  {
+    "hour": 101,
+    "datetime": "1979-08-09 05:00:00",
+    "rainfall_mm": 0.11,
+    "runoff_mm": 0.01,
+    "inflow_m3s": 179.0
+  },
+  {
+    "hour": 102,
+    "datetime": "1979-08-09 06:00:00",
+    "rainfall_mm": 0.13,
+    "runoff_mm": 0.01,
+    "inflow_m3s": 174.9
+  },
+  {
+    "hour": 103,
+    "datetime": "1979-08-09 07:00:00",
+    "rainfall_mm": 0.15,
+    "runoff_mm": 0.01,
+    "inflow_m3s": 170.5
+  },
+  {
+    "hour": 104,
+    "datetime": "1979-08-09 08:00:00",
+    "rainfall_mm": 0.19,
+    "runoff_mm": 0.01,
+    "inflow_m3s": 164.8
+  },
+  {
+    "hour": 105,
+    "datetime": "1979-08-09 09:00:00",
+    "rainfall_mm": 0.24,
+    "runoff_mm": 0.01,
+    "inflow_m3s": 158.6
+  },
+  {
+    "hour": 106,
+    "datetime": "1979-08-09 10:00:00",
+    "rainfall_mm": 0.38,
+    "runoff_mm": 0.02,
+    "inflow_m3s": 151.8
+  },
+  {
+    "hour": 107,
+    "datetime": "1979-08-09 11:00:00",
+    "rainfall_mm": 3.0,
+    "runoff_mm": 0.17,
+    "inflow_m3s": 144.9
+  },
+  {
+    "hour": 108,
+    "datetime": "1979-08-09 12:00:00",
+    "rainfall_mm": 0.76,
+    "runoff_mm": 0.04,
+    "inflow_m3s": 137.7
+  },
+  {
+    "hour": 109,
+    "datetime": "1979-08-09 13:00:00",
+    "rainfall_mm": 0.34,
+    "runoff_mm": 0.02,
+    "inflow_m3s": 130.0
+  },
+  {
+    "hour": 110,
+    "datetime": "1979-08-09 14:00:00",
+    "rainfall_mm": 0.21,
+    "runoff_mm": 0.01,
+    "inflow_m3s": 121.9
+  },
+  {
+    "hour": 111,
+    "datetime": "1979-08-09 15:00:00",
+    "rainfall_mm": 0.15,
+    "runoff_mm": 0.01,
+    "inflow_m3s": 113.5
+  },
+  {
+    "hour": 112,
+    "datetime": "1979-08-09 16:00:00",
+    "rainfall_mm": 0.13,
+    "runoff_mm": 0.01,
+    "inflow_m3s": 104.9
+  },
+  {
+    "hour": 113,
+    "datetime": "1979-08-09 17:00:00",
+    "rainfall_mm": 0.11,
+    "runoff_mm": 0.01,
+    "inflow_m3s": 97.4
+  },
+  {
+    "hour": 114,
+    "datetime": "1979-08-09 18:00:00",
+    "rainfall_mm": 0.1,
+    "runoff_mm": 0.01,
+    "inflow_m3s": 90.4
+  },
+  {
+    "hour": 115,
+    "datetime": "1979-08-09 19:00:00",
+    "rainfall_mm": 0.09,
+    "runoff_mm": 0.01,
+    "inflow_m3s": 83.9
+  },
+  {
+    "hour": 116,
+    "datetime": "1979-08-09 20:00:00",
+    "rainfall_mm": 0.09,
+    "runoff_mm": 0.01,
+    "inflow_m3s": 77.8
+  },
+  {
+    "hour": 117,
+    "datetime": "1979-08-09 21:00:00",
+    "rainfall_mm": 0.08,
+    "runoff_mm": 0.0,
+    "inflow_m3s": 72.6
+  },
+  {
+    "hour": 118,
+    "datetime": "1979-08-09 22:00:00",
+    "rainfall_mm": 0.08,
+    "runoff_mm": 0.0,
+    "inflow_m3s": 67.8
+  },
+  {
+    "hour": 119,
+    "datetime": "1979-08-09 23:00:00",
+    "rainfall_mm": 0.21,
+    "runoff_mm": 0.01,
+    "inflow_m3s": 63.1
+  },
+  {
+    "hour": 120,
+    "datetime": "1979-08-10 00:00:00",
+    "rainfall_mm": 0.34,
+    "runoff_mm": 0.14,
+    "inflow_m3s": 58.9
+  },
+  {
+    "hour": 121,
+    "datetime": "1979-08-10 01:00:00",
+    "rainfall_mm": 0.34,
+    "runoff_mm": 0.14,
+    "inflow_m3s": 55.0
+  },
+  {
+    "hour": 122,
+    "datetime": "1979-08-10 02:00:00",
+    "rainfall_mm": 0.37,
+    "runoff_mm": 0.16,
+    "inflow_m3s": 51.3
+  },
+  {
+    "hour": 123,
+    "datetime": "1979-08-10 03:00:00",
+    "rainfall_mm": 0.43,
+    "runoff_mm": 0.18,
+    "inflow_m3s": 48.0
+  },
+  {
+    "hour": 124,
+    "datetime": "1979-08-10 04:00:00",
+    "rainfall_mm": 0.49,
+    "runoff_mm": 0.21,
+    "inflow_m3s": 45.2
+  },
+  {
+    "hour": 125,
+    "datetime": "1979-08-10 05:00:00",
+    "rainfall_mm": 0.49,
+    "runoff_mm": 0.21,
+    "inflow_m3s": 42.8
+  },
+  {
+    "hour": 126,
+    "datetime": "1979-08-10 06:00:00",
+    "rainfall_mm": 0.58,
+    "runoff_mm": 0.25,
+    "inflow_m3s": 40.8
+  },
+  {
+    "hour": 127,
+    "datetime": "1979-08-10 07:00:00",
+    "rainfall_mm": 0.64,
+    "runoff_mm": 0.27,
+    "inflow_m3s": 39.3
+  },
+  {
+    "hour": 128,
+    "datetime": "1979-08-10 08:00:00",
+    "rainfall_mm": 0.83,
+    "runoff_mm": 0.35,
+    "inflow_m3s": 38.4
+  },
+  {
+    "hour": 129,
+    "datetime": "1979-08-10 09:00:00",
+    "rainfall_mm": 1.04,
+    "runoff_mm": 0.44,
+    "inflow_m3s": 38.0
+  },
+  {
+    "hour": 130,
+    "datetime": "1979-08-10 10:00:00",
+    "rainfall_mm": 1.65,
+    "runoff_mm": 0.7,
+    "inflow_m3s": 38.3
+  },
+  {
+    "hour": 131,
+    "datetime": "1979-08-10 11:00:00",
+    "rainfall_mm": 13.11,
+    "runoff_mm": 5.59,
+    "inflow_m3s": 39.6
+  },
+  {
+    "hour": 132,
+    "datetime": "1979-08-10 12:00:00",
+    "rainfall_mm": 3.34,
+    "runoff_mm": 1.42,
+    "inflow_m3s": 43.7
+  },
+  {
+    "hour": 133,
+    "datetime": "1979-08-10 13:00:00",
+    "rainfall_mm": 1.47,
+    "runoff_mm": 0.63,
+    "inflow_m3s": 49.5
+  },
+  {
+    "hour": 134,
+    "datetime": "1979-08-10 14:00:00",
+    "rainfall_mm": 0.92,
+    "runoff_mm": 0.39,
+    "inflow_m3s": 58.5
+  },
+  {
+    "hour": 135,
+    "datetime": "1979-08-10 15:00:00",
+    "rainfall_mm": 0.67,
+    "runoff_mm": 0.29,
+    "inflow_m3s": 69.2
+  },
+  {
+    "hour": 136,
+    "datetime": "1979-08-10 16:00:00",
+    "rainfall_mm": 0.55,
+    "runoff_mm": 0.23,
+    "inflow_m3s": 81.7
+  },
+  {
+    "hour": 137,
+    "datetime": "1979-08-10 17:00:00",
+    "rainfall_mm": 0.49,
+    "runoff_mm": 0.21,
+    "inflow_m3s": 96.1
+  },
+  {
+    "hour": 138,
+    "datetime": "1979-08-10 18:00:00",
+    "rainfall_mm": 0.43,
+    "runoff_mm": 0.18,
+    "inflow_m3s": 112.4
+  },
+  {
+    "hour": 139,
+    "datetime": "1979-08-10 19:00:00",
+    "rainfall_mm": 0.4,
+    "runoff_mm": 0.17,
+    "inflow_m3s": 131.3
+  },
+  {
+    "hour": 140,
+    "datetime": "1979-08-10 20:00:00",
+    "rainfall_mm": 0.4,
+    "runoff_mm": 0.17,
+    "inflow_m3s": 151.7
+  },
+  {
+    "hour": 141,
+    "datetime": "1979-08-10 21:00:00",
+    "rainfall_mm": 0.37,
+    "runoff_mm": 0.16,
+    "inflow_m3s": 174.2
+  },
+  {
+    "hour": 142,
+    "datetime": "1979-08-10 22:00:00",
+    "rainfall_mm": 0.37,
+    "runoff_mm": 0.16,
+    "inflow_m3s": 196.9
+  },
+  {
+    "hour": 143,
+    "datetime": "1979-08-10 23:00:00",
+    "rainfall_mm": 0.92,
+    "runoff_mm": 0.39,
+    "inflow_m3s": 217.4
+  },
+  {
+    "hour": 144,
+    "datetime": "1979-08-11 00:00:00",
+    "rainfall_mm": 1.76,
+    "runoff_mm": 1.46,
+    "inflow_m3s": 236.1
+  },
+  {
+    "hour": 145,
+    "datetime": "1979-08-11 01:00:00",
+    "rainfall_mm": 1.76,
+    "runoff_mm": 1.46,
+    "inflow_m3s": 251.9
+  },
+  {
+    "hour": 146,
+    "datetime": "1979-08-11 02:00:00",
+    "rainfall_mm": 1.92,
+    "runoff_mm": 1.6,
+    "inflow_m3s": 265.6
+  },
+  {
+    "hour": 147,
+    "datetime": "1979-08-11 03:00:00",
+    "rainfall_mm": 2.24,
+    "runoff_mm": 1.86,
+    "inflow_m3s": 277.5
+  },
+  {
+    "hour": 148,
+    "datetime": "1979-08-11 04:00:00",
+    "rainfall_mm": 2.57,
+    "runoff_mm": 2.13,
+    "inflow_m3s": 287.5
+  },
+  {
+    "hour": 149,
+    "datetime": "1979-08-11 05:00:00",
+    "rainfall_mm": 2.57,
+    "runoff_mm": 2.13,
+    "inflow_m3s": 296.9
+  },
+  {
+    "hour": 150,
+    "datetime": "1979-08-11 06:00:00",
+    "rainfall_mm": 3.05,
+    "runoff_mm": 2.53,
+    "inflow_m3s": 306.4
+  },
+  {
+    "hour": 151,
+    "datetime": "1979-08-11 07:00:00",
+    "rainfall_mm": 3.37,
+    "runoff_mm": 2.8,
+    "inflow_m3s": 317.5
+  },
+  {
+    "hour": 152,
+    "datetime": "1979-08-11 08:00:00",
+    "rainfall_mm": 4.33,
+    "runoff_mm": 3.59,
+    "inflow_m3s": 328.1
+  },
+  {
+    "hour": 153,
+    "datetime": "1979-08-11 09:00:00",
+    "rainfall_mm": 5.45,
+    "runoff_mm": 4.53,
+    "inflow_m3s": 341.9
+  },
+  {
+    "hour": 154,
+    "datetime": "1979-08-11 10:00:00",
+    "rainfall_mm": 8.66,
+    "runoff_mm": 7.19,
+    "inflow_m3s": 360.1
+  },
+  {
+    "hour": 155,
+    "datetime": "1979-08-11 11:00:00",
+    "rainfall_mm": 68.63,
+    "runoff_mm": 56.97,
+    "inflow_m3s": 384.7
+  },
+  {
+    "hour": 156,
+    "datetime": "1979-08-11 12:00:00",
+    "rainfall_mm": 17.48,
+    "runoff_mm": 14.51,
+    "inflow_m3s": 435.7
+  },
+  {
+    "hour": 157,
+    "datetime": "1979-08-11 13:00:00",
+    "rainfall_mm": 7.7,
+    "runoff_mm": 6.39,
+    "inflow_m3s": 502.1
+  },
+  {
+    "hour": 158,
+    "datetime": "1979-08-11 14:00:00",
+    "rainfall_mm": 4.81,
+    "runoff_mm": 3.99,
+    "inflow_m3s": 598.4
+  },
+  {
+    "hour": 159,
+    "datetime": "1979-08-11 15:00:00",
+    "rainfall_mm": 3.53,
+    "runoff_mm": 2.93,
+    "inflow_m3s": 709.8
+  },
+  {
+    "hour": 160,
+    "datetime": "1979-08-11 16:00:00",
+    "rainfall_mm": 2.89,
+    "runoff_mm": 2.4,
+    "inflow_m3s": 837.5
+  },
+  {
+    "hour": 161,
+    "datetime": "1979-08-11 17:00:00",
+    "rainfall_mm": 2.57,
+    "runoff_mm": 2.13,
+    "inflow_m3s": 986.2
+  },
+  {
+    "hour": 162,
+    "datetime": "1979-08-11 18:00:00",
+    "rainfall_mm": 2.24,
+    "runoff_mm": 1.86,
+    "inflow_m3s": 1152.4
+  },
+  {
+    "hour": 163,
+    "datetime": "1979-08-11 19:00:00",
+    "rainfall_mm": 2.08,
+    "runoff_mm": 1.73,
+    "inflow_m3s": 1344.9
+  },
+  {
+    "hour": 164,
+    "datetime": "1979-08-11 20:00:00",
+    "rainfall_mm": 2.08,
+    "runoff_mm": 1.73,
+    "inflow_m3s": 1552.5
+  },
+  {
+    "hour": 165,
+    "datetime": "1979-08-11 21:00:00",
+    "rainfall_mm": 1.92,
+    "runoff_mm": 1.6,
+    "inflow_m3s": 1782.4
+  },
+  {
+    "hour": 166,
+    "datetime": "1979-08-11 22:00:00",
+    "rainfall_mm": 1.92,
+    "runoff_mm": 1.6,
+    "inflow_m3s": 2013.3
+  },
+  {
+    "hour": 167,
+    "datetime": "1979-08-11 23:00:00",
+    "rainfall_mm": 4.81,
+    "runoff_mm": 3.99,
+    "inflow_m3s": 2222.6
+  },
+  {
+    "hour": 168,
+    "datetime": "1979-08-12 00:00:00",
+    "rainfall_mm": 1.56,
+    "runoff_mm": 1.26,
+    "inflow_m3s": 2413.9
+  },
+  {
+    "hour": 169,
+    "datetime": "1979-08-12 01:00:00",
+    "rainfall_mm": 1.56,
+    "runoff_mm": 1.26,
+    "inflow_m3s": 2571.5
+  },
+  {
+    "hour": 170,
+    "datetime": "1979-08-12 02:00:00",
+    "rainfall_mm": 1.7,
+    "runoff_mm": 1.38,
+    "inflow_m3s": 2699.9
+  },
+  {
+    "hour": 171,
+    "datetime": "1979-08-12 03:00:00",
+    "rainfall_mm": 1.98,
+    "runoff_mm": 1.6,
+    "inflow_m3s": 2796.9
+  },
+  {
+    "hour": 172,
+    "datetime": "1979-08-12 04:00:00",
+    "rainfall_mm": 2.26,
+    "runoff_mm": 1.83,
+    "inflow_m3s": 2858.5
+  },
+  {
+    "hour": 173,
+    "datetime": "1979-08-12 05:00:00",
+    "rainfall_mm": 2.26,
+    "runoff_mm": 1.83,
+    "inflow_m3s": 2894.9
+  },
+  {
+    "hour": 174,
+    "datetime": "1979-08-12 06:00:00",
+    "rainfall_mm": 2.69,
+    "runoff_mm": 2.18,
+    "inflow_m3s": 2908.8
+  },
+  {
+    "hour": 175,
+    "datetime": "1979-08-12 07:00:00",
+    "rainfall_mm": 2.97,
+    "runoff_mm": 2.41,
+    "inflow_m3s": 2909.3
+  },
+  {
+    "hour": 176,
+    "datetime": "1979-08-12 08:00:00",
+    "rainfall_mm": 3.82,
+    "runoff_mm": 3.09,
+    "inflow_m3s": 2870.0
+  },
+  {
+    "hour": 177,
+    "datetime": "1979-08-12 09:00:00",
+    "rainfall_mm": 4.81,
+    "runoff_mm": 3.9,
+    "inflow_m3s": 2818.5
+  },
+  {
+    "hour": 178,
+    "datetime": "1979-08-12 10:00:00",
+    "rainfall_mm": 7.64,
+    "runoff_mm": 6.19,
+    "inflow_m3s": 2756.4
+  },
+  {
+    "hour": 179,
+    "datetime": "1979-08-12 11:00:00",
+    "rainfall_mm": 60.52,
+    "runoff_mm": 49.06,
+    "inflow_m3s": 2687.9
+  },
+  {
+    "hour": 180,
+    "datetime": "1979-08-12 12:00:00",
+    "rainfall_mm": 15.41,
+    "runoff_mm": 12.49,
+    "inflow_m3s": 2630.6
+  },
+  {
+    "hour": 181,
+    "datetime": "1979-08-12 13:00:00",
+    "rainfall_mm": 6.79,
+    "runoff_mm": 5.5,
+    "inflow_m3s": 2572.1
+  },
+  {
+    "hour": 182,
+    "datetime": "1979-08-12 14:00:00",
+    "rainfall_mm": 4.24,
+    "runoff_mm": 3.44,
+    "inflow_m3s": 2527.5
+  },
+  {
+    "hour": 183,
+    "datetime": "1979-08-12 15:00:00",
+    "rainfall_mm": 3.11,
+    "runoff_mm": 2.52,
+    "inflow_m3s": 2481.7
+  },
+  {
+    "hour": 184,
+    "datetime": "1979-08-12 16:00:00",
+    "rainfall_mm": 2.55,
+    "runoff_mm": 2.06,
+    "inflow_m3s": 2443.7
+  },
+  {
+    "hour": 185,
+    "datetime": "1979-08-12 17:00:00",
+    "rainfall_mm": 2.26,
+    "runoff_mm": 1.83,
+    "inflow_m3s": 2442.6
+  },
+  {
+    "hour": 186,
+    "datetime": "1979-08-12 18:00:00",
+    "rainfall_mm": 1.98,
+    "runoff_mm": 1.6,
+    "inflow_m3s": 2461.7
+  },
+  {
+    "hour": 187,
+    "datetime": "1979-08-12 19:00:00",
+    "rainfall_mm": 1.84,
+    "runoff_mm": 1.49,
+    "inflow_m3s": 2506.3
+  },
+  {
+    "hour": 188,
+    "datetime": "1979-08-12 20:00:00",
+    "rainfall_mm": 1.84,
+    "runoff_mm": 1.49,
+    "inflow_m3s": 2571.0
+  },
+  {
+    "hour": 189,
+    "datetime": "1979-08-12 21:00:00",
+    "rainfall_mm": 1.7,
+    "runoff_mm": 1.38,
+    "inflow_m3s": 2671.2
+  },
+  {
+    "hour": 190,
+    "datetime": "1979-08-12 22:00:00",
+    "rainfall_mm": 1.7,
+    "runoff_mm": 1.38,
+    "inflow_m3s": 2777.3
+  },
+  {
+    "hour": 191,
+    "datetime": "1979-08-12 23:00:00",
+    "rainfall_mm": 4.24,
+    "runoff_mm": 3.44,
+    "inflow_m3s": 2868.6
+  },
+  {
+    "hour": 192,
+    "datetime": "1979-08-13 00:00:00",
+    "rainfall_mm": 0.1,
+    "runoff_mm": 0.01,
+    "inflow_m3s": 2955.0
+  },
+  {
+    "hour": 193,
+    "datetime": "1979-08-13 01:00:00",
+    "rainfall_mm": 0.1,
+    "runoff_mm": 0.01,
+    "inflow_m3s": 3019.2
+  },
+  {
+    "hour": 194,
+    "datetime": "1979-08-13 02:00:00",
+    "rainfall_mm": 0.11,
+    "runoff_mm": 0.01,
+    "inflow_m3s": 3061.3
+  },
+  {
+    "hour": 195,
+    "datetime": "1979-08-13 03:00:00",
+    "rainfall_mm": 0.13,
+    "runoff_mm": 0.01,
+    "inflow_m3s": 3078.3
+  },
+  {
+    "hour": 196,
+    "datetime": "1979-08-13 04:00:00",
+    "rainfall_mm": 0.15,
+    "runoff_mm": 0.01,
+    "inflow_m3s": 3070.4
+  },
+  {
+    "hour": 197,
+    "datetime": "1979-08-13 05:00:00",
+    "rainfall_mm": 0.15,
+    "runoff_mm": 0.01,
+    "inflow_m3s": 3043.9
+  },
+  {
+    "hour": 198,
+    "datetime": "1979-08-13 06:00:00",
+    "rainfall_mm": 0.18,
+    "runoff_mm": 0.02,
+    "inflow_m3s": 2998.8
+  },
+  {
+    "hour": 199,
+    "datetime": "1979-08-13 07:00:00",
+    "rainfall_mm": 0.2,
+    "runoff_mm": 0.02,
+    "inflow_m3s": 2944.7
+  },
+  {
+    "hour": 200,
+    "datetime": "1979-08-13 08:00:00",
+    "rainfall_mm": 0.25,
+    "runoff_mm": 0.03,
+    "inflow_m3s": 2860.0
+  },
+  {
+    "hour": 201,
+    "datetime": "1979-08-13 09:00:00",
+    "rainfall_mm": 0.32,
+    "runoff_mm": 0.03,
+    "inflow_m3s": 2764.7
+  },
+  {
+    "hour": 202,
+    "datetime": "1979-08-13 10:00:00",
+    "rainfall_mm": 0.51,
+    "runoff_mm": 0.05,
+    "inflow_m3s": 2657.5
+  },
+  {
+    "hour": 203,
+    "datetime": "1979-08-13 11:00:00",
+    "rainfall_mm": 4.04,
+    "runoff_mm": 0.4,
+    "inflow_m3s": 2543.2
+  },
+  {
+    "hour": 204,
+    "datetime": "1979-08-13 12:00:00",
+    "rainfall_mm": 1.03,
+    "runoff_mm": 0.1,
+    "inflow_m3s": 2421.2
+  },
+  {
+    "hour": 205,
+    "datetime": "1979-08-13 13:00:00",
+    "rainfall_mm": 0.45,
+    "runoff_mm": 0.04,
+    "inflow_m3s": 2287.1
+  },
+  {
+    "hour": 206,
+    "datetime": "1979-08-13 14:00:00",
+    "rainfall_mm": 0.28,
+    "runoff_mm": 0.03,
+    "inflow_m3s": 2143.8
+  },
+  {
+    "hour": 207,
+    "datetime": "1979-08-13 15:00:00",
+    "rainfall_mm": 0.21,
+    "runoff_mm": 0.02,
+    "inflow_m3s": 1990.4
+  },
+  {
+    "hour": 208,
+    "datetime": "1979-08-13 16:00:00",
+    "rainfall_mm": 0.17,
+    "runoff_mm": 0.02,
+    "inflow_m3s": 1832.6
+  },
+  {
+    "hour": 209,
+    "datetime": "1979-08-13 17:00:00",
+    "rainfall_mm": 0.15,
+    "runoff_mm": 0.01,
+    "inflow_m3s": 1693.7
+  },
+  {
+    "hour": 210,
+    "datetime": "1979-08-13 18:00:00",
+    "rainfall_mm": 0.13,
+    "runoff_mm": 0.01,
+    "inflow_m3s": 1562.1
+  },
+  {
+    "hour": 211,
+    "datetime": "1979-08-13 19:00:00",
+    "rainfall_mm": 0.12,
+    "runoff_mm": 0.01,
+    "inflow_m3s": 1435.6
+  },
+  {
+    "hour": 212,
+    "datetime": "1979-08-13 20:00:00",
+    "rainfall_mm": 0.12,
+    "runoff_mm": 0.01,
+    "inflow_m3s": 1317.1
+  },
+  {
+    "hour": 213,
+    "datetime": "1979-08-13 21:00:00",
+    "rainfall_mm": 0.11,
+    "runoff_mm": 0.01,
+    "inflow_m3s": 1214.7
+  },
+  {
+    "hour": 214,
+    "datetime": "1979-08-13 22:00:00",
+    "rainfall_mm": 0.11,
+    "runoff_mm": 0.01,
+    "inflow_m3s": 1117.5
+  },
+  {
+    "hour": 215,
+    "datetime": "1979-08-13 23:00:00",
+    "rainfall_mm": 0.28,
+    "runoff_mm": 0.03,
+    "inflow_m3s": 1024.2
+  },
+  {
+    "hour": 216,
+    "datetime": "1979-08-14 00:00:00",
+    "rainfall_mm": 0.18,
+    "runoff_mm": 0.04,
+    "inflow_m3s": 941.2
+  },
+  {
+    "hour": 217,
+    "datetime": "1979-08-14 01:00:00",
+    "rainfall_mm": 0.18,
+    "runoff_mm": 0.04,
+    "inflow_m3s": 865.2
+  },
+  {
+    "hour": 218,
+    "datetime": "1979-08-14 02:00:00",
+    "rainfall_mm": 0.2,
+    "runoff_mm": 0.05,
+    "inflow_m3s": 792.8
+  },
+  {
+    "hour": 219,
+    "datetime": "1979-08-14 03:00:00",
+    "rainfall_mm": 0.23,
+    "runoff_mm": 0.06,
+    "inflow_m3s": 724.8
+  },
+  {
+    "hour": 220,
+    "datetime": "1979-08-14 04:00:00",
+    "rainfall_mm": 0.27,
+    "runoff_mm": 0.06,
+    "inflow_m3s": 664.7
+  },
+  {
+    "hour": 221,
+    "datetime": "1979-08-14 05:00:00",
+    "rainfall_mm": 0.27,
+    "runoff_mm": 0.06,
+    "inflow_m3s": 609.5
+  },
+  {
+    "hour": 222,
+    "datetime": "1979-08-14 06:00:00",
+    "rainfall_mm": 0.32,
+    "runoff_mm": 0.07,
+    "inflow_m3s": 557.0
+  },
+  {
+    "hour": 223,
+    "datetime": "1979-08-14 07:00:00",
+    "rainfall_mm": 0.35,
+    "runoff_mm": 0.08,
+    "inflow_m3s": 509.6
+  },
+  {
+    "hour": 224,
+    "datetime": "1979-08-14 08:00:00",
+    "rainfall_mm": 0.45,
+    "runoff_mm": 0.11,
+    "inflow_m3s": 468.3
+  },
+  {
+    "hour": 225,
+    "datetime": "1979-08-14 09:00:00",
+    "rainfall_mm": 0.57,
+    "runoff_mm": 0.13,
+    "inflow_m3s": 430.2
+  },
+  {
+    "hour": 226,
+    "datetime": "1979-08-14 10:00:00",
+    "rainfall_mm": 0.9,
+    "runoff_mm": 0.21,
+    "inflow_m3s": 394.0
+  },
+  {
+    "hour": 227,
+    "datetime": "1979-08-14 11:00:00",
+    "rainfall_mm": 7.12,
+    "runoff_mm": 1.68,
+    "inflow_m3s": 361.9
+  },
+  {
+    "hour": 228,
+    "datetime": "1979-08-14 12:00:00",
+    "rainfall_mm": 1.81,
+    "runoff_mm": 0.43,
+    "inflow_m3s": 333.8
+  },
+  {
+    "hour": 229,
+    "datetime": "1979-08-14 13:00:00",
+    "rainfall_mm": 0.8,
+    "runoff_mm": 0.19,
+    "inflow_m3s": 308.4
+  },
+  {
+    "hour": 230,
+    "datetime": "1979-08-14 14:00:00",
+    "rainfall_mm": 0.5,
+    "runoff_mm": 0.12,
+    "inflow_m3s": 285.7
+  },
+  {
+    "hour": 231,
+    "datetime": "1979-08-14 15:00:00",
+    "rainfall_mm": 0.37,
+    "runoff_mm": 0.09,
+    "inflow_m3s": 266.4
+  },
+  {
+    "hour": 232,
+    "datetime": "1979-08-14 16:00:00",
+    "rainfall_mm": 0.3,
+    "runoff_mm": 0.07,
+    "inflow_m3s": 249.2
+  },
+  {
+    "hour": 233,
+    "datetime": "1979-08-14 17:00:00",
+    "rainfall_mm": 0.27,
+    "runoff_mm": 0.06,
+    "inflow_m3s": 233.6
+  },
+  {
+    "hour": 234,
+    "datetime": "1979-08-14 18:00:00",
+    "rainfall_mm": 0.23,
+    "runoff_mm": 0.06,
+    "inflow_m3s": 220.9
+  },
+  {
+    "hour": 235,
+    "datetime": "1979-08-14 19:00:00",
+    "rainfall_mm": 0.22,
+    "runoff_mm": 0.05,
+    "inflow_m3s": 211.3
+  },
+  {
+    "hour": 236,
+    "datetime": "1979-08-14 20:00:00",
+    "rainfall_mm": 0.22,
+    "runoff_mm": 0.05,
+    "inflow_m3s": 203.3
+  },
+  {
+    "hour": 237,
+    "datetime": "1979-08-14 21:00:00",
+    "rainfall_mm": 0.2,
+    "runoff_mm": 0.05,
+    "inflow_m3s": 196.6
+  },
+  {
+    "hour": 238,
+    "datetime": "1979-08-14 22:00:00",
+    "rainfall_mm": 0.2,
+    "runoff_mm": 0.05,
+    "inflow_m3s": 190.6
+  },
+  {
+    "hour": 239,
+    "datetime": "1979-08-14 23:00:00",
+    "rainfall_mm": 0.5,
+    "runoff_mm": 0.12,
+    "inflow_m3s": 184.6
+  },
+  {
+    "hour": 240,
+    "datetime": "1979-08-15 00:00:00",
+    "rainfall_mm": 0.0,
+    "runoff_mm": 0.0,
+    "inflow_m3s": 178.5
+  },
+  {
+    "hour": 241,
+    "datetime": "1979-08-15 01:00:00",
+    "rainfall_mm": 0.0,
+    "runoff_mm": 0.0,
+    "inflow_m3s": 171.9
+  },
+  {
+    "hour": 242,
+    "datetime": "1979-08-15 02:00:00",
+    "rainfall_mm": 0.0,
+    "runoff_mm": 0.0,
+    "inflow_m3s": 165.0
+  },
+  {
+    "hour": 243,
+    "datetime": "1979-08-15 03:00:00",
+    "rainfall_mm": 0.0,
+    "runoff_mm": 0.0,
+    "inflow_m3s": 158.7
+  },
+  {
+    "hour": 244,
+    "datetime": "1979-08-15 04:00:00",
+    "rainfall_mm": 0.0,
+    "runoff_mm": 0.0,
+    "inflow_m3s": 153.2
+  },
+  {
+    "hour": 245,
+    "datetime": "1979-08-15 05:00:00",
+    "rainfall_mm": 0.0,
+    "runoff_mm": 0.0,
+    "inflow_m3s": 147.6
+  },
+  {
+    "hour": 246,
+    "datetime": "1979-08-15 06:00:00",
+    "rainfall_mm": 0.0,
+    "runoff_mm": 0.0,
+    "inflow_m3s": 141.8
+  },
+  {
+    "hour": 247,
+    "datetime": "1979-08-15 07:00:00",
+    "rainfall_mm": 0.0,
+    "runoff_mm": 0.0,
+    "inflow_m3s": 136.4
+  },
+  {
+    "hour": 248,
+    "datetime": "1979-08-15 08:00:00",
+    "rainfall_mm": 0.01,
+    "runoff_mm": 0.0,
+    "inflow_m3s": 130.1
+  },
+  {
+    "hour": 249,
+    "datetime": "1979-08-15 09:00:00",
+    "rainfall_mm": 0.01,
+    "runoff_mm": 0.0,
+    "inflow_m3s": 123.5
+  },
+  {
+    "hour": 250,
+    "datetime": "1979-08-15 10:00:00",
+    "rainfall_mm": 0.01,
+    "runoff_mm": 0.0,
+    "inflow_m3s": 116.6
+  },
+  {
+    "hour": 251,
+    "datetime": "1979-08-15 11:00:00",
+    "rainfall_mm": 0.09,
+    "runoff_mm": 0.0,
+    "inflow_m3s": 109.6
+  },
+  {
+    "hour": 252,
+    "datetime": "1979-08-15 12:00:00",
+    "rainfall_mm": 0.02,
+    "runoff_mm": 0.0,
+    "inflow_m3s": 102.8
+  },
+  {
+    "hour": 253,
+    "datetime": "1979-08-15 13:00:00",
+    "rainfall_mm": 0.01,
+    "runoff_mm": 0.0,
+    "inflow_m3s": 96.4
+  },
+  {
+    "hour": 254,
+    "datetime": "1979-08-15 14:00:00",
+    "rainfall_mm": 0.01,
+    "runoff_mm": 0.0,
+    "inflow_m3s": 89.9
+  },
+  {
+    "hour": 255,
+    "datetime": "1979-08-15 15:00:00",
+    "rainfall_mm": 0.0,
+    "runoff_mm": 0.0,
+    "inflow_m3s": 83.2
+  },
+  {
+    "hour": 256,
+    "datetime": "1979-08-15 16:00:00",
+    "rainfall_mm": 0.0,
+    "runoff_mm": 0.0,
+    "inflow_m3s": 76.4
+  },
+  {
+    "hour": 257,
+    "datetime": "1979-08-15 17:00:00",
+    "rainfall_mm": 0.0,
+    "runoff_mm": 0.0,
+    "inflow_m3s": 70.4
+  },
+  {
+    "hour": 258,
+    "datetime": "1979-08-15 18:00:00",
+    "rainfall_mm": 0.0,
+    "runoff_mm": 0.0,
+    "inflow_m3s": 64.6
+  },
+  {
+    "hour": 259,
+    "datetime": "1979-08-15 19:00:00",
+    "rainfall_mm": 0.0,
+    "runoff_mm": 0.0,
+    "inflow_m3s": 59.0
+  },
+  {
+    "hour": 260,
+    "datetime": "1979-08-15 20:00:00",
+    "rainfall_mm": 0.0,
+    "runoff_mm": 0.0,
+    "inflow_m3s": 53.7
+  },
+  {
+    "hour": 261,
+    "datetime": "1979-08-15 21:00:00",
+    "rainfall_mm": 0.0,
+    "runoff_mm": 0.0,
+    "inflow_m3s": 49.0
+  },
+  {
+    "hour": 262,
+    "datetime": "1979-08-15 22:00:00",
+    "rainfall_mm": 0.0,
+    "runoff_mm": 0.0,
+    "inflow_m3s": 44.6
+  },
+  {
+    "hour": 263,
+    "datetime": "1979-08-15 23:00:00",
+    "rainfall_mm": 0.01,
+    "runoff_mm": 0.0,
+    "inflow_m3s": 40.4
+  }
+]

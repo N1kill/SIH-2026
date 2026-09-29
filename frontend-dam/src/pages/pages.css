@@ -1194,18 +1194,286 @@
   color: var(--text-secondary, #a7b6a9);
 }
 
-/* ── Outcome SVG Visualizations ────────────── */
+/* ── Outcome Rich Visualizations & Generated Plots ────────────── */
 .outcome-viz {
-  border-radius: 10px;
+  border-radius: 12px;
   overflow: hidden;
-  border: 1px solid rgba(167, 182, 169, 0.1);
-  background: rgba(8, 14, 13, 0.9);
+  border: 1px solid rgba(167, 182, 169, 0.16);
+  background: rgba(10, 16, 22, 0.95);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
 }
 
-.outcome-svg {
+.outcome-rich-container {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Telemetry HUD (Modeled after outputs/3d/index.html) */
+.outcome-telemetry-hud {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  background: rgba(16, 26, 36, 0.85);
+  border: 1px solid rgba(56, 189, 248, 0.2);
+  border-radius: 10px;
+  padding: 12px 16px;
+}
+
+.hud-metric-box {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.hud-label {
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: #8d99ae;
+}
+
+.hud-value {
+  font-family: var(--font-mono, monospace);
+  font-size: 13.5px;
+  font-weight: 700;
+}
+
+.val-cyan { color: #38bdf8; }
+.val-danger { color: #f87171; }
+.val-emerald { color: #34d399; }
+.val-warning { color: #fbbf24; }
+
+/* Plot Card Component */
+.outcome-plot-card {
+  position: relative;
+  background: rgba(8, 12, 18, 0.9);
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  border-radius: 10px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+
+.outcome-plot-card:hover {
+  border-color: #38bdf8;
+  box-shadow: 0 0 24px rgba(56, 189, 248, 0.2);
+  transform: translateY(-2px);
+}
+
+.plot-header-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  background: rgba(14, 22, 32, 0.9);
+  border-bottom: 1px solid rgba(56, 189, 248, 0.15);
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+  font-weight: 700;
+  color: #e0f2fe;
+}
+
+.plot-badge-hi-res {
+  color: #38bdf8;
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: rgba(56, 189, 248, 0.12);
+  border: 1px solid rgba(56, 189, 248, 0.3);
+}
+
+.outcome-plot-image {
   width: 100%;
   height: auto;
+  max-height: 480px;
+  object-fit: contain;
   display: block;
+  background: #020617;
+  padding: 6px;
+}
+
+.plot-caption {
+  padding: 10px 14px;
+  font-size: 12px;
+  line-height: 1.55;
+  color: #94a3b8;
+  background: rgba(10, 16, 24, 0.8);
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* Dual Plot Layout */
+.outcome-dual-plots {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+@media (max-width: 900px) {
+  .outcome-dual-plots {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Raster Toggle Buttons */
+.raster-toggle-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.raster-mode-btn {
+  background: rgba(16, 26, 36, 0.85);
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  color: #94a3b8;
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.raster-mode-btn.active, .raster-mode-btn:hover {
+  background: rgba(56, 189, 248, 0.18);
+  border-color: #38bdf8;
+  color: #38bdf8;
+}
+
+/* Damage Breakdown Progress Bars (Modeled after outputs/3d/index.html) */
+.outcome-damage-breakdown-card {
+  background: rgba(16, 24, 32, 0.9);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  border-radius: 10px;
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.damage-bar-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.damage-bar-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #f1faee;
+  font-family: var(--font-mono, monospace);
+}
+
+.damage-track {
+  height: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.damage-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.6s ease;
+}
+
+/* Validation Scorecard */
+.outcome-validation-scorecard {
+  background: rgba(8, 20, 18, 0.95);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  border-radius: 10px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.scorecard-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-family: var(--font-mono, monospace);
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #6ee7b7;
+}
+
+.scorecard-badge {
+  background: rgba(16, 185, 129, 0.2);
+  border: 1px solid #10b981;
+  color: #10b981;
+  padding: 3px 10px;
+  border-radius: 4px;
+  font-size: 11px;
+}
+
+.scorecard-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 14px;
+}
+
+.scorecard-item {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 10px 14px;
+  background: rgba(16, 32, 28, 0.6);
+  border: 1px solid rgba(16, 185, 129, 0.15);
+  border-radius: 8px;
+}
+
+.sc-lbl {
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+  color: #94a3b8;
+  font-weight: 600;
+}
+
+.sc-val {
+  font-family: var(--font-mono, monospace);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.sc-sub {
+  font-size: 10.5px;
+  color: #64748b;
+}
+
+.scorecard-footer {
+  font-size: 11.5px;
+  color: #64748b;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  padding-top: 10px;
+  line-height: 1.5;
+}
+
+.outcome-generic-panel {
+  padding: 24px;
+  background: rgba(12, 18, 26, 0.85);
+  border-radius: 10px;
+}
+
+.outcome-kpi-banner {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-mono, monospace);
+  font-size: 12px;
+  font-weight: 700;
+  color: #38bdf8;
+  margin-bottom: 12px;
+}
+
+.outcome-note {
+  font-size: 13.5px;
+  color: #94a3b8;
+  line-height: 1.6;
 }
 
 /* ── Bottom CTA ────────────────────────── */
@@ -1255,3 +1523,235 @@
     text-align: center;
   }
 }
+
+/* ═══════════════════════════════════════════
+   GIS EXPORT PACK SHOWCASE CARD
+═══════════════════════════════════════════ */
+.outcome-gis-export-card {
+  background: #091316;
+  border: 1px solid rgba(63, 168, 155, 0.45);
+  border-radius: 12px;
+  padding: 24px 28px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+}
+
+.gis-export-top-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 20px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(63, 168, 155, 0.2);
+}
+
+.gis-tag-pill {
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+  font-weight: 700;
+  color: #3fa89b;
+  letter-spacing: 0.08em;
+}
+
+.gis-dest-note {
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+  color: rgba(167, 182, 169, 0.7);
+  letter-spacing: 0.05em;
+}
+
+.gis-hero-showcase {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 28px;
+  align-items: center;
+}
+
+@media (max-width: 900px) {
+  .gis-hero-showcase {
+    grid-template-columns: 1fr;
+  }
+}
+
+.gis-isometric-graphic {
+  background: rgba(4, 9, 14, 0.8);
+  border: 1px solid rgba(63, 168, 155, 0.25);
+  border-radius: 10px;
+  padding: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.gis-layer-stack-svg {
+  width: 100%;
+  height: auto;
+  max-height: 200px;
+}
+
+.gis-content-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.gis-title {
+  font-size: 20px;
+  font-family: var(--font-serif, serif);
+  font-weight: 600;
+  color: #f1faee;
+  margin: 0;
+}
+
+.gis-subtitle {
+  font-size: 13px;
+  color: #5eead4;
+  font-family: var(--font-mono, monospace);
+  margin: 0;
+}
+
+.gis-desc {
+  font-size: 12.5px;
+  color: #a7b6a9;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.gis-format-badges {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 10px;
+  margin: 8px 0;
+}
+
+.gis-format-badge {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(63, 168, 155, 0.25);
+  border-radius: 8px;
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.gis-format-badge .badge-lbl {
+  font-family: var(--font-mono, monospace);
+  font-size: 9.5px;
+  color: #6f7f72;
+  letter-spacing: 0.1em;
+}
+
+.gis-format-badge .badge-val {
+  font-family: var(--font-mono, monospace);
+  font-size: 12px;
+  font-weight: 700;
+  color: #5eead4;
+}
+
+.gis-engine-wire {
+  font-size: 11px;
+  font-family: var(--font-mono, monospace);
+  color: #8d99ae;
+}
+
+.gis-engine-wire span {
+  color: #3fa89b;
+  font-weight: 700;
+}
+
+.gis-actions-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+
+.gis-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+
+.gis-btn.inspect {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #f1faee;
+}
+
+.gis-btn.inspect:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: #5eead4;
+}
+
+.gis-btn.primary {
+  background: #3fa89b;
+  border: 1px solid #5eead4;
+  color: #040810;
+}
+
+.gis-btn.primary:hover {
+  background: #5eead4;
+  box-shadow: 0 0 16px rgba(94, 234, 212, 0.5);
+  transform: translateY(-1px);
+}
+
+.gis-btn.secondary {
+  background: rgba(63, 168, 155, 0.15);
+  border: 1px solid rgba(63, 168, 155, 0.4);
+  color: #5eead4;
+}
+
+.gis-btn.secondary:hover {
+  background: rgba(63, 168, 155, 0.3);
+  box-shadow: 0 0 14px rgba(63, 168, 155, 0.3);
+  transform: translateY(-1px);
+}
+
+.gis-schema-inspect-box {
+  background: #040810;
+  border: 1px solid rgba(63, 168, 155, 0.5);
+  border-radius: 8px;
+  padding: 14px 18px;
+  margin-top: 12px;
+}
+
+.schema-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+  color: #5eead4;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.schema-header button {
+  background: none;
+  border: none;
+  color: #8d99ae;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.schema-pre {
+  background: rgba(0, 0, 0, 0.5);
+  padding: 10px;
+  border-radius: 6px;
+  color: #81e6d9;
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+  overflow-x: auto;
+  max-height: 240px;
+}
+

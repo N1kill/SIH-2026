@@ -56,20 +56,24 @@ def export_inundation_vectors():
     features = []
     kml_placemarks = []
 
-    # Channel path for WGS84 coordinates
+    # Channel path for WGS84 coordinates starting at Machhu-II Dam Toe
     channel_coords_wgs84 = [
-        [70.842, 22.820],
-        [70.839, 22.824],
-        [70.836, 22.828],
-        [70.833, 22.833],
-        [70.830, 22.838],
-        [70.825, 22.846],
-        [70.818, 22.858],
-        [70.810, 22.870],
-        [70.798, 22.890],
-        [70.782, 22.915],
-        [70.762, 22.945],
-        [70.745, 22.975],
+        [70.8796, 22.7539],  # Machhu-II Dam Toe (0 km)
+        [70.8742, 22.7680],  # Gorge Upper
+        [70.8650, 22.7830],  # Gorge Mid
+        [70.8520, 22.8020],  # Gorge Lower Canyon
+        [70.8420, 22.8200],  # Morbi South
+        [70.8390, 22.8240],  # Morbi Causeway
+        [70.8360, 22.8280],  # Morbi City Center
+        [70.8330, 22.8330],  # Morbi North
+        [70.8300, 22.8380],  # Bridge Reach
+        [70.8250, 22.8460],
+        [70.8180, 22.8580],
+        [70.8100, 22.8700],
+        [70.7980, 22.8900],
+        [70.7820, 22.9150],  # Lilapar / Dhuva
+        [70.7620, 22.9450],
+        [70.7450, 22.9750],  # Malia
     ]
 
     # Generate multi-tier GeoJSON polygon
@@ -130,12 +134,22 @@ def export_inundation_vectors():
         "features": features
     }
     
-    geojson_path = EXPORT_DIR / "machhu_flood_extent.geojson"
-    with open(geojson_path, "w") as f:
-        json.dump(geojson_data, f, indent=2)
-    with open(DASHBOARD_DIR / "machhu_flood_extent.geojson", "w") as f:
-        json.dump(geojson_data, f, indent=2)
-    logging.info(f"Saved GeoJSON: {geojson_path}")
+    geojson_paths = [
+        EXPORT_DIR / "machhu_flood_extent.geojson",
+        OUTPUTS_GIS / "machhu_flood_extent.geojson",
+        DASHBOARD_DIR / "machhu_flood_extent.geojson",
+        PROJECT_ROOT / "outputs" / "SIH-2026" / "outputs" / "gis" / "machhu_flood_extent.geojson",
+        PROJECT_ROOT / "frontend-dam" / "public" / "data" / "machhu_flood_extent.geojson",
+        PROJECT_ROOT / "frontend" / "public" / "data" / "machhu_flood_extent.geojson",
+    ]
+    for gp in geojson_paths:
+        try:
+            gp.parent.mkdir(parents=True, exist_ok=True)
+            with open(gp, "w") as f:
+                json.dump(geojson_data, f, indent=2)
+            logging.info(f"Saved GeoJSON: {gp}")
+        except Exception as e:
+            logging.warning(f"Could not write {gp}: {e}")
 
     # Write Google Earth KML
     kml_path = EXPORT_DIR / "machhu_flood_extent.kml"

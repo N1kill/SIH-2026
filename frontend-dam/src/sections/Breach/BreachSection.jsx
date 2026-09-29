@@ -355,26 +355,6 @@ export default function BreachSection() {
             />
           ))}
         </div>
-
-        {/* Bottom Comparative Synthesis Banner */}
-        <div className="cases-synthesis-card">
-          <div className="synthesis-text">
-            <h4>Empirical Calibration Across 6 Disaster Archetypes</h4>
-            <p>
-              Whether simulating a <strong>13,570 m³/s overtopping surge</strong> (Machhu-II), a{' '}
-              <strong>hyper-turbulent cryosphere GLOF</strong> (Teesta III), or coordinating{' '}
-              <strong>35-dam simultaneous releases</strong> (Kerala 2018), PRALAYA combines GIS digital
-              elevation models with 2D hydrodynamic finite-volume routing to predict flood propagation
-              timelines before inundation reaches downstream communities.
-            </p>
-          </div>
-
-          <div className="synthesis-action">
-            <a href="#theory" className="synthesis-cta">
-              EXPLORE HYDRODYNAMIC SOLVER ↓
-            </a>
-          </div>
-        </div>
       </div>
     </section>
   );

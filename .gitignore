@@ -35,4 +35,6 @@ powershell.bat
 powershell.cmd
 scratch/
 docs/
-frontend-dam/*.py
+frontend-dam/*.py
+gpu_test/
+tools/

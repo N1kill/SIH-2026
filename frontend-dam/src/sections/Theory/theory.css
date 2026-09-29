@@ -97,12 +97,11 @@
 }
 
 .theory-active-card {
-  background: rgba(16, 26, 24, 0.85);
-  border: 1px solid rgba(63, 168, 155, 0.25);
+  background: #0f1c19;
+  border: 1px solid rgba(63, 168, 155, 0.35);
   border-radius: 12px;
   padding: 28px;
-  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(12px);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6);
   display: flex;
   flex-direction: column;
 }
@@ -295,14 +294,13 @@
   gap: 8px;
   padding: 6px 12px;
   border-radius: 20px;
-  background: rgba(10, 18, 17, 0.85);
+  background: #0c1615;
   border: 1px solid rgba(63, 168, 155, 0.4);
   font-family: var(--font-mono, monospace);
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.1em;
   color: #81e6d9;
-  backdrop-filter: blur(8px);
 }
 
 .hud-live-dot {
@@ -323,11 +321,10 @@
   font-family: var(--font-mono, monospace);
   font-size: 10.5px;
   color: var(--accent-moss-light, #5d8a67);
-  background: rgba(10, 18, 17, 0.85);
+  background: #0c1615;
   padding: 4px 10px;
   border-radius: 4px;
   border: 1px solid rgba(93, 138, 103, 0.3);
-  backdrop-filter: blur(8px);
 }
 
 .theory-hud-metrics {
@@ -349,16 +346,15 @@
 }
 
 .hud-stat-pill {
-  background: rgba(10, 18, 17, 0.85);
+  background: #0b1513;
   border: 1px solid rgba(167, 182, 169, 0.2);
   border-radius: 6px;
   padding: 8px 10px;
-  backdrop-filter: blur(10px);
 }
 
 .hud-stat-pill.highlight {
   border-color: rgba(63, 168, 155, 0.5);
-  background: rgba(16, 32, 29, 0.85);
+  background: #11221f;
 }
 
 .hud-stat-lbl {
@@ -387,7 +383,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  background: rgba(10, 18, 17, 0.9);
+  background: #0c1615;
   border: 1px solid rgba(63, 168, 155, 0.3);
   border-radius: 6px;
   padding: 8px 12px;
@@ -395,5 +391,4 @@
   font-size: 11px;
   color: var(--text-secondary, #a7b6a9);
   z-index: 2;
-  backdrop-filter: blur(10px);
 }

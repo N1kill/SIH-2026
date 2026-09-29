@@ -20,8 +20,7 @@
   padding: clamp(38px, 4.8vh, 52px) 24px 14px;
   background: radial-gradient(circle at 8% 45%, rgba(63, 168, 155, 0.12) 0%, transparent 55%),
               radial-gradient(circle at 92% 75%, rgba(93, 138, 103, 0.09) 0%, transparent 60%),
-              rgba(8, 15, 14, 0.95);
-  backdrop-filter: blur(10px);
+              #080f0e;
   border-top: 1px solid rgba(63, 168, 155, 0.25);
   border-bottom: 1px solid rgba(63, 168, 155, 0.25);
   z-index: 10;

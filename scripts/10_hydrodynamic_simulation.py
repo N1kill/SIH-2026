@@ -31,6 +31,7 @@ Features:
      - outputs/gis/morbi_hydrograph.png
 """
 
+import argparse
 import json
 import logging
 import math
@@ -46,8 +47,12 @@ import numpy as np
 import pandas as pd
 import rasterio
 from rasterio.crs import CRS
+from rasterio.features import shapes
 from rasterio.transform import rowcol, xy
+from rasterio.warp import transform_geom
 from scipy.ndimage import gaussian_filter
+from shapely.geometry import shape, Polygon, MultiPolygon, mapping
+from shapely.ops import unary_union
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="[%(asctime)s] %(levelname)s: %(message)s")
@@ -152,18 +157,19 @@ def generate_unsteady_breach_hydrograph(breach_params, duration_hours=24.0, dt_s
 # ---------------------------------------------------------------------------
 
 # Real geographic coordinates for monitoring stations along downstream Machhu channel (WGS84)
+# Dam Toe directly at Machhu-II Dam embankment, cascading north through Morbi, Lilapar, and Malia
 STATION_COORDS_WGS84 = {
-    "dam_toe": {"name": "Machhu-II Dam Toe (0 km)", "lat": 22.8212, "lon": 70.8414},
-    "morbi":   {"name": "Morbi City Center (5.2 km)", "lat": 22.8684, "lon": 70.8117},
-    "lilapar": {"name": "Lilapar / Dhuva (12 km)", "lat": 22.9161, "lon": 70.7853},
-    "malia":   {"name": "Malia Miyana (25 km)", "lat": 22.9802, "lon": 70.7675},
+    "dam_toe": {"name": "Machhu-II Dam Toe (0 km)", "lat": 22.7539, "lon": 70.8796},
+    "morbi":   {"name": "Morbi City Center (7.5 km)", "lat": 22.8180, "lon": 70.8350},
+    "lilapar": {"name": "Lilapar / Dhuva (15 km)", "lat": 22.9161, "lon": 70.7853},
+    "malia":   {"name": "Malia Miyana (28 km)", "lat": 22.9802, "lon": 70.7675},
 }
 
 
-def run_2d_hydrodynamic_simulation(dem_path, breach_hydrograph_tuple, breach_params):
+def run_2d_hydrodynamic_simulation(dem_path, breach_hydrograph_tuple, breach_params, dam_config=None):
     """
     2D Raster Hydrodynamic Flood Inundation Model.
-    Vectorized diffusive-wave solver for downstream propagation from Machhu-II Dam.
+    Vectorized diffusive-wave solver for downstream propagation starting from Machhu-II Dam.
     """
     from pyproj import Transformer
 
@@ -194,35 +200,62 @@ def run_2d_hydrodynamic_simulation(dem_path, breach_hydrograph_tuple, breach_par
 
     # Convert real geographic station coordinates to grid row/col
     transformer = Transformer.from_crs("EPSG:4326", crs, always_xy=True)
+    tr_inv = Transformer.from_crs(crs, "EPSG:4326", always_xy=True)
 
-    def geo_to_grid(lat, lon, snap_radius=12):
-        """Convert lat/lon to grid row/col, snap to lowest elevation (channel thalweg)."""
+    # Load flow accumulation if available for channel thalweg snapping
+    flow_acc_path = DATA_PROCESSED / "flow_acc.tif"
+    flow_acc = None
+    if flow_acc_path.is_file():
+        try:
+            with rasterio.open(flow_acc_path) as fa_src:
+                flow_acc = fa_src.read(1)
+        except Exception as e:
+            logging.warning(f"Could not open flow_acc.tif: {e}")
+
+    def geo_to_grid(lat, lon, snap_radius=20):
+        """Convert lat/lon to grid row/col, snap to highest flow accumulation (channel thalweg)."""
         x, y = transformer.transform(lon, lat)
         r, c = rowcol(transform, x, y)
         r = int(np.clip(r, 0, nrows - 1))
         c = int(np.clip(c, 0, ncols - 1))
-        # Snap to channel (lowest elevation within radius)
         r_low = max(0, r - snap_radius)
         r_high = min(nrows, r + snap_radius + 1)
         c_low = max(0, c - snap_radius)
         c_high = min(ncols, c + snap_radius + 1)
-        sub_elev = dem[r_low:r_high, c_low:c_high]
-        min_idx = np.unravel_index(np.argmin(sub_elev), sub_elev.shape)
-        return r_low + min_idx[0], c_low + min_idx[1]
+        if flow_acc is not None:
+            sub_acc = flow_acc[r_low:r_high, c_low:c_high]
+            max_idx = np.unravel_index(np.argmax(sub_acc), sub_acc.shape)
+            return r_low + max_idx[0], c_low + max_idx[1]
+        else:
+            sub_elev = dem[r_low:r_high, c_low:c_high]
+            min_idx = np.unravel_index(np.argmin(sub_elev), sub_elev.shape)
+            return r_low + min_idx[0], c_low + min_idx[1]
 
-    # Use real dam toe coordinates (immediately downstream of dam axis)
-    dam_station = STATION_COORDS_WGS84["dam_toe"]
-    r_dam, c_dam = geo_to_grid(dam_station["lat"], dam_station["lon"], snap_radius=5)
+    # Use real dam toe coordinates from config or fallback (immediately downstream of dam axis)
+    if dam_config and "downstream_stations" in dam_config:
+        dam_toe_lat = dam_config["downstream_stations"][0]["lat"]
+        dam_toe_lon = dam_config["downstream_stations"][0]["lon"]
+    elif dam_config and "dam_toe" in dam_config:
+        dam_toe_lat = dam_config["dam_toe"]["lat"]
+        dam_toe_lon = dam_config["dam_toe"]["lon"]
+    else:
+        dam_toe_lat = STATION_COORDS_WGS84["dam_toe"]["lat"]
+        dam_toe_lon = STATION_COORDS_WGS84["dam_toe"]["lon"]
+
+    r_dam, c_dam = geo_to_grid(dam_toe_lat, dam_toe_lon, snap_radius=20)
     logging.info(f"Dam toe source cell in grid: row={r_dam}, col={c_dam}, elev={dem[r_dam, c_dam]:.2f}m")
 
-    # Build monitoring stations from real coordinates
+    # Build monitoring stations from config or fallback
     stations = {}
-    for key, info in STATION_COORDS_WGS84.items():
-        if key == "dam_toe":
-            sr, sc = geo_to_grid(info["lat"], info["lon"], snap_radius=5)
-        else:
-            sr, sc = geo_to_grid(info["lat"], info["lon"], snap_radius=15)
-        stations[key] = {"name": info["name"], "r": sr, "c": sc, "depth": []}
+    if dam_config and "downstream_stations" in dam_config:
+        for info in dam_config["downstream_stations"]:
+            key = info.get("key", info["name"])
+            sr, sc = geo_to_grid(info["lat"], info["lon"], snap_radius=20)
+            stations[key] = {"name": info["name"], "r": sr, "c": sc, "depth": []}
+    else:
+        for key, info in STATION_COORDS_WGS84.items():
+            sr, sc = geo_to_grid(info["lat"], info["lon"], snap_radius=20)
+            stations[key] = {"name": info["name"], "r": sr, "c": sc, "depth": []}
 
     logging.info("Monitoring stations (real geographic coordinates → grid):")
     for k, v in stations.items():
@@ -243,11 +276,11 @@ def run_2d_hydrodynamic_simulation(dem_path, breach_hydrograph_tuple, breach_par
     n_steps = len(time_seconds)
     cell_area = cell_size * cell_size
 
-    # Define active downstream computational bounding box
-    r_start = max(0, r_dam - 1300)
-    r_end = min(nrows, r_dam + 100)
-    c_start = max(0, c_dam - 500)
-    c_end = min(ncols, c_dam + 500)
+    # Define active downstream computational bounding box spanning from Dam Toe northward past Malia
+    r_start = max(0, r_dam - 1650)
+    r_end = min(nrows, r_dam + 50)
+    c_start = max(0, c_dam - 750)
+    c_end = min(ncols, c_dam + 600)
     logging.info(f"Active simulation domain: rows [{r_start}:{r_end}], cols [{c_start}:{c_end}] ({r_end-r_start}×{c_end-c_start} cells, res={cell_size:.1f}m)")
 
     logging.info(f"Starting 2D hydrodynamic simulation ({n_steps} timesteps, dt={dt_sim}s)...")
@@ -261,6 +294,14 @@ def run_2d_hydrodynamic_simulation(dem_path, breach_hydrograph_tuple, breach_par
 
     local_r_dam = r_dam - r_start
     local_c_dam = c_dam - c_start
+
+    # Milestone tracking setup
+    sub_transform = rasterio.windows.transform(rasterio.windows.Window(c_start, r_start, sub_ncols, sub_nrows), transform)
+    progression_milestones = [
+        0.25, 0.5, 0.75, 1.0, 1.5, 2.0, 2.5, 3.0, 4.0, 5.0, 6.0, 7.5, 9.0, 11.0, 13.0, 15.0, 17.5, 20.0, 22.0, 24.0
+    ]
+    progression_steps = []
+    milestone_idx = 0
 
     # Source breach cells (distributed across 156m channel thalweg at dam toe)
     src_cells = [(local_r_dam + dr, local_c_dam + dc) for dr in range(-1, 2) for dc in range(-2, 3)]
@@ -337,7 +378,7 @@ def run_2d_hydrodynamic_simulation(dem_path, breach_hydrograph_tuple, breach_par
                 slope_to_neighbor = (box_wse - neighbor_wse) / dist
                 # Maintain downstream physical thalweg bed slope along northern channel (dr < 0)
                 if dr < 0:
-                    slope_to_neighbor = np.maximum(slope_to_neighbor, 0.0012 * wet_mask)
+                    slope_to_neighbor = np.maximum(slope_to_neighbor, 0.0018 * wet_mask)
 
                 route_mask = wet_mask & (slope_to_neighbor > 0.0001)
 
@@ -410,10 +451,72 @@ def run_2d_hydrodynamic_simulation(dem_path, breach_hydrograph_tuple, breach_par
             d_val = float(np.max(depth_grid[max(0, st_r-1):min(nrows, st_r+2), max(0, st_c-1):min(ncols, st_c+2)]))
             st["depth"].append(d_val)
 
+        # 5. Extract milestone progression step
+        if milestone_idx < len(progression_milestones):
+            target_h = progression_milestones[milestone_idx]
+            if t_hr >= target_h or step == n_steps - 1:
+                milestone_idx += 1
+                wet_sub = sub_depth >= 0.10
+                if np.any(wet_sub):
+                    polygons = []
+                    for geom, val in shapes(wet_sub.astype(np.uint8), mask=wet_sub, transform=sub_transform):
+                        s = shape(geom)
+                        if s.area >= 2000:
+                            polygons.append(s.simplify(15.0, preserve_topology=True))
+
+                    if polygons:
+                        merged = unary_union(polygons) if len(polygons) > 1 else polygons[0]
+                        geojson_geom = transform_geom(crs, "EPSG:4326", mapping(merged))
+                        geom_type = geojson_geom["type"]
+                        coords = geojson_geom["coordinates"]
+
+                        # Find northernmost leading edge cell
+                        wet_sub_r, wet_sub_c = np.where(wet_sub)
+                        min_sub_r_idx = np.argmin(wet_sub_r)
+                        lead_r = r_start + wet_sub_r[min_sub_r_idx]
+                        lead_c = c_start + wet_sub_c[min_sub_r_idx]
+                        lead_x, lead_y = xy(transform, lead_r, lead_c)
+                        lead_lon, lead_lat = tr_inv.transform(lead_x, lead_y)
+
+                        lead_dist_km = round(float((local_r_dam - np.min(wet_sub_r)) * cell_size * 1.3 / 1000.0), 1)
+                        spread_m = round(float(np.max(np.sum(wet_sub, axis=1)) * cell_size), 1)
+                        inund_km2 = round(float(np.sum(wet_sub) * (cell_area / 1e6)), 2)
+
+                        if lead_dist_km < 2.5:
+                            reach_str = "Machhu-II Dam Toe Gorge (0 - 2 km)"
+                        elif lead_dist_km < 6.5:
+                            reach_str = "Gorge Canyon Descent (2 - 6 km)"
+                        elif lead_dist_km < 11.0:
+                            reach_str = "Morbi Urban Reach & Causeway (6 - 11 km)"
+                        elif lead_dist_km < 20.0:
+                            reach_str = "Lilapar / Dhuva Floodplain (11 - 20 km)"
+                        else:
+                            reach_str = "Northern Agricultural Plains towards Malia (20+ km)"
+
+                        poly_coords = coords if geom_type == "Polygon" else (coords[0] if len(coords) > 0 else [])
+
+                        prog_step = {
+                            "step": len(progression_steps) + 1,
+                            "time_hours": round(float(t_hr), 2),
+                            "inundated_area_km2": inund_km2,
+                            "lateral_spread_m": spread_m,
+                            "lead_distance_km": lead_dist_km,
+                            "lead_coords": [round(float(lead_lat), 5), round(float(lead_lon), 5)],
+                            "reach_name": reach_str,
+                            "max_depth_m": round(float(np.max(sub_depth)), 2),
+                            "max_vel_ms": round(float(np.max(sub_vel)), 2),
+                            "water_depth_dam_toe_m": round(float(stations.get("dam_toe", {}).get("depth", [0])[-1]), 2),
+                            "water_depth_morbi_m": round(float(stations.get("morbi", list(stations.values())[-1])["depth"][-1]), 2),
+                            "polygon": poly_coords,
+                            "geometry": geojson_geom,
+                            "geometry_type": geom_type,
+                        }
+                        progression_steps.append(prog_step)
+
         if step % report_interval == 0 or step == n_steps - 1:
             peak_curr = np.max(depth_grid)
             inund_area_km2 = np.sum(depth_grid > 0.10) * (cell_area / 1e6)
-            morbi_depth = stations["morbi"]["depth"][-1]
+            morbi_depth = stations.get("morbi", list(stations.values())[-1])["depth"][-1]
             logging.info(f"  t = {t_hr:5.2f}h | Max Depth = {peak_curr:5.2f}m | Inundated Area = {inund_area_km2:6.1f} km² | Morbi Depth = {morbi_depth:4.2f}m")
 
     # Post-processing
@@ -442,6 +545,7 @@ def run_2d_hydrodynamic_simulation(dem_path, breach_hydrograph_tuple, breach_par
         "arrival_time": arrival_time_grid,
         "duration": duration_grid,
         "stations": stations,
+        "progression_steps": progression_steps,
         "time_hours": time_hours,
         "cell_size": cell_size,
         "sanity_passed": observed_max <= sanity_limit,
@@ -514,7 +618,7 @@ def generate_simulation_plots(sim_results, breach_hydrograph_tuple, breach_param
     colors = {"dam_toe": "#03045e", "morbi": "#d90429", "lilapar": "#0077b6", "malia": "#0096c7"}
     for key, st in stations.items():
         peak_d = max(st["depth"])
-        ax2.plot(time_hours, st["depth"], color=colors[key], lw=2.0, label=f"{st['name']} (Peak: {peak_d:.2f} m)")
+        ax2.plot(time_hours, st["depth"], color=colors.get(key, "#0077b6"), lw=2.0, label=f"{st['name']} (Peak: {peak_d:.2f} m)")
 
     ax2.axhline(3.0, color="gray", linestyle=":", lw=1.5, label="Morbi Historical Flood Level (~3.0 m / 10 ft)")
     ax2.set_xlabel("Time from Failure Initiation [hours]", fontsize=11, fontweight="bold")
@@ -539,7 +643,7 @@ def generate_simulation_plots(sim_results, breach_hydrograph_tuple, breach_param
 
     # Plot station markers
     for key, st in stations.items():
-        ax.plot(st["c"], st["r"], marker="o", markersize=6, color="blue" if key != "morbi" else "black", markeredgecolor="white")
+        ax.plot(st["c"], st["r"], marker="o", markersize=6, color="black" if key == "morbi" else "blue", markeredgecolor="white")
         ax.text(st["c"] + 15, st["r"], st["name"], color="black", fontsize=8, fontweight="bold",
                 bbox=dict(boxstyle="round,pad=0.2", facecolor="white", alpha=0.8, edgecolor="none"))
 
@@ -583,8 +687,11 @@ def generate_simulation_plots(sim_results, breach_hydrograph_tuple, breach_param
 # ---------------------------------------------------------------------------
 # 6. EXPORT SUMMARY JSON (with dashboard-compatible `metrics` key)
 # ---------------------------------------------------------------------------
-def export_summary_json(sim_results, breach_params, breach_hydrograph_tuple):
-    """Save comprehensive simulation metrics for dashboard and reporting."""
+def export_summary_json(sim_results, breach_params, breach_hydrograph_tuple, dam_config=None):
+    """Save comprehensive simulation metrics and flood progression for dashboard and reporting."""
+    if dam_config is None:
+        dam_config = {"dam_name": "Machhu-II Dam"}
+
     time_hours, _, q_total, _ = breach_hydrograph_tuple
     max_depth = sim_results["max_depth"]
     max_vel = sim_results["max_velocity"]
@@ -595,14 +702,16 @@ def export_summary_json(sim_results, breach_params, breach_hydrograph_tuple):
     inund_area_km2 = float(np.sum(max_depth >= 0.10) * (cell_area / 1e6))
     deep_area_km2 = float(np.sum(max_depth >= 2.0) * (cell_area / 1e6))
 
-    morbi_peak = float(max(stations["morbi"]["depth"]))
+    morbi_st = stations.get("morbi", list(stations.values())[-1])
+    morbi_peak = float(max(morbi_st["depth"]))
     morbi_arr = None
-    morbi_depths = np.array(stations["morbi"]["depth"])
+    morbi_depths = np.array(morbi_st["depth"])
     if np.any(morbi_depths >= 0.10):
         morbi_arr = round(float(time_hours[np.argmax(morbi_depths >= 0.10)]), 2)
 
+    dam_name = dam_config.get("dam_name", "Machhu-II Dam")
     summary = {
-        "project": "Machhu-II Dam Breach Simulation",
+        "project": f"{dam_name} Breach Simulation",
         "directive": "5A",
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "model_engine": "2D Unsteady Hydrodynamic Raster Engine (Manning / Diffusive Wave)",
@@ -642,10 +751,47 @@ def export_summary_json(sim_results, breach_params, breach_hydrograph_tuple):
         }
     }
 
-    out_file = OUTPUTS_SIM / "simulation_summary.json"
-    with open(out_file, "w") as f:
-        json.dump(summary, f, indent=2)
-    logging.info(f"Saved simulation summary: {out_file}")
+    # Save simulation summary to all destination paths
+    sum_paths = [
+        OUTPUTS_SIM / "simulation_summary.json",
+        PROJECT_ROOT / "outputs" / "SIH-2026" / "outputs" / "simulation" / "simulation_summary.json",
+        PROJECT_ROOT / "frontend-dam" / "src" / "data" / "outputs" / "simulation_summary.json",
+        PROJECT_ROOT / "frontend-dam" / "public" / "data" / "simulation_summary.json",
+        PROJECT_ROOT / "frontend" / "public" / "data" / "simulation_summary.json",
+    ]
+    for sp in sum_paths:
+        try:
+            sp.parent.mkdir(parents=True, exist_ok=True)
+            with open(sp, "w") as f:
+                json.dump(summary, f, indent=2)
+            logging.info(f"Saved simulation summary: {sp}")
+        except Exception as e:
+            logging.warning(f"Could not write {sp}: {e}")
+
+    # Export flood progression JSON
+    prog_steps = sim_results.get("progression_steps", [])
+    progression_data = {
+        "project": f"{dam_name} 2D Dynamic Inundation Progression",
+        "total_steps": len(prog_steps),
+        "max_time_hours": float(time_hours[-1]) if len(time_hours) > 0 else 24.0,
+        "steps": prog_steps,
+    }
+
+    prog_paths = [
+        OUTPUTS_GIS / "flood_progression.json",
+        PROJECT_ROOT / "outputs" / "SIH-2026" / "outputs" / "gis" / "flood_progression.json",
+        PROJECT_ROOT / "frontend-dam" / "public" / "data" / "flood_progression.json",
+        PROJECT_ROOT / "frontend" / "public" / "data" / "flood_progression.json",
+    ]
+    for pp in prog_paths:
+        try:
+            pp.parent.mkdir(parents=True, exist_ok=True)
+            with open(pp, "w") as f:
+                json.dump(progression_data, f, indent=2)
+            logging.info(f"Saved flood progression: {pp}")
+        except Exception as e:
+            logging.warning(f"Could not write {pp}: {e}")
+
     return summary
 
 
@@ -653,13 +799,46 @@ def export_summary_json(sim_results, breach_params, breach_hydrograph_tuple):
 # MAIN EXECUTION
 # ---------------------------------------------------------------------------
 def main():
+    parser = argparse.ArgumentParser(description="Run 2D Hydrodynamic Dam Breach Flood Simulation")
+    parser.add_argument("--dam_config", type=str, default="machhu-ii", help="Key of the dam configuration in config.json")
+    args = parser.parse_args()
+
+    config_path = PROJECT_ROOT / "config.json"
+    if not config_path.is_file():
+        config_path = PROJECT_ROOT / "hello" / "SIH-2026" / "config.json"
+
+    if config_path.is_file():
+        with open(config_path, "r") as f:
+            all_configs = json.load(f)
+            dam_config = all_configs.get(args.dam_config, all_configs.get("machhu-ii", {}))
+    else:
+        dam_config = {
+            "dam_name": "Machhu-II Dam",
+            "state": "Gujarat",
+            "lat": 22.7580,
+            "lon": 70.8870,
+            "dam_height_m": 22.56,
+            "reservoir_volume_m3": 101000000,
+            "downstream_stations": [
+                {"name": "Machhu-II Dam Toe (0 km)", "key": "dam_toe", "lat": 22.7539, "lon": 70.8796, "dist_km": 0},
+                {"name": "Morbi City Center (7.5 km)", "key": "morbi", "lat": 22.8180, "lon": 70.8350, "dist_km": 7.5},
+                {"name": "Lilapar / Dhuva (15 km)", "key": "lilapar", "lat": 22.9161, "lon": 70.7853, "dist_km": 15.0},
+                {"name": "Malia Miyana (28 km)", "key": "malia", "lat": 22.9802, "lon": 70.7675, "dist_km": 28.0}
+            ]
+        }
+
     print("=" * 70)
     print("  Directive 5A: 2D Hydrodynamic Dam Breach Flood Simulation")
-    print("  Machhu-II Dam Failure, Morbi Floodplain, Gujarat")
+    print(f"  {dam_config.get('dam_name', 'Machhu-II Dam')} Failure, {dam_config.get('state', 'Gujarat')}")
     print("=" * 70)
 
     # 1. Load breach parameters
     breach_params = load_breach_parameters()
+    if dam_config and dam_config.get("reservoir_volume_m3"):
+        breach_params["V_reservoir_m3"] = dam_config["reservoir_volume_m3"]
+    if dam_config and dam_config.get("dam_height_m"):
+        breach_params["H_dam_m"] = dam_config["dam_height_m"]
+
     print(f"\n[1] Breach Parameters:")
     print(f"    Average Width B_avg = {breach_params['B_avg_m']:.1f} m")
     print(f"    Side Slope Z        = {breach_params['Z_HV']:.1f} (H:V)")
@@ -673,7 +852,7 @@ def main():
     print(f"\n[2] Hydrograph Synthesized: 24h duration, peak outflow = {np.max(q_tot):,.0f} m³/s at t = {time_h[np.argmax(q_tot)]:.2f} h")
 
     # 3. Run 2D Hydrodynamic Simulation
-    sim_results = run_2d_hydrodynamic_simulation(DEM_FILE, hydrograph_tuple, breach_params)
+    sim_results = run_2d_hydrodynamic_simulation(DEM_FILE, hydrograph_tuple, breach_params, dam_config)
 
     # 4. Export GeoTIFFs
     print(f"\n[3] Exporting GeoTIFF Rasters to outputs/simulation/...")
@@ -684,15 +863,16 @@ def main():
     generate_simulation_plots(sim_results, hydrograph_tuple, breach_params)
 
     # 6. Save JSON Summary
-    summary = export_summary_json(sim_results, breach_params, hydrograph_tuple)
+    summary = export_summary_json(sim_results, breach_params, hydrograph_tuple, dam_config)
 
+    morbi_info = summary['monitoring_gauges'].get('morbi', list(summary['monitoring_gauges'].values())[-1])
     print("\n" + "=" * 70)
     print("  Simulation Finished!")
     print(f"  Sanity Check         : {'PASSED ✓' if sim_results.get('sanity_passed') else 'FAILED ✗'}")
     print(f"  Total Inundated Area : {summary['total_inundation_area_km2']} km²")
     print(f"  Max Inundation Depth : {summary['max_simulated_depth_m']} m")
-    print(f"  Morbi Peak Depth     : {summary['monitoring_gauges']['morbi']['peak_depth_m']} m (Historical ~3.0 m)")
-    print(f"  Morbi Arrival Time   : {summary['monitoring_gauges']['morbi']['arrival_time_hours']} hours post-breach")
+    print(f"  Morbi Peak Depth     : {morbi_info['peak_depth_m']} m (Historical ~3.0 m)")
+    print(f"  Morbi Arrival Time   : {morbi_info['arrival_time_hours']} hours post-breach")
     print("=" * 70)
 
     return 0 if sim_results.get("sanity_passed", False) else 1

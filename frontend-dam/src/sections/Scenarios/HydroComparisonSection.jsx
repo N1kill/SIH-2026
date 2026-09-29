@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import SectionLabel from '../../components/SectionLabel';
-import BubbleOverlay from '../../components/BubbleOverlay';
 import {
   SlidersIcon,
   ScaleIcon,
@@ -11,11 +10,14 @@ import {
   StadiumIcon,
   MonumentIcon,
 } from '../../components/Icons';
+import ScientificPlotModal from '../../components/ScientificPlotModal';
+import { SCIENTIFIC_PLOTS } from '../../data/outputs/simulationOutputs';
+import EngineeringTwin3D from '../../components/EngineeringTwin3D';
 import './scenarios.css';
 
 /**
  * Scene 05 — Hydrodynamic Models, What-If Scenarios & Evacuation Routing
- * Docked Left-Corner Semicircle with Center Info Display & Floating Water Bubbles.
+ * Docked Left-Corner Semicircle with Center Info Display.
  * Screen freezes until 4th module is scrolled through too.
  */
 
@@ -46,7 +48,7 @@ const SCENE_ITEMS = [
     category: 'GROUND TRUTH CALIBRATION',
     pillLabel: 'ACTUAL VS SIMULATED MATCH',
     title: '1979 Machhu-II Ground Truth Calibration',
-    subtitle: 'F1-Score: 0.91 · Critical Success Index: 0.88',
+    subtitle: 'F1-Score: 0.9151 · Critical Success Index: 0.8435 · 99.91% Accuracy',
     desc: 'Direct empirical validation against Government of Gujarat survey records, Sentinel-1 SAR flood boundaries, and 28 downstream gauge stations.',
     icon: TargetIcon,
   },
@@ -56,7 +58,7 @@ const SCENE_ITEMS = [
     category: 'TACTICAL RESCUE ROUTING',
     pillLabel: 'NEAREST EVACUATION ROUTING',
     title: 'Dynamic Safe Corridors & Shelter Allocation',
-    subtitle: 'GIS network analysis cross-referencing live wavefront depths',
+    subtitle: '3 HADR High-Ground Centers (55,000 Capacity) · Buffer >52m MSL',
     desc: 'Prevents civilian convoys from traversing submerged roads, dynamically verifying topographic high-ground buffers (≥ +5m) and capacity balancing.',
     icon: RunnerIcon,
   },
@@ -66,6 +68,8 @@ export default function HydroComparisonSection() {
   const sectionRef = useRef(null);
   const [activeIndex, setActiveIndex] = useState(0);
   const [isFrozen, setIsFrozen] = useState(false);
+  const [selectedPlot, setSelectedPlot] = useState(null);
+  const [showDelftTwinModal, setShowDelftTwinModal] = useState(false);
 
   // Live state refs to guarantee event handlers always see current values without teardown
   const activeIndexRef = useRef(0);
@@ -385,9 +389,6 @@ export default function HydroComparisonSection() {
 
   return (
     <section id="scenarios" ref={sectionRef} className="scenarios-section">
-      {/* Dynamic Water Bubble Particle Emitter */}
-      <BubbleOverlay intensity={1.6} />
-
       {/* Background Matrix Watermark */}
       <div className="orbital-bg-watermark">
         <div className="watermark-row">PRALAYA AI · DIGITAL TWIN · HYDRODYNAMICS</div>
@@ -849,6 +850,19 @@ export default function HydroComparisonSection() {
                         <span>T=3h Peak Wave</span>
                         <span>T=8h Receding Flow</span>
                       </div>
+                      <div style={{ marginTop: '14px', display: 'flex', justifyContent: 'flex-end' }}>
+                        <button
+                          type="button"
+                          className="view-plot-btn"
+                          onClick={() => setSelectedPlot(SCIENTIFIC_PLOTS.find((p) => p.id === 'sensitivity_scenarios_plot'))}
+                          title="View authentic GIS model sensitivity scenarios plot"
+                        >
+                          <span>VIEW AUTHENTIC SENSITIVITY PLOT (HI-RES)</span>
+                          <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
+                            <path d="M3 11L11 3M11 3H5M11 3V9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -889,13 +903,44 @@ export default function HydroComparisonSection() {
                       </div>
                       <div className="spec-row">
                         <span className="spec-label">Best Suited For</span>
-                        <span className="spec-value">Downstream city evacuation timelines & area extent</span>
+                        <span className="spec-value">Downstream city evacuation timelines &amp; area extent</span>
                       </div>
                     </div>
 
-                    <div className="model-badge-footer">
-                      <span className="check-tag">✓ Macro Watershed Routing</span>
-                      <span className="check-tag">✓ GIS GeoTIFF Compatibility</span>
+                    <div className="model-badge-footer" style={{ flexDirection: 'column', gap: '8px', alignItems: 'stretch' }}>
+                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                        <span className="check-tag">✓ Macro Watershed Routing</span>
+                        <span className="check-tag">✓ GIS GeoTIFF Compatibility</span>
+                        <span className="check-tag" style={{ borderColor: '#38bdf8', color: '#38bdf8' }}>✓ Delft3D-FM (98.4% Match)</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setShowDelftTwinModal(true)}
+                        style={{
+                          marginTop: '6px',
+                          padding: '10px 16px',
+                          borderRadius: '8px',
+                          border: '1px solid #38bdf8',
+                          background: 'linear-gradient(135deg, rgba(56, 189, 248, 0.22) 0%, rgba(14, 165, 233, 0.12) 100%)',
+                          color: '#e0f2fe',
+                          fontFamily: 'var(--font-mono, monospace)',
+                          fontSize: '11px',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '8px',
+                          transition: 'all 0.2s ease',
+                          letterSpacing: '0.04em',
+                        }}
+                        title="Open interactive Delft3D-FM 3D Flexible Mesh & Input Deck Inspector"
+                      >
+                        <span>🎮 LAUNCH DELFT3D-FM 3D LAB &amp; DECK (.MDU)</span>
+                        <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
+                          <path d="M3 11L11 3M11 3H5M11 3V9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      </button>
                     </div>
                   </div>
 
@@ -905,8 +950,9 @@ export default function HydroComparisonSection() {
                     <h3 className="model-name">SPH (Smoothed Particle Hydrodynamics)</h3>
                     <div className="model-role">Microscopic Near-Field Dam Collapse (0 m — 2 km)</div>
                     <p className="model-summary">
-                      Meshless Lagrangian computational fluid dynamics treating water as millions of discrete interacting particles.
-                      Captures violent turbulent wave overtopping, fluid impact pressure on concrete piers, and structural cavitation.
+                      Meshless Lagrangian computational fluid dynamics treating water as millions of discrete
+                      interacting particles. Captures violent turbulent wave overtopping, fluid impact pressure on
+                      concrete piers, and structural cavitation.
                     </p>
 
                     <div className="model-specs-table">
@@ -928,12 +974,12 @@ export default function HydroComparisonSection() {
                       </div>
                       <div className="spec-row">
                         <span className="spec-label">Best Suited For</span>
-                        <span className="spec-value">Near-crest hydraulic jump & structural failure forces</span>
+                        <span className="spec-value">Near-crest hydraulic jump &amp; structural failure forces</span>
                       </div>
                     </div>
 
                     <div className="model-badge-footer">
-                      <span className="check-tag">✓ 3D Turbulence & Pier Impact</span>
+                      <span className="check-tag">✓ 3D Turbulence &amp; Pier Impact</span>
                       <span className="check-tag">✓ High-Fidelity Twin Visuals</span>
                     </div>
                   </div>
@@ -945,9 +991,9 @@ export default function HydroComparisonSection() {
                   <h4>How PRALAYA Bridges Both Solvers Seamlessly</h4>
                   <p>
                     PRALAYA leverages <strong>SPH particle hydrodynamics</strong> at the localized dam axis (0-2 km)
-                    to calculate exact dynamic breach enlargement and violent outflow discharge, then transfers the resulting
-                    hydrograph into the <strong>Delft3D/FVM shallow water solver</strong> to route the flood wave across 80+ km
-                    of downstream digital elevation terrain in real-time.
+                    to calculate exact dynamic breach enlargement and violent outflow discharge, then transfers the
+                    resulting hydrograph into the <strong>Delft3D/FVM shallow water solver</strong> to route the flood
+                    wave across 80+ km of downstream digital elevation terrain in real-time.
                   </p>
                 </div>
               </div>
@@ -964,29 +1010,42 @@ export default function HydroComparisonSection() {
                         1979 Machhu-II Disaster: Actual Survey Records vs PRALAYA Simulation
                       </h4>
                     </div>
-                    <span className="f1-badge">F1-SCORE: 0.91 · CSI: 0.88</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <span className="f1-badge">F1: 0.9151 · CSI: 0.8435 · 99.91% ACCURACY</span>
+                      <button
+                        type="button"
+                        className="view-plot-btn"
+                        onClick={() => setSelectedPlot(SCIENTIFIC_PLOTS.find((p) => p.id === 'satellite_validation_plot'))}
+                        title="View Copernicus Sentinel-1 SAR orbital validation plot"
+                      >
+                        <span>VIEW SAR VALIDATION PLOT</span>
+                        <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
+                          <path d="M3 11L11 3M11 3H5M11 3V9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      </button>
+                    </div>
                   </div>
 
                   <div className="actual-sim-metrics-row">
                     <div className="sim-metric-card">
-                      <span className="sim-lbl">HISTORICAL REPORTED FLOOD AREA</span>
-                      <span className="sim-val">65.2 km²</span>
-                      <span className="sim-sub">Government of Gujarat Commission Records (1980)</span>
+                      <span className="sim-lbl">HISTORICAL GROUND TRUTH (MORBI)</span>
+                      <span className="sim-val">6.1 m</span>
+                      <span className="sim-sub">~20 ft mark (Sandesara & Wooten / CWC Records)</span>
                     </div>
                     <div className="sim-metric-card">
-                      <span className="sim-lbl">PRALAYA SIMULATED FLOOD AREA</span>
-                      <span className="sim-val highlight-cyan">68.4 km²</span>
-                      <span className="sim-sub">Coupled 30m DEM + 2D Saint-Venant Solver</span>
+                      <span className="sim-lbl">PRALAYA 2D SIMULATED DEPTH</span>
+                      <span className="sim-val highlight-cyan">6.32 m</span>
+                      <span className="sim-sub">Relative Error: 3.61% (Diffusive Wave Engine)</span>
                     </div>
                     <div className="sim-metric-card">
-                      <span className="sim-lbl">SPATIAL OVERLAP CONCORDANCE</span>
-                      <span className="sim-val highlight-green">92.4%</span>
-                      <span className="sim-sub">Verified via Sentinel-1 SAR & historical contours</span>
+                      <span className="sim-lbl">CRITICAL SUCCESS INDEX (CSI)</span>
+                      <span className="sim-val highlight-green">0.8435</span>
+                      <span className="sim-sub">Hit Rate / Sensitivity: 97.74% (68,389 TP pixels)</span>
                     </div>
                     <div className="sim-metric-card">
-                      <span className="sim-lbl">ARRIVAL TIME VARIANCE</span>
-                      <span className="sim-val highlight-amber">-12 mins</span>
-                      <span className="sim-sub">Historical record: 2h 55m | Simulated: 2h 45m</span>
+                      <span className="sim-lbl">DOCUMENTED WAVE ARRIVAL</span>
+                      <span className="sim-val highlight-amber">2.5h – 3.5h</span>
+                      <span className="sim-sub">Simulated arrival at Morbi Center: 1.57h (94 min)</span>
                     </div>
                   </div>
 
@@ -1116,8 +1175,23 @@ export default function HydroComparisonSection() {
                   {/* Right Column: Live Evacuation Shelter Matrix */}
                   <div className="evac-matrix-card">
                     <div className="matrix-header">
-                      <span className="matrix-title">LIVE EVACUATION SHELTER MATRIX</span>
-                      <span className="active-shelter-count">3 OF 4 SHELTERS ACTIVE</span>
+                      <div>
+                        <span className="matrix-title">LIVE HADR HIGH-GROUND RELIEF MATRIX</span>
+                        <span className="active-shelter-count" style={{ display: 'block', marginTop: '2px' }}>
+                          55,000 PERSONS TOTAL CAPACITY (&gt;52M MSL BUFFER)
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        className="view-plot-btn"
+                        onClick={() => setSelectedPlot(SCIENTIFIC_PLOTS.find((p) => p.id === 'risk_evacuation_map'))}
+                        title="View topographic risk zones and dynamic evacuation corridors map"
+                      >
+                        <span>VIEW EVACUATION MAP</span>
+                        <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
+                          <path d="M3 11L11 3M11 3H5M11 3V9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      </button>
                     </div>
 
                     <div className="shelters-list">
@@ -1129,17 +1203,17 @@ export default function HydroComparisonSection() {
                               <SchoolIcon size={18} color="#86efac" />
                             </span>
                             <div>
-                              <strong>Morbi East Higher Secondary School</strong>
-                              <span className="shelter-coords">22.812°N, 70.854°E</span>
+                              <strong>Morbi East High Ground Shelter 1</strong>
+                              <span className="shelter-coords">Elevation Ridge (&gt;55m MSL)</span>
                             </div>
                           </div>
-                          <span className="shelter-status-badge safe">SAFE (ACTIVE)</span>
+                          <span className="shelter-status-badge safe">PRIMARY BENCHMARK</span>
                         </div>
                         <div className="shelter-stats-grid">
-                          <div><span>DISTANCE:</span> <strong>2.1 km</strong></div>
-                          <div><span>ELEVATION:</span> <strong>+18.4 m</strong> (Safe buffer)</div>
-                          <div><span>CAPACITY:</span> <strong>4,500 people</strong></div>
-                          <div><span>ROUTE:</span> <strong>Ridge Road (Unsubmerged)</strong></div>
+                          <div><span>ELEVATION:</span> <strong>&gt;55.0 m MSL</strong> (Safe buffer)</div>
+                          <div><span>CAPACITY:</span> <strong>25,000 people</strong></div>
+                          <div><span>CORRIDOR:</span> <strong>R1_EAST (Central to East Bypass)</strong></div>
+                          <div><span>STATUS:</span> <strong>Above Inundation Zone</strong></div>
                         </div>
                       </div>
 
@@ -1151,17 +1225,17 @@ export default function HydroComparisonSection() {
                               <StadiumIcon size={18} color="#86efac" />
                             </span>
                             <div>
-                              <strong>District Sports Stadium & Gymnasium</strong>
-                              <span className="shelter-coords">22.825°N, 70.868°E</span>
+                              <strong>Morbi South-East Relief Camp</strong>
+                              <span className="shelter-coords">Government Complex (&gt;52m MSL)</span>
                             </div>
                           </div>
-                          <span className="shelter-status-badge safe">SAFE (ACTIVE)</span>
+                          <span className="shelter-status-badge safe">SECONDARY SAFE</span>
                         </div>
                         <div className="shelter-stats-grid">
-                          <div><span>DISTANCE:</span> <strong>3.4 km</strong></div>
-                          <div><span>ELEVATION:</span> <strong>+26.1 m</strong> (Safe buffer)</div>
-                          <div><span>CAPACITY:</span> <strong>8,000 people</strong></div>
-                          <div><span>ROUTE:</span> <strong>Highway 8A Bypass</strong></div>
+                          <div><span>ELEVATION:</span> <strong>&gt;52.0 m MSL</strong> (High ground)</div>
+                          <div><span>CAPACITY:</span> <strong>18,000 people</strong></div>
+                          <div><span>CORRIDOR:</span> <strong>R2_SOUTH (Vankaner Elevated Highway)</strong></div>
+                          <div><span>STATUS:</span> <strong>Secondary Inflow Cutoff Route</strong></div>
                         </div>
                       </div>
 
@@ -1173,17 +1247,17 @@ export default function HydroComparisonSection() {
                               <MonumentIcon size={18} color="#86efac" />
                             </span>
                             <div>
-                              <strong>Navlakhi Hill Community Center</strong>
-                              <span className="shelter-coords">22.839°N, 70.880°E</span>
+                              <strong>Liliya Ridge Transit Hub</strong>
+                              <span className="shelter-coords">High Ground Transport Hub</span>
                             </div>
                           </div>
-                          <span className="shelter-status-badge safe">SAFE (ACTIVE)</span>
+                          <span className="shelter-status-badge safe">TRANSIT BENCHMARK</span>
                         </div>
                         <div className="shelter-stats-grid">
-                          <div><span>DISTANCE:</span> <strong>4.8 km</strong></div>
-                          <div><span>ELEVATION:</span> <strong>+32.0 m</strong> (Plateau peak)</div>
-                          <div><span>CAPACITY:</span> <strong>5,500 people</strong></div>
-                          <div><span>ROUTE:</span> <strong>Plateau Arterial Corridor</strong></div>
+                          <div><span>ELEVATION:</span> <strong>&gt;54.0 m MSL</strong> (Ridge buffer)</div>
+                          <div><span>CAPACITY:</span> <strong>12,000 people</strong></div>
+                          <div><span>CORRIDOR:</span> <strong>Liliya Elevated Radial Bypass</strong></div>
+                          <div><span>STATUS:</span> <strong>Civic Transport Arterial</strong></div>
                         </div>
                       </div>
 
@@ -1195,17 +1269,17 @@ export default function HydroComparisonSection() {
                               <AlertIcon size={18} color="#ef4444" />
                             </span>
                             <div>
-                              <strong>Riverbank Community Hall (Lowland)</strong>
-                              <span className="shelter-coords">22.818°N, 70.838°E</span>
+                              <strong>Riverbank Lowland Municipal Hall</strong>
+                              <span className="shelter-coords">22.818°N, 70.838°E · Inundated Lowland</span>
                             </div>
                           </div>
-                          <span className="shelter-status-badge danger">INUNDATION RISK (CUT OFF)</span>
+                          <span className="shelter-status-badge danger">SEVERED (&gt;3.0m DEPTH)</span>
                         </div>
                         <div className="shelter-stats-grid">
-                          <div><span>DISTANCE:</span> <strong>1.2 km</strong></div>
-                          <div><span>PREDICTED DEPTH:</span> <strong style={{ color: '#ef4444' }}>3.2 m at T+1h 15m</strong></div>
-                          <div><span>ACTION:</span> <strong style={{ color: '#ef4444' }}>DE-LISTED FROM ROUTING</strong></div>
-                          <div><span>REROUTED TO:</span> <strong>Morbi East School (+0.9 km)</strong></div>
+                          <div><span>WATER DEPTH:</span> <strong style={{ color: '#ef4444' }}>3.8 m Inundation</strong></div>
+                          <div><span>ROADWAY:</span> <strong style={{ color: '#ef4444' }}>SEVERED / BLOCKED</strong></div>
+                          <div><span>ALGORITHM:</span> <strong>Rerouted to R1_EAST</strong></div>
+                          <div><span>PROTOCOL:</span> <strong>DO NOT DISPATCH CONVOYS</strong></div>
                         </div>
                       </div>
                     </div>
@@ -1265,6 +1339,54 @@ export default function HydroComparisonSection() {
           </span>
         </div>
       </div>
+
+      {/* High-Resolution Scientific GIS Plot Modal */}
+      {selectedPlot && (
+        <ScientificPlotModal
+          plot={selectedPlot}
+          onClose={() => setSelectedPlot(null)}
+        />
+      )}
+
+      {/* Interactive Delft3D-FM 3D Digital Twin Modal */}
+      {showDelftTwinModal && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 9999,
+            background: 'rgba(5, 12, 11, 0.88)',
+            backdropFilter: 'blur(20px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '24px',
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowDelftTwinModal(false);
+          }}
+        >
+          <div
+            style={{
+              position: 'relative',
+              width: '100%',
+              maxWidth: '1240px',
+              height: '86vh',
+              maxHeight: '820px',
+              borderRadius: '20px',
+              overflow: 'hidden',
+              boxShadow: '0 25px 60px rgba(0, 0, 0, 0.95)',
+              border: '1px solid rgba(56, 189, 248, 0.35)',
+            }}
+          >
+            <EngineeringTwin3D
+              height="100%"
+              initialTab="delft3d"
+              onClose={() => setShowDelftTwinModal(false)}
+            />
+          </div>
+        </div>
+      )}
     </section>
   );
 }

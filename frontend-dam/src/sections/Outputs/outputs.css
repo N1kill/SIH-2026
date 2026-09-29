@@ -206,7 +206,19 @@
   transition: transform 0.8s ease;
 }
 
-.accordion-slot.is-expanded:hover .unified-theme-svg {
+.showcase-plot-bg-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+  opacity: 0.88;
+  transition: transform 0.8s ease;
+  background: #020617;
+  padding: 8px;
+}
+
+.accordion-slot.is-expanded:hover .unified-theme-svg,
+.accordion-slot.is-expanded:hover .showcase-plot-bg-img {
   transform: scale(1.02);
 }
 
@@ -474,8 +486,7 @@
 .inspect-modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.85);
-  backdrop-filter: blur(8px);
+  background: rgba(0, 0, 0, 0.92);
   z-index: 100000;
   display: flex;
   align-items: center;
@@ -574,3 +585,75 @@
   border-radius: 4px;
   cursor: pointer;
 }
+
+/* Scientific Plot Buttons & Badges */
+.view-plot-btn {
+  background: rgba(63, 168, 155, 0.2);
+  border: 1px solid rgba(63, 168, 155, 0.55);
+  color: #5eead4;
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  padding: 6px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(63, 168, 155, 0.15);
+}
+
+.view-plot-btn:hover {
+  background: rgba(63, 168, 155, 0.35);
+  border-color: #5eead4;
+  color: #ffffff;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(63, 168, 155, 0.3);
+}
+
+.view-plot-btn svg {
+  transition: transform 0.2s ease;
+}
+
+.view-plot-btn:hover svg {
+  transform: translateX(2px) translateY(-2px);
+}
+
+.plot-available-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-mono, monospace);
+  font-size: 9.5px;
+  font-weight: 700;
+  color: #fde047;
+  background: rgba(253, 224, 71, 0.12);
+  border: 1px solid rgba(253, 224, 71, 0.28);
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.modal-download-json-btn {
+  background: rgba(63, 168, 155, 0.2);
+  border: 1px solid rgba(63, 168, 155, 0.4);
+  color: #5eead4;
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+  font-weight: 600;
+  padding: 5px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.15s ease;
+}
+
+.modal-download-json-btn:hover {
+  background: rgba(63, 168, 155, 0.35);
+  color: #ffffff;
+}
+

@@ -1,0 +1,72 @@
+{
+  "directive": "6",
+  "timestamp": "2026-09-13T07:50:14.037092+00:00",
+  "accuracy_metrics": {
+    "True_Positive_pixels": 68389,
+    "False_Positive_pixels": 11107,
+    "False_Negative_pixels": 1578,
+    "True_Negative_pixels": 13956055,
+    "Critical_Success_Index_CSI": 0.8435,
+    "F1_Score": 0.9151,
+    "Hit_Rate_Sensitivity": 0.9774,
+    "False_Alarm_Ratio_FAR": 0.1397,
+    "Overall_Accuracy": 0.9991,
+    "Cohens_Kappa": 0.9147
+  },
+  "historical_ground_truth": {
+    "morbi_flood_height_historical_m": 6.1,
+    "morbi_flood_height_simulated_m": 6.32,
+    "relative_error_percent": 3.61,
+    "historical_flood_benchmark_description": "~6.1 m sustained (~20ft) / 3.7-9.1m surge",
+    "historical_sources": "Sandesara & Wooten (2011, ISBN 978-1616144319); CWC/NDMA Machhu-II Post-Disaster Records",
+    "historical_wave_arrival_time_hours": "2.5 - 3.5 hours"
+  },
+  "sensitivity_scenarios": [
+    {
+      "id": "base",
+      "name": "Base Case (Froehlich 2008)",
+      "B_avg": 156.0,
+      "t_f": 2.5,
+      "Q_p": 6647.0,
+      "peak_depth_morbi": 6.32,
+      "inund_area_km2": 71.5
+    },
+    {
+      "id": "width_plus25",
+      "name": "+25% Breach Width",
+      "B_avg": 195.0,
+      "t_f": 2.0,
+      "Q_p": 8309.0,
+      "peak_depth_morbi": 7.58,
+      "inund_area_km2": 84.4
+    },
+    {
+      "id": "width_minus25",
+      "name": "-25% Breach Width",
+      "B_avg": 117.0,
+      "t_f": 3.12,
+      "Q_p": 4985.0,
+      "peak_depth_morbi": 4.93,
+      "inund_area_km2": 58.6
+    },
+    {
+      "id": "extreme_plus50",
+      "name": "+50% Extreme Overtopping",
+      "B_avg": 234.0,
+      "t_f": 1.5,
+      "Q_p": 10500.0,
+      "peak_depth_morbi": 9.16,
+      "inund_area_km2": 100.1
+    },
+    {
+      "id": "conservative_minus50",
+      "name": "-50% Conservative Breach",
+      "B_avg": 78.0,
+      "t_f": 4.0,
+      "Q_p": 3324.0,
+      "peak_depth_morbi": 3.67,
+      "inund_area_km2": 42.9
+    }
+  ],
+  "sensitivity_methodology": "First-order linear parametric scaling from base 2D hydrodynamic simulation"
+}

@@ -6,7 +6,6 @@ import TheorySection from './sections/Theory/TheorySection';
 import OutputsAccordion from './sections/Outputs/OutputsAccordion';
 import HydroComparisonSection from './sections/Scenarios/HydroComparisonSection';
 import FeaturesSection from './sections/Features/FeaturesSection';
-import BubbleOverlay from './components/BubbleOverlay';
 
 // Dedicated Sub-Pages
 import AboutPage from './pages/AboutPage';
@@ -15,20 +14,49 @@ import SimulatePage from './pages/SimulatePage';
 import DocsPage from './pages/DocsPage';
 
 /**
+ * Determine initial page from URL pathname or hash
+ */
+function getInitialPage() {
+  const path = window.location.pathname.replace(/^\//, '').toLowerCase();
+  const hash = window.location.hash.replace(/^#\/?/, '').toLowerCase();
+  const validPages = ['simulate', 'about', 'contact', 'docs'];
+  if (validPages.includes(path)) return path;
+  if (validPages.includes(hash)) return hash;
+  return 'home';
+}
+
+/**
  * PRALAYA — Dam Breach 3D Digital Twin & Inundation Simulation
  * 
  * Multi-Page & Multi-Scene Experience:
  * - Navbar: Home | Simulate | About | Contact Us | Docs
- * - Scene 01: The Calm // 3D Dam Camera Director (#hero)
- * - Scene 02: Why is PRALAYA built // Historical Dam Breaches & Failure Case Archives (#breach)
- * - Scene 03: Solving In Theory // 2D Saint-Venant Equations & Digital Elevation Meshes (#theory)
- * - Scene 04 to 06: Water Particles Continuum (Continuous BubbleOverlay through Scenes 04, 05, 06)
- *   - Scene 04: Engine Outputs & Deliverables (Horizontal Expanding Accordion Cards)
- *   - Scene 05: Models & Scenarios (Delft3D vs SPH, What-If Sandbox, Evacuation Tracking)
- *   - Scene 06: Decision Support (Command Center & Footer)
+ * - Scene 01: The Calm // 3D Dam Camera Director with Photorealistic WebGL Water Simulation
+ * - Scene 02: Why is PRALAYA built // Historical Dam Breaches & Failure Case Archives
+ * - Scene 03: Solving In Theory // 2D Saint-Venant Equations & Digital Elevation Meshes
+ * - Scene 04: Engine Outputs & Deliverables (Horizontal Expanding Accordion Cards)
+ * - Scene 05: Models & Scenarios (Delft3D vs SPH, What-If Sandbox, Evacuation Tracking)
+ * - Scene 06: Decision Support (Command Center & Footer)
  */
 export default function App() {
-  const [currentPage, setCurrentPage] = useState('home');
+  const [currentPage, setCurrentPage] = useState(getInitialPage);
+
+  // Sync URL history when page changes
+  const handleNavigate = (page) => {
+    setCurrentPage(page);
+    const targetPath = page === 'home' ? '/' : `/${page}`;
+    if (window.location.pathname !== targetPath) {
+      window.history.pushState({ page }, '', targetPath);
+    }
+  };
+
+  // Listen to browser forward/back buttons
+  useEffect(() => {
+    const handlePopState = () => {
+      setCurrentPage(getInitialPage());
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   // Scroll to top whenever switching sub-pages
   useEffect(() => {
@@ -48,13 +76,13 @@ export default function App() {
       }}
     >
       {/* 1. Global Floating Glassmorphic HUD Navbar */}
-      <Navbar currentPage={currentPage} onNavigate={setCurrentPage} />
+      <Navbar currentPage={currentPage} onNavigate={handleNavigate} />
 
       {/* 2. Main Page Router / View Switcher */}
       {currentPage === 'home' && (
         <main>
-          {/* Scene 01: The Calm (3D Dam with calibrated camera director) */}
-          <DamCameraDirector id="hero" showWater={false} />
+          {/* Scene 01: The Calm (3D Photogrammetry Dam Model — Water Simulation OFF by default, toggleable via UI) */}
+          <DamCameraDirector id="hero" initialWater={false} />
 
           {/* Scene 02: Why is PRALAYA built (Historical Dam Breaches & Case Archives) */}
           <BreachSection />
@@ -62,44 +90,31 @@ export default function App() {
           {/* Scene 03: How We Solve It In Theory (2D Saint-Venant & DEM Mesh Physics + AI Visual) */}
           <TheorySection />
 
-          {/* Scene 04 to End: CONTINUOUS WATER PARTICLES EMITTER */}
-          <div
-            className="water-particles-continuum"
-            style={{
-              position: 'relative',
-              width: '100%',
-              overflow: 'visible',
-            }}
-          >
-            {/* HTML5 Canvas Underwater Particle Emitter running continuously across Scenes 04-06 */}
-            <BubbleOverlay intensity={1.8} />
+          {/* Scene 04: Engine Deliverable Outputs (Horizontal Expanding Accordion Deck with 7 outputs) */}
+          <OutputsAccordion />
 
-            {/* Scene 04: Engine Deliverable Outputs (Horizontal Expanding Accordion Deck with 7 outputs) */}
-            <OutputsAccordion />
+          {/* Scene 05: Hydrodynamic Models, What-If Sandbox & Nearest Evacuation Routing */}
+          <HydroComparisonSection />
 
-            {/* Scene 05: Hydrodynamic Models, What-If Sandbox & Nearest Evacuation Routing */}
-            <HydroComparisonSection />
-
-            {/* Scene 06: Decision Support & Evacuation Sequencing (Command Center & Footer) */}
-            <FeaturesSection />
-          </div>
+          {/* Scene 06: Decision Support & Evacuation Sequencing (Command Center & Footer) */}
+          <FeaturesSection />
         </main>
       )}
 
       {currentPage === 'simulate' && (
-        <SimulatePage onBackToHome={() => setCurrentPage('home')} />
+        <SimulatePage onBackToHome={() => handleNavigate('home')} />
       )}
 
       {currentPage === 'about' && (
-        <AboutPage onBackToHome={() => setCurrentPage('home')} />
+        <AboutPage onBackToHome={() => handleNavigate('home')} />
       )}
 
       {currentPage === 'contact' && (
-        <ContactPage onBackToHome={() => setCurrentPage('home')} />
+        <ContactPage onBackToHome={() => handleNavigate('home')} />
       )}
 
       {currentPage === 'docs' && (
-        <DocsPage onBackToHome={() => setCurrentPage('home')} />
+        <DocsPage onBackToHome={() => handleNavigate('home')} />
       )}
     </div>
   );

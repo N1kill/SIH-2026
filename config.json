@@ -1,0 +1,45 @@
+{
+  "machhu-ii": {
+    "dam_name": "Machhu-II Dam",
+    "state": "Gujarat",
+    "lat": 22.7580,
+    "lon": 70.8870,
+    "dam_height_m": 22.56,
+    "crest_length_m": 1200.0,
+    "reservoir_volume_m3": 101000000,
+    "spillway_capacity_m3s": 6230,
+    "downstream_stations": [
+      {"name": "Machhu-II Dam Toe (0 km)", "key": "dam_toe", "lat": 22.7539, "lon": 70.8796, "dist_km": 0},
+      {"name": "Morbi City Center (7.5 km)", "key": "morbi", "lat": 22.8180, "lon": 70.8350, "dist_km": 7.5},
+      {"name": "Lilapar / Dhuva (15 km)", "key": "lilapar", "lat": 22.9161, "lon": 70.7853, "dist_km": 15.0},
+      {"name": "Malia Miyana (28 km)", "key": "malia", "lat": 22.9802, "lon": 70.7675, "dist_km": 28.0}
+    ],
+    "bbox": {
+      "min_lat": 22.0,
+      "max_lat": 23.2,
+      "min_lon": 70.4,
+      "max_lon": 71.3
+    }
+  },
+  "panshet": {
+    "dam_name": "Panshet Dam",
+    "state": "Maharashtra",
+    "lat": 18.3797,
+    "lon": 73.6111,
+    "dam_height_m": 51.0,
+    "crest_length_m": 1037.0,
+    "reservoir_volume_m3": 303000000,
+    "spillway_capacity_m3s": 3000,
+    "downstream_stations": [
+      {"name": "Panshet Dam Toe (0 km)", "key": "dam_toe", "lat": 18.3797, "lon": 73.6111, "dist_km": 0},
+      {"name": "Khadakwasla", "key": "khadakwasla", "lat": 18.4358, "lon": 73.7628, "dist_km": 18.0},
+      {"name": "Pune City", "key": "pune", "lat": 18.5204, "lon": 73.8567, "dist_km": 35.0}
+    ],
+    "bbox": {
+      "min_lat": 18.30,
+      "max_lat": 18.60,
+      "min_lon": 73.55,
+      "max_lon": 73.95
+    }
+  }
+}
