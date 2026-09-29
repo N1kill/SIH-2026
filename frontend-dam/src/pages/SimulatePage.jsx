@@ -114,7 +114,7 @@ const OUTCOME_SECTIONS = [
   },
 ];
 
-export default function SimulatePage({ onBackToHome }) {
+export default function SimulatePage({ onBackToHome, onViewSimulation }) {
   const [selectedDamId, setSelectedDamId] = useState(INDIAN_DAMS[0].id);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -145,10 +145,6 @@ export default function SimulatePage({ onBackToHome }) {
     setSelectedDamId(damId);
     setIsDropdownOpen(false);
     setSearchQuery('');
-  };
-
-  const scrollToOutcomes = () => {
-    outcomesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
   return (
@@ -299,8 +295,8 @@ export default function SimulatePage({ onBackToHome }) {
               </div>
             </div>
 
-            {/* Scroll to outcomes CTA */}
-            <button type="button" className="scroll-outcomes-btn" onClick={scrollToOutcomes}>
+            {/* Open the operational 2D/3D simulation dashboard */}
+            <button type="button" className="scroll-outcomes-btn" onClick={onViewSimulation}>
               <span>VIEW SIMULATION OUTCOMES</span>
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                 <path d="M7 2L7 12M7 12L3 8M7 12L11 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />

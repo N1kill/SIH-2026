@@ -4214,6 +4214,13 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   // Fullscreen
+  const btnBackFrontend = document.getElementById("btn-back-frontend");
+  if (btnBackFrontend) {
+    btnBackFrontend.addEventListener("click", () => {
+      window.location.assign("/");
+    });
+  }
+
   const btnFullscreen = document.getElementById("btn-fullscreen");
   if (btnFullscreen) {
     btnFullscreen.addEventListener("click", () => {

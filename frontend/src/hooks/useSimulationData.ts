@@ -66,11 +66,12 @@ export function useSimulationData(): LoadedSimulationState {
 
   useEffect(() => {
     let isMounted = true;
+    const dataUrl = (name: string) => `${import.meta.env.BASE_URL}data/${name}`;
     async function loadData() {
       try {
         const [terrain, hydraulics, runs] = await Promise.all([
-          fetch('/data/terrain_3d_data.json').then((r) => jsonResponse<Terrain3DData>(r, 'Terrain')),
-          fetch('/data/project_hydraulics.json').then((r) => jsonResponse<ProjectHydraulics>(r, 'Hydraulics')),
+          fetch(dataUrl('terrain_3d_data.json')).then((r) => jsonResponse<Terrain3DData>(r, 'Terrain')),
+          fetch(dataUrl('project_hydraulics.json')).then((r) => jsonResponse<ProjectHydraulics>(r, 'Hydraulics')),
           fetch('/api/simulation/results').then((r) => jsonResponse<RunSummary[]>(r, 'Simulation results')),
         ]);
         const completed = runs

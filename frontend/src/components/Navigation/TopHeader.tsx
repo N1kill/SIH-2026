@@ -1,10 +1,7 @@
 import React from 'react';
-import type { ViewMode } from '../../types/simulation';
 import { LayerToggles } from './LayerToggles';
 
 interface TopHeaderProps {
-  activeTab: ViewMode;
-  onSelectTab: (tab: ViewMode) => void;
   layers: {
     flood: boolean;
     evacuation: boolean;
@@ -16,8 +13,6 @@ interface TopHeaderProps {
 }
 
 export const TopHeader: React.FC<TopHeaderProps> = ({
-  activeTab,
-  onSelectTab,
   layers,
   onToggleLayer,
   routesAvailable,
@@ -31,25 +26,14 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
         <span className="brand-chip-tag">HYDRO TWIN</span>
       </div>
 
-      {activeTab === '2d' && (
-        <LayerToggles layers={layers} onToggle={onToggleLayer} routesAvailable={routesAvailable} />
-      )}
+      <LayerToggles layers={layers} onToggle={onToggleLayer} routesAvailable={routesAvailable} />
 
       {/* View Switcher Pill */}
       <div className="tab-switch-pill">
-        <button
-          className={`tab-pill-btn ${activeTab === '3d' ? 'active' : ''}`}
-          onClick={() => onSelectTab('3d')}
-        >
-          <span>🏗️</span> 3D Twin
-        </button>
-        <button
-          className={`tab-pill-btn ${activeTab === '2d' ? 'active' : ''}`}
-          onClick={() => onSelectTab('2d')}
-        >
-          <span>🗺️</span> 2D Operations
-        </button>
+        <a className="tab-pill-btn" href="/twin/twin.html">3D Twin</a>
+        <span className="tab-pill-btn active" aria-current="page">2D Operations</span>
       </div>
+      <a className="tab-pill-btn" href="/">Frontend</a>
     </div>
   );
 };

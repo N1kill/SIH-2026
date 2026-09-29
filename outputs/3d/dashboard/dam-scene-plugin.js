@@ -4,14 +4,16 @@ import {RGBELoader} from 'three/addons/loaders/RGBELoader.js';
 import {KTX2Loader} from 'three/addons/loaders/KTX2Loader.js';
 import {DRACOLoader} from 'three/addons/loaders/DRACOLoader.js';
 import {MeshoptDecoder} from 'three/addons/libs/meshopt_decoder.module.js';
+import {GRAVITY,releaseProfile} from './scene-physics.js';
 
 const DECK_ABOVE_GATE_M=1.5;
 
 // Visual reconstruction only: derive the sill and deck from configured levels.
 // This changes the reference template's vertical dimensions, never the world scale.
-export function fitReferenceGeometry(geometry,{groundElevationM,waterElevationM,crestElevationM}){
-  const height=waterElevationM-groundElevationM;
-  const gateHeight=crestElevationM-waterElevationM-DECK_ABOVE_GATE_M;
+export function fitReferenceGeometry(geometry,{groundElevationM,waterElevationM,crestElevationM,sillElevationM}){
+  const sill=sillElevationM??crestElevationM-DECK_ABOVE_GATE_M-geometry.gate_height_m;
+  const height=sill-groundElevationM;
+  const gateHeight=crestElevationM-sill-DECK_ABOVE_GATE_M;
   if(![height,gateHeight].every(Number.isFinite)||height<=0||gateHeight<=0)
     throw new Error('Configured ground, water and crest elevations cannot fit the studio reference');
   return {...geometry,height_m:height,gate_height_m:gateHeight};
@@ -19,7 +21,7 @@ export function fitReferenceGeometry(geometry,{groundElevationM,waterElevationM,
 
 // Portable, metre-scale local scene. Never changes the project's georeferenced terrain.
 export class DamScenePlugin {
-  constructor(renderer,{embedded=false,geometry=null}={}) { this.renderer=renderer; this.embedded=embedded; this.geometry=geometry; this.root=new THREE.Group(); this.gates=new Map(); this.waters=[]; this.time=0; }
+  constructor(renderer,{embedded=false,geometry=null}={}) { this.renderer=renderer; this.embedded=embedded; this.geometry=geometry; this.root=new THREE.Group(); this.gates=new Map(); this.waters=[]; this.time=0; this.debris=[]; }
   async load(manifest, baseURL) {
     this.manifest=manifest;
     const model=manifest.assets.find(a=>a.role==='model');
@@ -54,6 +56,7 @@ export class DamScenePlugin {
       float noise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(hash(i),hash(i+vec2(1,0)),f.x),mix(hash(i+vec2(0,1)),hash(i+1.),f.x),f.y);}
       void main(){vec2 p=world.xz;float n=noise(p*.85-vec2(0,time*2.5))+noise(p*3.3+vec2(time*.8,-time*4.))*.35;float lines=sin(world.x*17.+noise(p*.6)*4.);float foam=flow*clamp(vUv.y*1.3+n*.65-.3,0.,1.)+ (1.-flow)*step(0.,world.z)*smoothstep(.7,1.2,n)*.5;vec3 dark=vec3(.10,.20,.19);vec3 water=mix(dark,vec3(.25,.36,.33),n*.35);water+=pow(max(0.,sin(p.x*.7+p.y*1.1+time)*.5+.5),32.)*.05;vec3 col=mix(water,vec3(.82,.88,.84),foam);col+=flow*lines*.015;gl_FragColor=vec4(col,flow>.5?clamp(release*3.,0.,.97):.98);}`});this.waters.push(mat);return mat;}
   assemble(g){
+    this.geometry=g;
     const concrete=this.concrete(),steel=new THREE.MeshStandardMaterial({color:0x343f40,metalness:.8,roughness:.4}),road=new THREE.MeshStandardMaterial({color:0x535656,roughness:1}),wet=concrete.clone();wet.color.set(0x6b746b);
     const pitch=g.bay_width_m+g.pier_width_m,W=g.bays*pitch+g.pier_width_m,H=g.height_m,L=g.chute_length_m;
     this.width=W;
@@ -77,7 +80,7 @@ export class DamScenePlugin {
       this.box(g.bay_width_m-.3,g.gate_height_m,.5,0,g.gate_height_m/2,0,steel,gate);
       for(let y=1;y<g.gate_height_m;y+=1.8)this.box(g.bay_width_m,.22,.6,0,y,.4,steel,gate);
       this.rod([-g.bay_width_m/2,0,.8],[g.bay_width_m/2,g.gate_height_m,.8],.13,steel,gate);this.rod([g.bay_width_m/2,0,.8],[-g.bay_width_m/2,g.gate_height_m,.8],.13,steel,gate);
-      this.gates.set('gate-'+(i+1),{node:gate,base:H,axis:'y',max:g.gate_height_m});
+      this.gates.set('gate-'+(i+1),{node:gate,base:H,axis:'y',max:g.gate_height_m,x,width:g.bay_width_m-.3,material:steel});
       this.box(2,1.3,1.8,x,H+g.gate_height_m+2,1,steel);
       const sheet=this.sheet(g,x,g.bay_width_m-.35,this.waterMaterial(true),.13);sheet.userData.gateId='gate-'+(i+1);this.gates.get(sheet.userData.gateId).water=sheet;
       for(const side of [-1,1])this.rod([x+side*g.bay_width_m*.3,H+g.gate_height_m,1],[x+side*g.bay_width_m*.3,H+g.gate_height_m+2,1],.045,steel);
@@ -88,6 +91,10 @@ export class DamScenePlugin {
     // Lower inspection catwalk and diagonal support brackets.
     this.box(W,.25,2.2,0,H*.65,12,steel);for(let x=-W/2;x<=W/2;x+=2.5){this.rod([x,H*.65,13],[x,H*.65+1.2,13],.05,steel);this.rod([x,H*.65,13],[x+2.5,H*.65+1.2,13],.035,steel);}this.rod([-W/2,H*.65+1.2,13],[W/2,H*.65+1.2,13],.06,steel);
     for(const x of [-W/2-2,W/2+2])this.box(8,H+3,12,x,(H+3)/2,-3,concrete);
+    if(this.embedded){
+      this.box(W+12,2,L+g.basin_length_m,0,-1,(L+g.basin_length_m)/2,wet);
+      for(const x of [-W/2-2,W/2+2])this.box(4,4,L+g.basin_length_m,x,2,(L+g.basin_length_m)/2,concrete);
+    }
     if(!this.embedded){
       for(const x of [-W/2-2,W/2+2])this.box(4,7,L+g.basin_length_m,x,1.5,(L+g.basin_length_m)/2,concrete);
       this.box(W+12,2,L+g.basin_length_m,0,-2,(L+g.basin_length_m)/2,wet);
@@ -101,13 +108,81 @@ export class DamScenePlugin {
     const pg=new THREE.BufferGeometry();pg.setAttribute('position',new THREE.Float32BufferAttribute(points,3));this.spray=new THREE.Points(pg,new THREE.PointsMaterial({color:0xd8e4df,size:.24,transparent:true,opacity:.25,depthWrite:false}));this.root.add(this.spray);
   }
   setPreview(openingFraction){if(!Number.isFinite(openingFraction))throw Error('Preview fraction must be finite');openingFraction=THREE.MathUtils.clamp(openingFraction,0,1);for(const gate of this.gates.values()){gate.node.visible=true;gate.node.position[gate.axis]=gate.base+openingFraction*gate.max;if(gate.water){gate.water.visible=openingFraction>0;gate.water.material.uniforms.release.value=openingFraction;}}if(this.spray)this.spray.visible=openingFraction>0;}
+  setCondition(condition,waterElevation){
+    const g=this.geometry;
+    if(!g)return;
+    this.debris.forEach(mesh=>{this.root.remove(mesh);mesh.geometry.dispose();});this.debris=[];
+    this.previewRelease=0;
+    let index=0;
+    for(const gate of this.gates.values()){
+      index++;
+      if(gate.damage){this.root.remove(gate.damage);gate.damage.geometry.dispose();gate.damage=null;}
+      const affected=condition.state==='breached'&&index>=condition.gateIndex
+        &&index<condition.gateIndex+(condition.type==='full'?condition.failedGateCount:1);
+      let width=gate.width,opening=condition.gateOpeningM;
+      gate.node.visible=true;gate.node.position.y=gate.base+opening;
+      if(affected){
+        opening=condition.type==='full'?gate.max:condition.type==='crack'?condition.leakOpeningMm/1000:condition.holeHeightM;
+        width=condition.type==='full'?gate.width:Math.min(gate.width-.1,condition.holeWidthM);
+        opening=Math.min(gate.max,opening);
+        gate.node.visible=false;
+        if(condition.type!=='full'){
+          // The opening is removed from the actual gate mesh, not painted over it.
+          const shape=new THREE.Shape();shape.moveTo(-gate.width/2,0);shape.lineTo(-width/2,0);shape.lineTo(-width/2,opening);shape.lineTo(width/2,opening);shape.lineTo(width/2,0);shape.lineTo(gate.width/2,0);shape.lineTo(gate.width/2,gate.max);shape.lineTo(-gate.width/2,gate.max);shape.closePath();
+          gate.damage=new THREE.Mesh(new THREE.ExtrudeGeometry(shape,{depth:.5,bevelEnabled:false}),gate.material);
+          gate.damage.position.set(gate.x,gate.base,.75);gate.damage.castShadow=true;this.root.add(gate.damage);
+        }else{
+          const debris=new THREE.Mesh(new THREE.BoxGeometry(gate.width,gate.max,.5),gate.material);
+          debris.position.set(gate.x,gate.base+gate.max/2,3);debris.userData={start:this.time,initialY:debris.position.y};debris.castShadow=true;this.root.add(debris);this.debris.push(debris);
+        }
+      }
+      const head=Math.max(0,waterElevation-this.root.position.y-gate.base);
+      const wetOpening=Math.min(opening,head),velocity=Math.sqrt(2*GRAVITY*Math.max(0,head-wetOpening*.5));
+      // Explicit architectural preview: ideal gravity head with a stated 0.62 orifice coefficient.
+      const discharge=.62*width*wetOpening*velocity;
+      this.previewRelease+=discharge;
+      gate.release={width,opening:wetOpening,velocity,discharge};
+      this.updateRelease(gate);
+    }
+    if(this.spray)this.spray.visible=false;
+  }
+  updateRelease(gate){
+    if(!gate.water||!gate.release)return;
+    const g=this.geometry,r=gate.release;
+    gate.water.visible=r.discharge>0;
+    if(!gate.water.visible)return;
+    // Follow the concrete chute, apron and collision terrain under gravity.
+    const start=-g.deck_width_m,length=g.chute_length_m+g.basin_length_m-start;
+    const support=z=>z<=g.chute_length_m?this.profile(g,Math.max(0,z)):0;
+    const profile=releaseProfile({elevation:gate.base+r.opening*.5,speed:r.velocity,length,segments:64,supportAt:d=>support(start+d),thickness:Math.min(.2,r.opening*.15)});
+    const pos=gate.water.geometry.attributes.position;
+    profile.forEach((point,j)=>{for(let i=0;i<2;i++)pos.setXYZ(j*2+i,gate.x+(i-.5)*r.width,point.y,start+point.distance);});
+    gate.water.geometry.setDrawRange(0,Math.max(0,profile.length-1)*6);
+    pos.needsUpdate=true;gate.water.geometry.computeVertexNormals();gate.water.geometry.computeBoundingSphere();
+    gate.water.material.uniforms.release.value=Math.min(1,.35+r.opening);
+  }
   applyReplayFrame(frame){
     // Callers must supply explicit per-gate states. No inference from aggregate discharge.
     if(!Number.isFinite(frame.time_s))throw Error('Replay time_s must be finite');
-    for(const gate of this.gates.values()){gate.node.visible=false;if(gate.water)gate.water.visible=false;}
+    this.debris.forEach(mesh=>{this.root.remove(mesh);mesh.geometry.dispose();});this.debris=[];
+    for(const gate of this.gates.values()){
+      if(gate.damage){this.root.remove(gate.damage);gate.damage.geometry.dispose();gate.damage=null;}
+      gate.release=null;gate.node.visible=true;gate.node.position[gate.axis]=gate.base;if(gate.water)gate.water.visible=false;
+    }
     for(const state of frame.gates??[]){const g=this.gates.get(state.gate_id);if(!g)continue;if(!Number.isFinite(state.opening_m)||state.opening_m<0)throw Error('Invalid opening_m');g.node.visible=true;g.node.position[g.axis]=g.base+Math.min(g.max,state.opening_m);if(g.water)g.water.visible=Number.isFinite(state.discharge_m3s)&&state.discharge_m3s>0;}
     if(this.spray)this.spray.visible=false;this.update(frame.time_s);
   }
-  update(time){this.time=time;for(const m of this.waters)m.uniforms.time.value=time;}
+  update(time){
+    this.time=time;for(const m of this.waters)m.uniforms.time.value=time;
+    for(const mesh of this.debris){
+      const t=Math.min(5,Math.max(0,time-mesh.userData.start)),z=3+t*2;
+      mesh.rotation.x=-Math.min(Math.PI/2,t*1.8);
+      const c=Math.cos(mesh.rotation.x),s=Math.sin(mesh.rotation.x);
+      let contact=-Infinity;
+      for(const dy of [-this.geometry.gate_height_m/2,this.geometry.gate_height_m/2])for(const dz of [-.25,.25])
+        contact=Math.max(contact,this.profile(this.geometry,z+dy*s+dz*c)-(dy*c-dz*s)+.04);
+      mesh.position.z=z;mesh.position.y=Math.max(contact,mesh.userData.initialY-GRAVITY*t*t*.5);
+    }
+  }
   dispose(){const geos=new Set(),mats=new Set(),textures=new Set();this.root.traverse(o=>{if(o.geometry)geos.add(o.geometry);for(const m of Array.isArray(o.material)?o.material:o.material?[o.material]:[]){mats.add(m);for(const value of Object.values(m))if(value?.isTexture)textures.add(value);}});geos.forEach(g=>g.dispose());mats.forEach(m=>m.dispose());textures.forEach(t=>t.dispose());this.environment?.dispose();this.draco?.dispose();this.ktx?.dispose();this.root.clear();}
 }

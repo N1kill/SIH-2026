@@ -1,7 +1,8 @@
 """Local single-user digital-twin API and static dashboard.
 
 Start with: python -m uvicorn server:app --host 127.0.0.1 --port 8050 --workers 1
-The historical dashboard is retained at /index.html for reference only.
+The PRALAYA landing page, 2D operations view, and engineering twin are served
+at /, /simulation/, and /twin/twin.html respectively.
 """
 import asyncio
 import json
@@ -23,6 +24,8 @@ from src.project import projects
 
 ROOT=Path(__file__).resolve().parent
 DASHBOARD_DIR=ROOT/"outputs/3d/dashboard"
+FRONTEND_DIR=ROOT/"frontend/dist"
+FRONTEND_DAM_DIR=ROOT/"frontend-dam/dist"
 
 
 def load_local_env():
@@ -128,13 +131,13 @@ async def lifespan(app):
             await asyncio.sleep(.05)
 
 
-app=FastAPI(title="InundaX scenario laboratory",version="1.0",lifespan=lifespan)
+app=FastAPI(title="PRALAYA scenario laboratory",version="1.0",lifespan=lifespan)
 app.include_router(router)
 
 
 @app.get("/")
 def index():
-    return FileResponse(DASHBOARD_DIR/"twin.html")
+    return FileResponse(FRONTEND_DAM_DIR/"index.html")
 
 
 @app.post("/api/research/start",status_code=202)
@@ -229,7 +232,9 @@ async def dflow_replay(ws:WebSocket):
 
 from src.dam_scene_api import router as dam_scene_router
 app.include_router(dam_scene_router)
-app.mount("/",StaticFiles(directory=str(DASHBOARD_DIR)),name="dashboard")
+app.mount("/simulation",StaticFiles(directory=str(FRONTEND_DIR),html=True),name="simulation_2d")
+app.mount("/twin",StaticFiles(directory=str(DASHBOARD_DIR),html=True),name="simulation_3d")
+app.mount("/",StaticFiles(directory=str(FRONTEND_DAM_DIR),html=True),name="frontend_dam")
 
 if __name__=="__main__":
     import uvicorn

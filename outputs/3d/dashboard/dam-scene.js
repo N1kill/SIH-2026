@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import {releaseProfile} from './scene-physics.js';
 
 const clamp=(value,min,max)=>Math.max(min,Math.min(max,value));
 
@@ -162,17 +163,21 @@ export class FlowSheet {
     const material=new THREE.MeshPhysicalMaterial({color,transparent:true,opacity:.78,roughness:.14,metalness:0,transmission:.08,depthWrite:false,side:THREE.DoubleSide,emissive:new THREE.Color(color).multiplyScalar(.08)});
     this.mesh=new THREE.Mesh(geometry,material);this.mesh.name=name;this.mesh.visible=false;this.mesh.renderOrder=4;
   }
-  update({discharge,velocity,elevation,downstream,along,lateral=0,time=0}){
+  update({discharge,velocity,elevation,downstream,along,lateral=0,time=0,supportAt=()=>0}){
     if(!Number.isFinite(discharge)||discharge<=0){this.mesh.visible=false;return;}
     const speed=Math.max(velocity||1,.5),area=discharge/speed,width=clamp(Math.sqrt(area)*2.1,2.5,70),length=clamp(speed*11+Math.sqrt(discharge)*2,25,420),positions=this.mesh.geometry.attributes.position.array,uv=this.mesh.geometry.attributes.uv.array;
-    for(let i=0;i<=this.segments;i++){
-      const f=i/this.segments,distance=f*length,fall=Math.pow(f,1.35)*Math.min(length*.18,42),ribbon=width*(1-.45*f)+Math.sin(f*18+time*.004)*width*.04;
+    const profile=releaseProfile({elevation,speed,length,segments:this.segments,supportAt:distance=>{
+      const x=downstream.x*distance+along.x*lateral,z=downstream.z*distance+along.z*lateral;
+      return Math.max(...[-1,0,1].map(side=>supportAt(x+along.x*side*width/2,z+along.z*side*width/2)));
+    }});
+    for(let i=0;i<profile.length;i++){
+      const f=i/this.segments,{distance,y}=profile[i],ribbon=width*(1-.45*f);
       for(let side=0;side<2;side++){
         const edge=side?1:-1,index=(i*2+side)*3,x=downstream.x*distance+along.x*(lateral+edge*ribbon/2),z=downstream.z*distance+along.z*(lateral+edge*ribbon/2);
-        positions[index]=x;positions[index+1]=elevation-fall+Math.sin(f*28+time*.006)*.25;positions[index+2]=z;const u=(i*2+side)*2;uv[u]=side;uv[u+1]=f;
+        positions[index]=x;positions[index+1]=Math.max(y,supportAt(x,z)+.04);positions[index+2]=z;const u=(i*2+side)*2;uv[u]=side;uv[u+1]=f;
       }
     }
-    this.mesh.geometry.attributes.position.needsUpdate=true;this.mesh.geometry.computeVertexNormals();this.mesh.geometry.computeBoundingSphere();this.mesh.material.opacity=clamp(.55+Math.log10(discharge+1)*.08,.58,.9);this.mesh.visible=true;
+    this.mesh.geometry.setDrawRange(0,Math.max(0,profile.length-1)*6);this.mesh.geometry.attributes.position.needsUpdate=true;this.mesh.geometry.computeVertexNormals();this.mesh.geometry.computeBoundingSphere();this.mesh.material.opacity=clamp(.55+Math.log10(discharge+1)*.08,.58,.9);this.mesh.visible=profile.length>1;
   }
   dispose(){this.mesh.geometry.dispose();this.mesh.material.dispose();}
 }

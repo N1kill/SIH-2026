@@ -31,6 +31,19 @@ test('water clips against elevation and source footprint as level changes',()=>{
   assert.ok(area(waterSurfacePositions(masked,[0,0,0],1))<4);
 });
 
+test('intact dam leaves the downstream side dry even below reservoir level',()=>{
+  const divided={...source,reservoir_mask:[
+    [true,true,true],
+    [true,true,true],
+    [false,false,false],
+  ]};
+  const positions=waterSurfacePositions(divided,[0,0,0],1);
+  assert.ok(area(positions)>0);
+  assert.ok(area(positions)<area(waterSurfacePositions(source,[0,0,0],1)));
+  const downstreamOnly={...divided,reservoir_mask:divided.reservoir_mask.map(row=>row.map(value=>!value))};
+  assert.equal(area(waterSurfacePositions(downstreamOnly,[0,0,0],0)),0);
+});
+
 test('visual shoreline connector remains local, valid-only and separate from source',()=>{
   const dry={grid_size:4,bounds:[-2,-2,2,2],valid:Array.from({length:4},()=>[true,true,true,true]),
     reservoir_mask:Array.from({length:4},()=>[false,false,false,false]),elevation:Array.from({length:4},()=>[0,0,0,0])};

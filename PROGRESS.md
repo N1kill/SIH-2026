@@ -1,5 +1,18 @@
 # SIH-2026 Pipeline Development Progress
 
+## 2026-09-29 — PRALAYA simulation view integration
+
+- The `frontend-dam` landing page now hands off to the existing React 2D GIS
+  operations view at `/simulation/`; its 3D switch opens the engineering twin at
+  `/twin/twin.html`, with links back to 2D and the frontend. The old InundaX
+  landing page is no longer in that navigation path.
+- Replaced the regressed full-terrain Water planes with Three.js Water geometry
+  clipped to the upstream reservoir mask and replayed DEM water level. Downstream
+  flood cells and breach/spillway jets remain tied to saved solver output; animated
+  normal-map waves are only an optical effect, not a fluid solver.
+- Built both frontends and checked the landing, 2D, 3D, studio, and Water addon
+  routes plus completed-run 2D data endpoints. Automated water-footprint tests pass.
+
 ## 2026-09-29 — studio reference in the dashboard
 
 - The built-in nine-bay spillway study now appears at the centre of the intact dam

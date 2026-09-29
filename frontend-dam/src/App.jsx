@@ -87,7 +87,10 @@ export default function App() {
       )}
 
       {currentPage === 'simulate' && (
-        <SimulatePage onBackToHome={() => setCurrentPage('home')} />
+        <SimulatePage
+          onBackToHome={() => setCurrentPage('home')}
+          onViewSimulation={() => window.location.assign('/simulation/')}
+        />
       )}
 
       {currentPage === 'about' && (
