@@ -56,6 +56,19 @@ class Terrain:
                 eligible = groups == groups[tuple(nearest)]
         return eligible
 
+    def reservoir_footprint(self, project, fallback_level):
+        """Viewer footprint; elevation clipping is performed at the replayed level."""
+        if not project.reservoir_polygon_path:
+            return self.reservoir_mask(project, fallback_level)
+        import geopandas as gpd
+        geom = gpd.read_file(input_path(project.reservoir_polygon_path))
+        if geom.crs is None:
+            raise ValueError("Reservoir polygon requires CRS metadata")
+        geom = geom.to_crs(self.crs)
+        return self.valid & rasterize(
+            [(g, 1) for g in geom.geometry], out_shape=self.elevation.shape,
+            transform=self.transform, fill=0).astype(bool)
+
 
 def load_terrain(project: Project, half_width=6000, size=100) -> Terrain:
     if not project.dem_path:
@@ -91,7 +104,7 @@ def load_terrain(project: Project, half_width=6000, size=100) -> Terrain:
     outlet = rowcol(transform, ox+math.sin(a)*transform.a*1.5, oy+math.cos(a)*transform.a*1.5)
     if not valid[outlet]:
         raise ValueError("Downstream source cell has NoData")
-    fingerprint = hashlib.sha256(json.dumps(["twin-v6",project.model_dump(), path.stat().st_mtime_ns,
+    fingerprint = hashlib.sha256(json.dumps(["twin-v7",project.model_dump(), path.stat().st_mtime_ns,
                                             size, half_width], sort_keys=True).encode()).hexdigest()[:20]
     metadata = {"crs": crs, "bounds": list(bounds), "origin": [ox, oy, bed], "grid_size": size,
                 "cell_size_m": transform.a, "transform": list(transform)[:6], "cache_key": fingerprint,
@@ -112,16 +125,17 @@ def build_twin(project, half_width=6000, size=100):
     if target.exists():
         return json.loads(target.read_text(encoding="utf-8"))
     level = project.initial_water_level_m or (terrain.origin[2]+project.dam_height_m*.9)
+    footprint_level = max(level, project.maximum_water_level_m or level)
     payload = {**terrain.metadata, "elevation": terrain.elevation.round(3).tolist(),
-               "valid": terrain.valid.tolist(), "reservoir_mask": terrain.reservoir_mask(project, level).tolist(),
+               "valid": terrain.valid.tolist(), "reservoir_mask": terrain.reservoir_footprint(project, footprint_level).tolist(),
                "project": project.model_dump(), "initial_level_m": level,
                "dam_local": [0, 0, 0], "river_lines": []}
     # Near-dam LOD is derived from the source DEM, never upscaled as claimed new survey detail.
     detail=load_terrain(project,min(half_width,1000),min(size,100))
-    detail_mask_level = max(level, project.maximum_water_level_m or level)
+    detail_mask_level = footprint_level
     payload["detail"]={**detail.metadata,"elevation":detail.elevation.round(3).tolist(),
                        "valid":detail.valid.tolist(),
-                       "reservoir_mask":detail.reservoir_mask(project, detail_mask_level).tolist(),
+                       "reservoir_mask":detail.reservoir_footprint(project, detail_mask_level).tolist(),
                        "reservoir_mask_level_m":detail_mask_level}
     if project.crest_coordinates:
         payload["crest_local"]=[list(terrain.local(lon,lat,level)) for lon,lat in project.crest_coordinates]

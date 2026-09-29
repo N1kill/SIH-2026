@@ -5,9 +5,21 @@ import {KTX2Loader} from 'three/addons/loaders/KTX2Loader.js';
 import {DRACOLoader} from 'three/addons/loaders/DRACOLoader.js';
 import {MeshoptDecoder} from 'three/addons/libs/meshopt_decoder.module.js';
 
+const DECK_ABOVE_GATE_M=1.5;
+
+// Visual reconstruction only: derive the sill and deck from configured levels.
+// This changes the reference template's vertical dimensions, never the world scale.
+export function fitReferenceGeometry(geometry,{groundElevationM,waterElevationM,crestElevationM}){
+  const height=waterElevationM-groundElevationM;
+  const gateHeight=crestElevationM-waterElevationM-DECK_ABOVE_GATE_M;
+  if(![height,gateHeight].every(Number.isFinite)||height<=0||gateHeight<=0)
+    throw new Error('Configured ground, water and crest elevations cannot fit the studio reference');
+  return {...geometry,height_m:height,gate_height_m:gateHeight};
+}
+
 // Portable, metre-scale local scene. Never changes the project's georeferenced terrain.
 export class DamScenePlugin {
-  constructor(renderer) { this.renderer=renderer; this.root=new THREE.Group(); this.gates=new Map(); this.waters=[]; this.time=0; }
+  constructor(renderer,{embedded=false,geometry=null}={}) { this.renderer=renderer; this.embedded=embedded; this.geometry=geometry; this.root=new THREE.Group(); this.gates=new Map(); this.waters=[]; this.time=0; }
   async load(manifest, baseURL) {
     this.manifest=manifest;
     const model=manifest.assets.find(a=>a.role==='model');
@@ -17,7 +29,7 @@ export class DamScenePlugin {
       const loader=new GLTFLoader().setDRACOLoader(this.draco).setKTX2Loader(this.ktx).setMeshoptDecoder(MeshoptDecoder);
       const gltf=await loader.loadAsync(baseURL+model.filename); this.root.add(gltf.scene);
       for(const b of manifest.gate_bindings){const node=gltf.scene.getObjectByName(b.node); if(!node)throw Error('Missing gate node '+b.node);this.gates.set(b.gate_id,{node,base:node.position[b.axis],axis:b.axis,max:b.maximum_opening_m});}
-    } else this.assemble(manifest.geometry);
+    } else this.assemble(this.geometry||manifest.geometry);
     this.root.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;}});
     const env=manifest.assets.find(a=>a.role==='environment');
     if(env){const hdr=await new RGBELoader().loadAsync(baseURL+env.filename);hdr.mapping=THREE.EquirectangularReflectionMapping;this.environment=hdr;}
@@ -70,18 +82,21 @@ export class DamScenePlugin {
       const sheet=this.sheet(g,x,g.bay_width_m-.35,this.waterMaterial(true),.13);sheet.userData.gateId='gate-'+(i+1);this.gates.get(sheet.userData.gateId).water=sheet;
       for(const side of [-1,1])this.rod([x+side*g.bay_width_m*.3,H+g.gate_height_m,1],[x+side*g.bay_width_m*.3,H+g.gate_height_m+2,1],.045,steel);
     }
-    const deckY=H+g.gate_height_m+1.5;
+    const deckY=H+g.gate_height_m+DECK_ABOVE_GATE_M;
     this.box(W+6,1,g.deck_width_m,0,deckY,-1,concrete);this.box(W+6,.08,g.deck_width_m-1,0,deckY+.55,-1,road);
     for(const z of [-1-g.deck_width_m/2,-1+g.deck_width_m/2]){for(let x=-W/2;x<=W/2;x+=2.5)this.rod([x,deckY+.5,z],[x,deckY+1.9,z],.055,steel);for(const y of [deckY+1.1,deckY+1.9])this.rod([-W/2-3,y,z],[W/2+3,y,z],.055,steel);}
     // Lower inspection catwalk and diagonal support brackets.
     this.box(W,.25,2.2,0,H*.65,12,steel);for(let x=-W/2;x<=W/2;x+=2.5){this.rod([x,H*.65,13],[x,H*.65+1.2,13],.05,steel);this.rod([x,H*.65,13],[x+2.5,H*.65+1.2,13],.035,steel);}this.rod([-W/2,H*.65+1.2,13],[W/2,H*.65+1.2,13],.06,steel);
-    for(const x of [-W/2-2,W/2+2]){this.box(4,7,L+g.basin_length_m,x,1.5,(L+g.basin_length_m)/2,concrete);this.box(8,H+3,12,x,(H+3)/2,-3,concrete);}
-    this.box(W+12,2,L+g.basin_length_m,0,-2,(L+g.basin_length_m)/2,wet);
-    const basin=new THREE.Mesh(new THREE.PlaneGeometry(W,g.basin_length_m,1,1),this.waterMaterial());basin.rotation.x=-Math.PI/2;basin.position.set(0,.1,L+g.basin_length_m/2);this.root.add(basin);
-    const reservoir=new THREE.Mesh(new THREE.PlaneGeometry(W,100),this.waterMaterial());reservoir.rotation.x=-Math.PI/2;reservoir.position.set(0,H-1,-58);this.root.add(reservoir);
-    // Explicit architectural preview enclosure avoids a floating reservoir slab.
-    for(const x of [-W/2-2,W/2+2])this.box(4,H+1,112,x,(H-3)/2,-53,concrete);
-    this.box(W+8,H+1,4,0,(H-3)/2,-110,concrete);
+    for(const x of [-W/2-2,W/2+2])this.box(8,H+3,12,x,(H+3)/2,-3,concrete);
+    if(!this.embedded){
+      for(const x of [-W/2-2,W/2+2])this.box(4,7,L+g.basin_length_m,x,1.5,(L+g.basin_length_m)/2,concrete);
+      this.box(W+12,2,L+g.basin_length_m,0,-2,(L+g.basin_length_m)/2,wet);
+      const basin=new THREE.Mesh(new THREE.PlaneGeometry(W,g.basin_length_m,1,1),this.waterMaterial());basin.rotation.x=-Math.PI/2;basin.position.set(0,.1,L+g.basin_length_m/2);this.root.add(basin);
+      const reservoir=new THREE.Mesh(new THREE.PlaneGeometry(W,100),this.waterMaterial());reservoir.rotation.x=-Math.PI/2;reservoir.position.set(0,H-1,-58);this.root.add(reservoir);
+      // These walls belong to the standalone studio preview, not the terrain view.
+      for(const x of [-W/2-2,W/2+2])this.box(4,H+1,112,x,(H-3)/2,-53,concrete);
+      this.box(W+8,H+1,4,0,(H-3)/2,-110,concrete);
+    }
     const points=[];let s=13;const random=()=>{s=(s*1664525+1013904223)>>>0;return s/4294967296;};for(let i=0;i<2500;i++)points.push((random()-.5)*(W-5),random()*3,L+random()*12);
     const pg=new THREE.BufferGeometry();pg.setAttribute('position',new THREE.Float32BufferAttribute(points,3));this.spray=new THREE.Points(pg,new THREE.PointsMaterial({color:0xd8e4df,size:.24,transparent:true,opacity:.25,depthWrite:false}));this.root.add(this.spray);
   }

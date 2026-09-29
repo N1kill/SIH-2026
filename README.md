@@ -10,6 +10,15 @@ not been calibrated against observed 1979 flood extents and must not be used as 
 operational evacuation forecast. Every result records its solver, inputs, assumptions,
 CRS, resolution, timing, provenance, and mass residual.
 
+The 3D viewer renders metre-scale parametric dam geometry and a water surface clipped
+to the supplied reservoir footprint and replayed level. The water shader is visual
+only; it does not solve Navier–Stokes equations. No surveyed Machhu-II GLB asset is
+bundled. The published crest and reported dam height imply a toe below the current
+DEM sample at the dam, so the viewer reports both values instead of altering the DEM.
+The optional intact-dam studio study fits its procedural sill and deck to configured
+water and crest elevations. Its engineering-view shoreline connection is a labeled,
+DEM-clipped visual inference; neither changes the simulation or source data.
+
 ## Quick start
 
 Python 3.11–3.13 and Node.js 20+ are supported.

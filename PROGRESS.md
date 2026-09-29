@@ -1,5 +1,32 @@
 # SIH-2026 Pipeline Development Progress
 
+## 2026-09-29 — studio reference in the dashboard
+
+- The built-in nine-bay spillway study now appears at the centre of the intact dam
+  in the main dashboard, with a matching opening in the parametric embankment.
+  Its bay widths remain in authored metres and it is DEM-ground-anchored; it is
+  explicitly labeled an unverified architectural study, not Machhu-II geometry.
+- Breach and forecast views return to the existing evidence-aware parametric dam.
+  The reference model does not affect routing, breach mechanics, or gate discharge.
+- The dashboard version now derives its procedural gate-sill and deck elevations
+  from the project's configured starting reservoir level and crest over the visible
+  near-dam DEM. The standalone studio keeps its original template dimensions.
+- An explicitly marked, DEM-clipped local water connection bridges the approximate
+  shoreline polygon's near-dam gap only while the intact study is visible. The
+  configured reservoir level, supplied polygon and solver inputs are unchanged.
+
+## 2026-09-29 — reservoir rendering and geometry disclosure
+
+- Replaced square reservoir tiles with a level-clipped surface on the DEM cell-centre
+  grid in both overview and engineering views. The supplied reservoir polygon remains
+  the footprint; the replayed elevation determines wet triangles at each frame.
+- The scene now reports the visible DEM-to-crest height alongside the configured dam
+  height and identifies the dam as a parametric reconstruction. Machhu-II's DEM sample
+  and published crest imply about 9.1 m visible at the site versus 22.56 m reported
+  structural height; no surveyed toe or authored GLB was fabricated.
+- The viewer states that the surface shader is visual and the default solver is a
+  diffusive-wave screening approximation, not a Navier–Stokes solve.
+
 ## 2026-09-24 — simulation-backed 2D operations map
 
 - Corrected a breach-routing datum error: when an evidence-backed dam crest is

@@ -55,8 +55,19 @@ must be embedded in GLB for material assignment; no arbitrary slot mapping occur
 
 Gate movement is clamped to maximum opening. Missing discharge hides parametric flow
 sheets; aggregate release is never divided into invented per-gate flows. Studio
-controls are illustrative, not solver states. The main saved-run adapter is not yet
-connected to this module. Real node animation currently supports translation only.
+controls are illustrative, not solver states. The main dashboard displays the
+reference package as a default-on architectural study at the dam centre before
+breach replay. Its horizontal bay dimensions remain authored, but the procedural
+vertical section is rebuilt in metre units: the gate sill follows the configured
+starting water elevation, and the deck follows the configured crest. This is a
+visual fit, not a measurement of spillway geometry. It is hidden
+when a breach begins, leaving the project's parametric dam and existing hydraulic
+replay. In the intact engineering view only, a local DEM-clipped, inferred water
+connection spans the gap to the supplied shoreline polygon at the unchanged
+configured level. The study and water connection do not supply solver geometry,
+shoreline data or gate flows. The main saved-run
+adapter is not yet connected to this module. Real node animation currently supports
+translation only.
 
 ## Acceptance
 

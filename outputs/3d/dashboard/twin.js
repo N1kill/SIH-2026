@@ -2,6 +2,8 @@ import * as THREE from 'three';
 import { OrbitControls } from '/vendor/OrbitControls.js';
 import {DamAssetLoader,DamDeformer,Diagnostics,ForecastLayer,HydraulicEffects,QualityManager,ReplayClock,SceneDirector,TelemetryPanel,waterMaterial} from '/replay-modules.js';
 import {FlowSheet,MaterialLibrary,ReplaySeriesChart,buildDamAssembly,createSkyDome,disposeDamScene} from '/dam-scene.js';
+import {DamScenePlugin,fitReferenceGeometry} from '/dam-scene-plugin.js';
+import {studyShorelineSource,waterSurfacePositions} from '/water-surface.js';
 
 const $ = id => document.getElementById(id);
 const api = async (path, options) => {
@@ -14,6 +16,8 @@ let terrain, assetManifest, runId, socket, latest, selectedFrame=0, frameCount=0
 let scene, renderer, camera, controls, terrainMesh, detailTerrainMesh, waterMesh, engineeringWater, floodMesh, damGroup, riverGroup, debugGroup, particleMesh, flowGroup,skyDome;
 let breachJet, spillwayJet, overtoppingJet;
 let damParts=[], imageryMeshes=[], projects=[], savedRuns=[], shelterGroup,currentForecast,materialLibrary,sceneMaterials,damAssembly;
+let studyManifest,studyPlugin,studyAssembly,studyFit,studyWaterSource,baseAssetStatus='';
+let displayedBreachWidth=0,displayedWaterLevel=null;
 let quality,director,deformer,effects,diagnostics,cameraGoal,targetGoal,lastAnimationTime=performance.now();
 const replayClock=new ReplayClock();
 const telemetry=new TelemetryPanel($('metrics'));
@@ -80,29 +84,20 @@ function fillCells(mesh,indices,levels,colors) {
   mesh.geometry.attributes.color.needsUpdate=true;mesh.geometry.computeBoundingSphere();
 }
 function reservoir(level) {
-  const indices=[],levels=[],colors=[],n=terrain.grid_size;
-  for(let r=0;r<n;r++)for(let c=0;c<n;c++)if(terrain.reservoir_mask[r][c]&&terrain.elevation[r][c]<level){indices.push(r*n+c);levels.push(level);colors.push(0x168cad);}
-  fillCells(waterMesh,indices,levels,colors);
-  if(engineeringWater){
-    engineeringWater.position.y=level-terrain.origin[2];
-    const elevations=engineeringWater.geometry.userData.cellElevations||[];
-    engineeringWater.geometry.setDrawRange(0,elevations.filter(elevation=>elevation<level).length*6);
+  displayedWaterLevel=level;
+  const detail=terrain.detail?.reservoir_mask?terrain.detail:terrain;
+  for(const [mesh,source] of [[waterMesh,terrain],[engineeringWater,studyPlugin?.root.visible&&studyWaterSource?studyWaterSource:detail]]){
+    if(!mesh)continue;
+    const geometry=new THREE.BufferGeometry();
+    geometry.setAttribute('position',new THREE.BufferAttribute(waterSurfacePositions(source,terrain.origin,level),3));
+    geometry.computeVertexNormals();
+    mesh.geometry.dispose();mesh.geometry=geometry;
+    mesh.position.y=level-terrain.origin[2];
   }
-}
-function engineeringWaterGeometry() {
-  const source=terrain.detail?.reservoir_mask?terrain.detail:terrain,n=source.grid_size,b=source.bounds,o=terrain.origin,cells=[];
-  for(let row=0;row<n-1;row++)for(let column=0;column<n-1;column++)if(source.reservoir_mask[row]?.[column]){
-    const x0=b[0]+column*(b[2]-b[0])/n-o[0],x1=b[0]+(column+1)*(b[2]-b[0])/n-o[0];
-    const z0=o[1]-(b[3]-row*(b[3]-b[1])/n),z1=o[1]-(b[3]-(row+1)*(b[3]-b[1])/n);
-    const elevation=Math.max(source.elevation[row][column],source.elevation[row+1][column],source.elevation[row][column+1],source.elevation[row+1][column+1]);
-    cells.push({x0,x1,z0,z1,elevation});
-  }
-  cells.sort((a,b)=>a.elevation-b.elevation);const positions=[],uv=[];
-  for(const cell of cells){positions.push(cell.x0,0,cell.z0,cell.x0,0,cell.z1,cell.x1,0,cell.z0,cell.x1,0,cell.z0,cell.x0,0,cell.z1,cell.x1,0,cell.z1);uv.push(0,0,0,1,1,0,1,0,0,1,1,1);}
-  const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));geometry.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));geometry.computeVertexNormals();geometry.userData.cellElevations=cells.map(cell=>cell.elevation);return geometry;
 }
 function disposeScene() {
   if(!scene)return;
+  studyPlugin?.dispose();studyPlugin=null;studyAssembly=null;studyFit=null;studyWaterSource=null;
   disposeDamScene(damAssembly,materialLibrary);damAssembly=null;materialLibrary=null;sceneMaterials=null;
   for(const sheet of [breachJet,spillwayJet,overtoppingJet])sheet?.dispose?.();
   scene.traverse(o=>{o.geometry?.dispose();if(o.material){for(const m of [].concat(o.material)){m.map?.dispose();m.dispose();}}});
@@ -117,8 +112,48 @@ function rebuildDam(breachWidth=0,breachDepth=0,breachTopWidth=breachWidth,stres
   damAssembly=buildDamAssembly({terrain,manifest:assetManifest,elevationAt,materials:sceneMaterials});
   damGroup.add(damAssembly.group);damParts=damAssembly.pickables;deformer=new DamDeformer(damAssembly.deformMeshes);
   const check=damAssembly.dimensionCheck,status=damAssembly.structureStatus==='approved'?'approved hydraulic structures':'hydraulic structures unavailable';
-  $('assetStatus').textContent=`${assetManifest.reconstruction_label} · geometry ${check.status} (${check.path_length_m.toFixed(0)} m crest path) · ${status}`;
-  $('assetStatus').className=`scene-chip ${check.status==='pass'?'ok':'warning'}`;
+  const visibleHeight=damAssembly.crest-elevationAt(0,0);
+  const heightGap=Math.abs(visibleHeight-terrain.project.dam_height_m);
+  baseAssetStatus=`${assetManifest.reconstruction_label} · parametric dam · ${check.path_length_m.toFixed(0)} m crest path · ${visibleHeight.toFixed(1)} m above DEM at site / ${terrain.project.dam_height_m.toFixed(1)} m reported height · ${status}`;
+  $('assetStatus').textContent=baseAssetStatus;
+  $('assetStatus').className=`scene-chip ${check.status==='pass'&&heightGap<=2?'ok':'warning'}`;
+}
+function showStudy(breachWidth=displayedBreachWidth){
+  displayedBreachWidth=breachWidth;
+  const active=Boolean(studyPlugin&&$('showStudy').checked&&breachWidth<=0);
+  if(studyPlugin)studyPlugin.root.visible=active;
+  if(studyAssembly)studyAssembly.group.visible=active;
+  if(damAssembly)damAssembly.group.visible=!active;
+  $('studyWarning').hidden=!active;
+  if(active)$('assetStatus').textContent=`Site-fitted studio study · ${studyPlugin.width.toFixed(0)} m wide · sill ${studyFit.waterElevationM.toFixed(2)} m · deck ${studyFit.crestElevationM.toFixed(2)} m · unverified geometry, 1:1 world units`;
+  else if(damAssembly)$('assetStatus').textContent=baseAssetStatus;
+}
+async function installStudy(){
+  if(!studyManifest||studyPlugin||!$('showStudy').checked)return;
+  if(studyManifest.assets.some(asset=>asset.role==='model'))throw new Error('Authored GLB cannot be site-fitted without a surveyed transform');
+  const activeRenderer=renderer;
+  const ground=elevationAt(0,0),fit={groundElevationM:ground+terrain.origin[2],waterElevationM:terrain.initial_level_m,crestElevationM:terrain.project.crest_elevation_m};
+  const geometry=fitReferenceGeometry(studyManifest.geometry,fit);
+  const plugin=await new DamScenePlugin(renderer,{embedded:true,geometry}).load(studyManifest,`/api/dam-scene/packages/${encodeURIComponent(studyManifest.package_id)}/assets/`);
+  if(renderer!==activeRenderer){plugin.dispose();return;}
+  plugin.root.name='Studio architectural study · not site verified';
+  plugin.root.position.set(0,ground,0);
+  const path=terrain.crest_local||[];
+  if(path.length>=2){
+    const nearest=path.reduce((best,point,index)=>point[0]**2+point[2]**2<path[best][0]**2+path[best][2]**2?index:best,0);
+    const a=path[Math.max(0,nearest-1)],b=path[Math.min(path.length-1,nearest+1)];
+    let angle=-Math.atan2(b[2]-a[2],b[0]-a[0]);
+    const bearing=terrain.project.downstream_bearing_deg*Math.PI/180;
+    if(Math.sin(angle)*Math.sin(bearing)-Math.cos(angle)*Math.cos(bearing)<0)angle+=Math.PI;
+    plugin.root.rotation.y=angle;
+  }
+  plugin.setPreview(0);
+  studyPlugin=plugin;
+  studyFit=fit;
+  studyWaterSource=studyShorelineSource(terrain.detail?.reservoir_mask?terrain.detail:terrain,terrain.origin,{widthM:plugin.width,bearingDeg:terrain.project.downstream_bearing_deg});
+  studyAssembly=buildDamAssembly({terrain,manifest:assetManifest,elevationAt,materials:sceneMaterials,visualGapM:plugin.width+4});
+  damGroup.add(studyAssembly.group,plugin.root);
+  showStudy();reservoir(terrain.initial_level_m);cameraView();
 }
 function makeFlowJet(color,name){
   const sheet=new FlowSheet(color,name);flowGroup.add(sheet.mesh);return sheet;
@@ -153,8 +188,8 @@ function setupScene() {
     if(detailGeometry){const detailOverlay=new THREE.Mesh(detailGeometry,material);detailOverlay.name='Supplied imagery coverage · near dam';detailOverlay.renderOrder=1;scene.add(detailOverlay);imageryMeshes.push(detailOverlay);}
     applyViewVisibility();
   },undefined,()=>message('Supplied imagery failed to load; showing DEM terrain only'));
-  waterMesh=cellMesh(0xffffff,.68);waterMesh.name='Reservoir: '+terrain.reservoir_geometry;scene.add(waterMesh);
-  engineeringWater=new THREE.Mesh(engineeringWaterGeometry(),waterMaterial());
+  waterMesh=new THREE.Mesh(new THREE.BufferGeometry(),waterMaterial());waterMesh.name='Reservoir: '+terrain.reservoir_geometry;scene.add(waterMesh);
+  engineeringWater=new THREE.Mesh(new THREE.BufferGeometry(),waterMaterial());
   engineeringWater.name='Simulated reservoir surface';engineeringWater.renderOrder=2;scene.add(engineeringWater);
   floodMesh=cellMesh(0xffffff,.8);floodMesh.name='Backend simulated flood';scene.add(floodMesh);
   reservoir(terrain.initial_level_m);
@@ -182,8 +217,13 @@ function setupScene() {
   renderer.domElement.addEventListener('pointerdown',event=>{
     const box=renderer.domElement.getBoundingClientRect();const ray=new THREE.Raycaster();
     ray.setFromCamera(new THREE.Vector2(2*(event.clientX-box.left)/box.width-1,1-2*(event.clientY-box.top)/box.height),camera);
-    const hit=ray.intersectObjects([terrainMesh,detailTerrainMesh,waterMesh,engineeringWater,floodMesh,...damParts,...flowGroup.children,...shelterGroup.children].filter(Boolean),false)[0];
-    if(hit)$('selection').textContent=`${hit.object.name} · Easting ${(hit.point.x+terrain.origin[0]).toFixed(1)} m · Northing ${(terrain.origin[1]-hit.point.z).toFixed(1)} m · Elevation ${(hit.point.y+terrain.origin[2]).toFixed(1)} m`;
+    const hit=ray.intersectObjects([terrainMesh,detailTerrainMesh,waterMesh,engineeringWater,floodMesh,...damParts,studyPlugin?.root.visible?studyPlugin.root:null,...flowGroup.children,...shelterGroup.children].filter(Boolean),true)[0];
+    if(hit){
+      let part=hit.object,studio=false;
+      while(part){if(part===studyPlugin?.root){studio=true;break;}part=part.parent;}
+      const label=studio?'Studio architectural study (unverified)':hit.object.name;
+      $('selection').textContent=`${label} · Easting ${(hit.point.x+terrain.origin[0]).toFixed(1)} m · Northing ${(terrain.origin[1]-hit.point.z).toFixed(1)} m · Elevation ${(hit.point.y+terrain.origin[2]).toFixed(1)} m`;
+    }
   });
 }
 function applyViewVisibility() {
@@ -202,7 +242,7 @@ function applyViewVisibility() {
   const coverage=terrain.imagery_coverage_percent==null?'imagery unavailable':`imagery coverage ${terrain.imagery_coverage_percent.toFixed(1)}%`;
   if(close){
     scene.background.set(0x14222c);scene.fog.color.set(0x14222c);scene.fog.near=650;scene.fog.far=1800;
-    $('sceneMessage').textContent=`${mode==='diagnostic'?'Diagnostic':'Engineering'} close-up · ${assetManifest?.reconstruction_label||'provenance unavailable'} · 1:1 scale · simulated water level`;
+    $('sceneMessage').textContent=`${mode==='diagnostic'?'Diagnostic':'Engineering'} close-up · ${assetManifest?.reconstruction_label||'provenance unavailable'} · 1:1 metre units · diffusive-wave screening replay`;
   }else{
     scene.background.set(0x0c1521);scene.fog.color.set(0x0c1521);scene.fog.near=1200;scene.fog.far=7000;
     $('sceneMessage').textContent=`${terrain.crs} · ${terrain.cell_size_m.toFixed(0)} m grid · 1:1 vertical scale · ${coverage} · ${terrain.reconstruction_tier}`;
@@ -237,7 +277,7 @@ function cameraView() {
 }
 function resize(){if(!renderer)return;const w=viewport.clientWidth,h=viewport.clientHeight;renderer.setSize(w,h);camera.aspect=w/h;camera.updateProjectionMatrix();}
 new ResizeObserver(resize).observe(viewport);
-function animate(now=performance.now()){requestAnimationFrame(animate);if(renderer){const elapsed=now-lastAnimationTime;lastAnimationTime=now;if(cameraGoal&&!quality?.noMotion){camera.position.lerp(cameraGoal,.1);controls.target.lerp(targetGoal,.1);if(camera.position.distanceTo(cameraGoal)<.05){camera.position.copy(cameraGoal);controls.target.copy(targetGoal);cameraGoal=null;}}controls.update();effects?.animate(now,quality?.noMotion);renderer.render(scene,camera);quality?.sample(elapsed);diagnostics?.update(latest);}}animate();
+function animate(now=performance.now()){requestAnimationFrame(animate);if(renderer){const elapsed=now-lastAnimationTime;lastAnimationTime=now;if(cameraGoal&&!quality?.noMotion){camera.position.lerp(cameraGoal,.1);controls.target.lerp(targetGoal,.1);if(camera.position.distanceTo(cameraGoal)<.05){camera.position.copy(cameraGoal);controls.target.copy(targetGoal);cameraGoal=null;}}controls.update();effects?.animate(now,quality?.noMotion);studyPlugin?.update(now*.001);renderer.render(scene,camera);quality?.sample(elapsed);diagnostics?.update(latest);}}animate();
 function showFrame(frame) {
   viewport.classList.remove('forecast-state');latest=frame;selectedFrame=frame.index;$('timeline').value=frame.index;$('clock').textContent=`${frame.time_s.toFixed(1)} s`;
   replaySeries.push(frame);
@@ -248,9 +288,10 @@ function showFrame(frame) {
     return palette[mode==='risk'&&v>=2?3:x>=3?3:x>=1.5?2:x>=.5?1:0];
   });
   fillCells(floodMesh,field.indices,field.indices.map((i,k)=>terrain.elevation[Math.floor(i/n)][i%n]+field.depth_m[k]+.15),colors);
-  reservoir(frame.reservoir.elevation_m);
   const stressRatio=frame.breach.shear_stress_pa==null?0:frame.breach.shear_stress_pa/Math.max(frame.breach.collapse_shear_pa,1);
   rebuildDam(frame.breach.width_m,frame.breach.depth_m,frame.breach.top_width_m??frame.breach.width_m,stressRatio);
+  showStudy(frame.breach.width_m);
+  reservoir(frame.reservoir.elevation_m);
   updateFlowJet(breachJet,frame.breach.discharge_m3s,frame.breach.velocity_ms,frame.breach.invert_m-terrain.origin[2]);
   updateFlowJet(spillwayJet,frame.spillway?.discharge_m3s,frame.spillway?.exit_velocity_ms,(frame.spillway?.crest_elevation_m??terrain.origin[2])-terrain.origin[2],-45);
   updateFlowJet(overtoppingJet,frame.overtopping?.discharge_m3s,Math.sqrt(2*9.81*(frame.overtopping?.head_m||0)),terrain.project.dam_height_m,45);
@@ -268,14 +309,24 @@ function showFrame(frame) {
   $('physicsStatus').textContent=`${frame.breach.material||'Unspecified material'} · ${resistance} · head ${head.toFixed(2)} m · breach ${frame.breach.discharge_m3s.toFixed(1)} m³/s · spillway ${spillway} · overtopping ${(frame.overtopping?.discharge_m3s||0).toFixed(1)} m³/s`;
 }
 async function prepare(values=scenario()) {
-  message('Preparing terrain…');replaySeries.clear();[terrain,assetManifest]=await Promise.all([api(`/api/terrain/metadata?project_id=${encodeURIComponent(values.project_id)}&grid_size=${values.grid_size}&half_width_m=${values.domain_half_width_m}`),api(`/api/project/${encodeURIComponent(values.project_id)}/assets`)]);new DamAssetLoader(assetManifest).validate();
+  message('Preparing terrain…');replaySeries.clear();latest=null;displayedBreachWidth=0;displayedWaterLevel=null;
+  [terrain,assetManifest]=await Promise.all([api(`/api/terrain/metadata?project_id=${encodeURIComponent(values.project_id)}&grid_size=${values.grid_size}&half_width_m=${values.domain_half_width_m}`),api(`/api/project/${encodeURIComponent(values.project_id)}/assets`)]);
+  new DamAssetLoader(assetManifest).validate();
+  studyManifest=await api('/api/dam-scene/packages/spillway-reference').catch(()=>null);
+  if(!studyManifest?.validation?.valid)studyManifest=null;
+  $('showStudy').disabled=!studyManifest;
+  if(!studyManifest)$('showStudy').checked=false;
   const breachDepth=$('scenario').elements.breach_depth_m;
   if(breachDepth.dataset.userSet!=='true'){
     const p=terrain.project,crest=p.crest_elevation_m??terrain.origin[2]+p.dam_height_m;
     const level=p.initial_water_level_m??terrain.origin[2]+p.dam_height_m*.9;
     breachDepth.value=Math.min(p.dam_height_m,Math.max(.1,crest-level+Math.min(1,p.dam_height_m*.05))).toFixed(2);
   }
-  setupScene();$('provenance').textContent=JSON.stringify({source:terrain.source,assumptions:terrain.project.assumptions,reservoir:terrain.reservoir_geometry,imagery:terrain.imagery,structures:assetManifest.specification,asset_manifest_hash:assetManifest.manifest_hash},null,2);message('Ready. Configure a scenario and run.');
+  setupScene();
+  if(studyManifest&&$('showStudy').checked){
+    try{await installStudy();}catch(error){$('showStudy').checked=false;$('showStudy').disabled=true;message(`Studio study unavailable: ${error.message}`);}
+  }
+  $('provenance').textContent=JSON.stringify({source:terrain.source,assumptions:terrain.project.assumptions,reservoir:terrain.reservoir_geometry,imagery:terrain.imagery,structures:assetManifest.specification,asset_manifest_hash:assetManifest.manifest_hash,studio_study:studyManifest?{package_id:studyManifest.package_id,classification:studyManifest.classification,project_id:studyManifest.project_id,assumptions:studyManifest.assumptions,site_fit:studyFit,visual_shoreline_connection:studyWaterSource?'DEM-clipped local inference, not used by solver':null}:null},null,2);message('Ready. Configure a scenario and run.');
 }
 $('scenario').elements.breach_depth_m.addEventListener('input',event=>{event.target.dataset.userSet='true';});
 $('scenario').addEventListener('invalid',event=>event.target.closest('details')?.setAttribute('open',''),true);
@@ -297,6 +348,7 @@ $('stop').onclick=async()=>{try{await api('/api/simulation/stop',{method:'POST'}
 $('project').onchange=()=>prepare().catch(e=>message(e.message));$('camera').onchange=cameraView;$('viewMode').onchange=()=>{applyViewVisibility();cameraView();};
 $('layer').onchange=()=>{const mode=$('layer').value;$('legend').textContent=mode==='risk'?'Project thresholds: LOW / MODERATE ≥0.5 m / HIGH ≥1.5 m / VERY HIGH ≥3 m or ≥2 m/s':`${mode==='depth'?'Depth (m)':'Velocity (m/s)'}: cyan <0.5 · blue 0.5–1.5 · amber 1.5–3 · red ≥3`;if(latest)showFrame(latest);};
 $('showWater').onchange=applyViewVisibility;$('showRiver').onchange=applyViewVisibility;$('debug').onchange=applyViewVisibility;
+$('showStudy').onchange=()=>{(studyPlugin?Promise.resolve():installStudy()).then(()=>{showStudy();reservoir(displayedWaterLevel??terrain.initial_level_m);}).catch(error=>{$('showStudy').checked=false;showStudy();message(`Studio study unavailable: ${error.message}`);});};
 async function seek(index){if(!runId)return;showFrame(await api(`/api/simulation/results/${runId}/frames/${index}`));}
 $('timeline').oninput=()=>{playing=false;clearTimeout(replayTimer);$('play').textContent='Play replay';seek(Number($('timeline').value)).catch(e=>message(e.message));};
 async function replay(){if(!playing)return;await seek((selectedFrame+1)%frameCount);replayTimer=setTimeout(()=>replay().catch(e=>message(e.message)),500/Number($('speed').value));}
@@ -311,7 +363,7 @@ $('liveLayer').onclick=()=>{if(latest)showFrame(latest);$('layer').dispatchEvent
 $('arrival').onclick=async()=>{try{if(!runId)throw new Error('Complete or load a run first');playing=false;clearTimeout(replayTimer);const fields=await api(`/api/simulation/results/${runId}/fields`);const ids=[],levels=[],colors=[],n=terrain.grid_size;fields.arrival_time.forEach((t,i)=>{if(t>=0){ids.push(i);levels.push(terrain.elevation[Math.floor(i/n)][i%n]+fields.depth_max[i]+.15);colors.push(t<300?0xf15d56:t<900?0xf6ad45:t<1800?0x2882d9:0x34d3de);}});fillCells(floodMesh,ids,levels,colors);$('legend').textContent='Arrival: red <5 min · amber 5–15 min · blue 15–30 min · cyan ≥30 min; only simulated wet cells';}catch(e){message(e.message);}};
 $('refresh').onclick=()=>refresh().catch(e=>message(e.message));
 $('load').onclick=async()=>{try{const r=savedRuns.find(r=>r.simulation_id===$('runs').value);if(!r)return;playing=false;clearTimeout(replayTimer);runId=r.simulation_id;frameCount=r.frame_count;await prepare(r.scenario);$('timeline').max=frameCount-1;await seek(0);for(const id of ['play','reset','stepBack','stepForward','forecast'])$(id).disabled=false;await evidence();message('Stored replay loaded; no solver rerun.');}catch(e){message(e.message);}};
-function applyForecastTrajectory(){if(!currentForecast?.bands?.length)return;const key=$('trajectory').value,row=currentForecast.bands.at(-1),record={reservoir_level_m:row.reservoir_level_m[key],breach_width_m:row.breach_width_m[key],breach_invert_m:row.breach_invert_m[key],discharge_m3s:row.discharge_m3s[key]};reservoir(record.reservoir_level_m);const crest=(terrain.project.crest_elevation_m??terrain.origin[2]+terrain.project.dam_height_m);const depth=Math.max(0,crest-record.breach_invert_m);rebuildDam(record.breach_width_m,depth,record.breach_width_m+2*(latest?.breach?.side_slope_h_per_v??1)*depth,0);updateFlowJet(breachJet,record.discharge_m3s,Math.sqrt(2*9.81*Math.max(record.reservoir_level_m-record.breach_invert_m,0)),record.breach_invert_m-terrain.origin[2]);$('timeRegion').textContent='FORECAST';$('timeRegion').className='time-region forecast';viewport.classList.add('forecast-state');$('physicsStatus').textContent=`Forecast ${key.toUpperCase()} at horizon · simulated ensemble trajectory · not an observation · Q ${record.discharge_m3s.toFixed(1)} m³/s`;}
+function applyForecastTrajectory(){if(!currentForecast?.bands?.length)return;const key=$('trajectory').value,row=currentForecast.bands.at(-1),record={reservoir_level_m:row.reservoir_level_m[key],breach_width_m:row.breach_width_m[key],breach_invert_m:row.breach_invert_m[key],discharge_m3s:row.discharge_m3s[key]};const crest=(terrain.project.crest_elevation_m??terrain.origin[2]+terrain.project.dam_height_m);const depth=Math.max(0,crest-record.breach_invert_m);rebuildDam(record.breach_width_m,depth,record.breach_width_m+2*(latest?.breach?.side_slope_h_per_v??1)*depth,0);showStudy(record.breach_width_m);reservoir(record.reservoir_level_m);updateFlowJet(breachJet,record.discharge_m3s,Math.sqrt(2*9.81*Math.max(record.reservoir_level_m-record.breach_invert_m,0)),record.breach_invert_m-terrain.origin[2]);$('timeRegion').textContent='FORECAST';$('timeRegion').className='time-region forecast';viewport.classList.add('forecast-state');$('physicsStatus').textContent=`Forecast ${key.toUpperCase()} at horizon · simulated ensemble trajectory · not an observation · Q ${record.discharge_m3s.toFixed(1)} m³/s`;}
 $('forecast').onclick=async()=>{try{if(!runId)throw new Error('Complete or load a run first');$('forecast').disabled=true;$('forecastSummary').textContent='Running bounded physics ensemble…';currentForecast=await api(`/api/simulation/results/${runId}/forecasts`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ensemble_size:9,horizon_s:3600,seed:20260921,include_far_field:$('forecastFarField').checked})});forecastLayer.render(currentForecast);applyForecastTrajectory();}catch(e){message(e.message);$('forecastSummary').textContent=e.message;}finally{$('forecast').disabled=false;}};
 $('trajectory').onchange=applyForecastTrajectory;
 let researchSocket,researchReconnect;

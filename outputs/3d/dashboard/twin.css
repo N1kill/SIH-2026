@@ -46,6 +46,7 @@ progress { width: 100%; accent-color: var(--accent); }
 .scene-chip { width: fit-content; max-width: 100%; padding: 4px 8px; border: 1px solid rgba(160,185,205,.55); border-radius: 3px; background: rgba(7,14,25,.78); color: #c8d7e5; font: 10px/1.45 ui-monospace, monospace; overflow-wrap: anywhere; backdrop-filter: blur(8px); }
 .scene-chip.ok { border-color: rgba(79,196,139,.72); }
 .scene-chip.warning { border-color: rgba(246,173,69,.82); color: #ffd99b; }
+.scene-chip.study-warning { border-color: #f6ad45; color: #fff0cf; background: rgba(91,54,12,.94); font-weight: 700; }
 .orientation { position: absolute; z-index: 4; right: 20px; top: 18px; display: grid; justify-items: center; color: #d7e8f3; font: 700 10px/1 ui-monospace, monospace; text-shadow: 0 1px 3px #000; pointer-events: none; }
 .orientation i { display: block; width: 1px; height: 34px; margin-top: 4px; background: linear-gradient(#e9f6ff 0 45%, #e26d5d 45%); transform: rotate(18deg); transform-origin: top; box-shadow: 0 0 5px rgba(255,255,255,.35); }
 #selection, .legend { padding: 8px 18px; font-size: 12px; color: var(--muted); }

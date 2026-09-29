@@ -102,7 +102,7 @@ function buildApprovedSpillway(group,manifest,materials,height){
   assembly.position.set(-total/2,height*.3,0);assembly.traverse(object=>{if(object.isMesh){object.castShadow=object.receiveShadow=true;}});group.add(assembly);return {objects,status:'approved'};
 }
 
-export function buildDamAssembly({terrain,manifest,elevationAt,materials}){
+export function buildDamAssembly({terrain,manifest,elevationAt,materials,visualGapM=0}){
   const group=new THREE.Group();group.name='Evidence-aware dam assembly';const project=terrain.project,spec=manifest.specification||{};
   const angle=project.downstream_bearing_deg*Math.PI/180,length=project.dam_length_m||1000;
   const source=terrain.crest_local;
@@ -121,11 +121,18 @@ export function buildDamAssembly({terrain,manifest,elevationAt,materials}){
       positions.push(x,finalY,z);uv.push(station.distance/28,crossIndex/3);meta.push({distance:Math.abs(station.distance-breachDistance),surface:crossIndex>0&&crossIndex<3,ground,baseY:finalY});
     });
   }
-  for(let band=0;band<3;band++)for(let station=0;station<stations.length-1;station++){
-    const a=station*4+band,b=a+4;indices.push(a,b,a+1,a+1,b,b+1);
+  const groups=[];
+  for(let band=0;band<3;band++){
+    const start=indices.length;
+    for(let station=0;station<stations.length-1;station++){
+      const midpoint=(stations[station].distance+stations[station+1].distance)/2;
+      if(Math.abs(midpoint-breachDistance)<visualGapM/2)continue;
+      const a=station*4+band,b=a+4;indices.push(a,b,a+1,a+1,b,b+1);
+    }
+    groups.push([start,indices.length-start,band]);
   }
   const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));geometry.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));geometry.setIndex(indices);
-  const indicesPerBand=(stations.length-1)*6;geometry.clearGroups();for(let band=0;band<3;band++)geometry.addGroup(band*indicesPerBand,indicesPerBand,band);
+  geometry.clearGroups();for(const [start,count,band] of groups)geometry.addGroup(start,count,band);
   geometry.computeVertexNormals();geometry.computeBoundingSphere();
   const dam=new THREE.Mesh(geometry,[materials.downstream,materials.crest,materials.upstream]);dam.castShadow=dam.receiveShadow=true;
   dam.name=`Continuous earthfill embankment · ${manifest.reconstruction_label}`;dam.userData.deformation=meta;group.add(dam);
@@ -133,7 +140,10 @@ export function buildDamAssembly({terrain,manifest,elevationAt,materials}){
   const roadPositions=[],roadUv=[],roadIndices=[],roadMeta=[];
   stations.forEach((station,index)=>{
     for(const offset of [-crestWidth*.43,crestWidth*.43]){const x=station.x+station.nx*offset,z=station.z+station.nz*offset,ground=elevationAt(x,z);roadPositions.push(x,crest+.06,z);roadUv.push(station.distance/18,index);roadMeta.push({distance:Math.abs(station.distance-breachDistance),surface:true,ground,baseY:crest+.06});}
-    if(index<stations.length-1){const a=index*2;roadIndices.push(a,a+2,a+1,a+1,a+2,a+3);}
+    if(index<stations.length-1){
+      const midpoint=(station.distance+stations[index+1].distance)/2;
+      if(Math.abs(midpoint-breachDistance)>=visualGapM/2){const a=index*2;roadIndices.push(a,a+2,a+1,a+1,a+2,a+3);}
+    }
   });
   const roadGeometry=new THREE.BufferGeometry();roadGeometry.setAttribute('position',new THREE.Float32BufferAttribute(roadPositions,3));roadGeometry.setAttribute('uv',new THREE.Float32BufferAttribute(roadUv,2));roadGeometry.setIndex(roadIndices);roadGeometry.computeVertexNormals();
   const road=new THREE.Mesh(roadGeometry,materials.crest);road.castShadow=road.receiveShadow=true;road.name=`Crest surface · assumed width ${crestWidth.toFixed(1)} m`;road.userData.deformation=roadMeta;group.add(road);
