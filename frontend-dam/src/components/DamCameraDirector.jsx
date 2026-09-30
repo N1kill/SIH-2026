@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { SKETCHFAB_CONFIG } from '../animation/animationConfig';
 import WebGLDamWater from './WebGLDamWater';
-import EngineeringTwin3D from './EngineeringTwin3D';
 
 /**
  * Linear 3D vector interpolation helper
@@ -337,14 +336,28 @@ export const SAVED_POSITIONS = {
             zIndex: 1,
           }}
         >
-          <EngineeringTwin3D height="100%" />
+          <iframe 
+            src="/twin/twin.html" 
+            style={{ width: '100%', height: '100%', border: 'none' }} 
+            title="Engineering Twin" 
+          />
         </div>
       )}
 
       {/* 2. Viewport: Photogrammetry Dam Model with Keyframe Flight Director */}
-      {engineMode === 'flight' && (
-        <>
-          <div
+      <div
+        style={{
+          opacity: engineMode === 'flight' ? 1 : 0,
+          pointerEvents: engineMode === 'flight' ? 'auto' : 'none',
+          transition: 'opacity 0.6s ease',
+          position: 'absolute',
+          inset: 0,
+          width: '100%',
+          height: '100%',
+          zIndex: 0,
+        }}
+      >
+        <div
             style={{
               position: 'absolute',
               inset: 0,
@@ -371,17 +384,16 @@ export const SAVED_POSITIONS = {
             />
           </div>
 
-          {/* WebGL Dynamic Water Simulation (Strictly OFF by default, rendered only when user toggles ON) */}
-          {waterEnabled && (
-            <WebGLDamWater
-              activeStage={activeStage}
-              isWaterActive={true}
-              showThread={showThread}
-              onToggleThread={() => setShowThread((prev) => !prev)}
-            />
-          )}
-        </>
-      )}
+        {/* WebGL Dynamic Water Simulation (Strictly OFF by default, rendered only when user toggles ON) */}
+        {waterEnabled && (
+          <WebGLDamWater
+            activeStage={activeStage}
+            isWaterActive={true}
+            showThread={showThread}
+            onToggleThread={() => setShowThread((prev) => !prev)}
+          />
+        )}
+      </div>
 
       {/* 3. Floating Editorial Narrative HUD on Left */}
       <div

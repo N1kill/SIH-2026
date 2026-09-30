@@ -18,7 +18,7 @@ import InteractiveHydrograph from '../components/InteractiveHydrograph';
 import InteractiveMorbiHydrograph from '../components/InteractiveMorbiHydrograph';
 import InteractiveDamageAnalytics from '../components/InteractiveDamageAnalytics';
 import InteractiveSensitivityScenarios from '../components/InteractiveSensitivityScenarios';
-import EngineeringTwin3D from '../components/EngineeringTwin3D';
+// EngineeringTwin3D removed, using twin.html iframe instead
 import './pages.css';
 
 /**
@@ -158,8 +158,11 @@ export default function SimulatePage({ onBackToHome }) {
   const [searchQuery, setSearchQuery] = useState('');
   const dropdownRef = useRef(null);
   const outcomesRef = useRef(null);
+  const [showOutcomes, setShowOutcomes] = useState(false);
+  const [loadingOutcomes, setLoadingOutcomes] = useState(false);
 
   const selectedDam = INDIAN_DAMS.find((d) => d.id === selectedDamId) || INDIAN_DAMS[0];
+  const isMachhu = selectedDam.id === 'machhu-2' || selectedDam.id === 'machhu-ii';
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -183,10 +186,23 @@ export default function SimulatePage({ onBackToHome }) {
     setSelectedDamId(damId);
     setIsDropdownOpen(false);
     setSearchQuery('');
+    setShowOutcomes(false);
+    setLoadingOutcomes(false);
   };
 
   const scrollToOutcomes = () => {
-    outcomesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (!showOutcomes) {
+      setLoadingOutcomes(true);
+      setTimeout(() => {
+        setLoadingOutcomes(false);
+        setShowOutcomes(true);
+        setTimeout(() => {
+          outcomesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 100);
+      }, 1500);
+    } else {
+      outcomesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
   };
 
   return (
@@ -274,8 +290,8 @@ export default function SimulatePage({ onBackToHome }) {
                       <button
                         key={dam.id}
                         type="button"
-                        className={`dam-dropdown-item ${dam.id === selectedDamId ? 'active' : ''} ${dam.id !== 'machhu-ii' ? 'disabled' : ''}`}
-                        onClick={() => dam.id === 'machhu-ii' && handleSelectDam(dam.id)}
+                        className={`dam-dropdown-item ${dam.id === selectedDamId ? 'active' : ''}`}
+                        onClick={() => handleSelectDam(dam.id)}
                       >
                         <div className="dam-item-name">{dam.name}</div>
                         <div className="dam-item-meta">
@@ -339,7 +355,13 @@ export default function SimulatePage({ onBackToHome }) {
 
             {/* Scroll to outcomes CTA & Direct 3D Twin Launcher */}
             <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '14px' }}>
-              <button type="button" className="scroll-outcomes-btn" onClick={scrollToOutcomes}>
+              <button 
+                type="button" 
+                className="scroll-outcomes-btn" 
+                onClick={scrollToOutcomes}
+                disabled={!isMachhu}
+                style={!isMachhu ? { opacity: 0.5, cursor: 'not-allowed', borderColor: '#334155', color: '#64748b' } : {}}
+              >
                 <span>VIEW SIMULATION OUTCOMES</span>
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                   <path d="M7 2L7 12M7 12L3 8M7 12L11 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
@@ -349,13 +371,15 @@ export default function SimulatePage({ onBackToHome }) {
                 type="button"
                 className="scroll-outcomes-btn"
                 style={{
-                  background: 'linear-gradient(135deg, rgba(56, 189, 248, 0.2) 0%, rgba(14, 165, 233, 0.12) 100%)',
-                  borderColor: '#38bdf8',
-                  color: '#7dd3fc',
+                  background: isMachhu ? 'linear-gradient(135deg, rgba(56, 189, 248, 0.2) 0%, rgba(14, 165, 233, 0.12) 100%)' : 'rgba(255, 255, 255, 0.05)',
+                  borderColor: isMachhu ? '#38bdf8' : '#334155',
+                  color: isMachhu ? '#7dd3fc' : '#64748b',
+                  opacity: isMachhu ? 1 : 0.5,
+                  cursor: isMachhu ? 'pointer' : 'not-allowed'
                 }}
+                disabled={!isMachhu}
                 onClick={() => {
-                  outcomesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                  window.dispatchEvent(new CustomEvent('pralaya_switch_raster_mode', { detail: 'twin3d' }));
+                  if (isMachhu) window.open('/twin/twin.html', '_blank');
                 }}
                 title="Launch 3D Engineering Twin & Delft3D Flexible Mesh"
               >
@@ -422,21 +446,30 @@ export default function SimulatePage({ onBackToHome }) {
       </div>
 
       {/* ═══════════════════════════════════════════
-          SCROLLABLE OUTCOME SECTIONS
+          SCROLLABLE OUTCOME SECTIONS (FUSION LOAD)
       ═══════════════════════════════════════════ */}
       <div className="container" ref={outcomesRef}>
-        <div className="sim-outcomes-header">
-          <SectionLabel
-            directive="ENGINE OUTPUTS"
-            label={`${selectedDam.name.toUpperCase()} // 8 OUTPUT LAYERS`}
-            variant="cyan"
-          />
-          <h2 className="sim-outcomes-title">Hydrodynamic Simulation Outputs</h2>
-          <p className="sim-outcomes-subtitle">
-            Scroll through all 8 output layers generated by the PRALAYA breach simulation engine
-            for <strong>{selectedDam.name}</strong>.
-          </p>
-        </div>
+        {loadingOutcomes && (
+          <div style={{ textAlign: 'center', padding: '60px 20px', color: '#81e6d9', fontFamily: 'var(--font-mono)' }}>
+            <div className="loader-spinner" style={{ margin: '0 auto 20px' }}></div>
+            <div>Processing Hydrodynamic Outputs...</div>
+          </div>
+        )}
+        
+        {showOutcomes && (
+          <>
+            <div className="sim-outcomes-header">
+              <SectionLabel
+                directive="ENGINE OUTPUTS"
+                label={`${selectedDam.name.toUpperCase()} // 8 OUTPUT LAYERS`}
+                variant="cyan"
+              />
+              <h2 className="sim-outcomes-title">Hydrodynamic Simulation Outputs</h2>
+              <p className="sim-outcomes-subtitle">
+                Scroll through all 8 output layers generated by the PRALAYA breach simulation engine
+                for <strong>{selectedDam.name}</strong>.
+              </p>
+            </div>
 
         <div className="sim-outcomes-list">
           {OUTCOME_SECTIONS.map((section, idx) => {
@@ -519,6 +552,8 @@ export default function SimulatePage({ onBackToHome }) {
             );
           })}
         </div>
+          </>
+        )}
       </div>
 
       {/* ═══════════════════════════════════════════
@@ -816,8 +851,12 @@ function OutcomeVisualization({ section, dam, onOpenPlot }) {
         )}
 
         {rasterMode === 'twin3d' && (
-          <div style={{ width: '100%', marginTop: '10px' }}>
-            <EngineeringTwin3D height="680px" initialTab="delft3d" />
+          <div style={{ width: '100%', marginTop: '10px', height: '680px' }}>
+            <iframe 
+              src="/twin/twin.html" 
+              style={{ width: '100%', height: '100%', border: 'none' }} 
+              title="Engineering Twin" 
+            />
           </div>
         )}
       </div>

@@ -181,6 +181,10 @@ app.include_router(router)
 
 
 @app.get("/")
+@app.get("/simulate")
+@app.get("/about")
+@app.get("/contact")
+@app.get("/docs")
 def index():
     return FileResponse(FRONTEND_DAM_DIR / "index.html")
 
