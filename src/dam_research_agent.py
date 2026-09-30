@@ -512,7 +512,7 @@ def build_agent(
             _emit(progress_callback, "archive_rejected", title=title, error=str(exc))
             return json.dumps({"archived": False, "error": str(exc)})
 
-    model_id = model_name or os.getenv("DAM_RESEARCH_MODEL", "openai:gpt-5-mini")
+    model_id = model_name or os.getenv("DAM_RESEARCH_MODEL", "google_genai:gemini-1.5-flash")
     system_prompt = SYSTEM_PROMPT
     model_options: dict[str, Any] = {"temperature": 0}
     if model_id.startswith("google_genai:"):
@@ -579,7 +579,7 @@ def run_research(
     thread_id: str | None = None,
     progress_callback: ProgressCallback | None = None,
 ) -> dict:
-    selected_model = model_name or os.getenv("DAM_RESEARCH_MODEL", "openai:gpt-5-mini")
+    selected_model = model_name or os.getenv("DAM_RESEARCH_MODEL", "google_genai:gemini-1.5-flash")
     if selected_model.startswith("ollama:"):
         from .dam_research_local import run_local_research
 
