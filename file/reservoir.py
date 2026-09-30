@@ -34,6 +34,7 @@ class StorageElevationCurve:
     `is_synthetic` is set True so downstream reporting can flag it as an
     assumption rather than surveyed bathymetry.
     """
+
     elevations_m: Optional[np.ndarray] = None
     storages_m3: Optional[np.ndarray] = None
     areas_m2: Optional[np.ndarray] = None
@@ -63,7 +64,7 @@ class StorageElevationCurve:
         if not self.is_synthetic:
             return float(np.interp(elevation_m, self.elevations_m, self.storages_m3))
         h_above_bed = max(elevation_m - self.bed_elevation_m, 0.0)
-        return float(self.coeff * h_above_bed ** self.exponent)
+        return float(self.coeff * h_above_bed**self.exponent)
 
     def surface_area(self, elevation_m: float) -> float:
         """dS/dh at this elevation -- used to convert flow rates to level change."""
@@ -79,14 +80,16 @@ class ReservoirState:
     curve: StorageElevationCurve
     dam_crest_elevation_m: float
     spillway_crest_elevation_m: float
-    spillway_coeff_cd: float = 1.7          # broad-crested weir coefficient
+    spillway_coeff_cd: float = 1.7  # broad-crested weir coefficient
     spillway_width_m: float = 20.0
     storage_m3: float = 0.0
     time_s: float = 0.0
 
     def __post_init__(self):
         if self.storage_m3 == 0.0:
-            raise ValueError("Initialize storage_m3 to the reservoir's starting volume.")
+            raise ValueError(
+                "Initialize storage_m3 to the reservoir's starting volume."
+            )
 
     @property
     def elevation_m(self) -> float:
@@ -98,10 +101,11 @@ class ReservoirState:
         if head <= 0:
             return 0.0
         # Standard weir equation: Q = Cd * L * H^1.5
-        return self.spillway_coeff_cd * self.spillway_width_m * head ** 1.5
+        return self.spillway_coeff_cd * self.spillway_width_m * head**1.5
 
-    def overtopping_outflow_m3s(self, discharge_coeff: float = 1.7,
-                                 crest_length_m: float = 100.0) -> float:
+    def overtopping_outflow_m3s(
+        self, discharge_coeff: float = 1.7, crest_length_m: float = 100.0
+    ) -> float:
         """Flow over the dam crest itself once the reservoir exceeds crest elevation
         but before/without a structural breach forming. Distinct from the breach
         outflow computed in breach.py."""
@@ -109,10 +113,16 @@ class ReservoirState:
         head = max(h - self.dam_crest_elevation_m, 0.0)
         if head <= 0:
             return 0.0
-        return discharge_coeff * crest_length_m * head ** 1.5
+        return discharge_coeff * crest_length_m * head**1.5
 
-    def step(self, dt_s: float, inflow_m3s: float, breach_outflow_m3s: float,
-              seepage_m3s: float = 0.0, include_overtopping: bool = True) -> dict:
+    def step(
+        self,
+        dt_s: float,
+        inflow_m3s: float,
+        breach_outflow_m3s: float,
+        seepage_m3s: float = 0.0,
+        include_overtopping: bool = True,
+    ) -> dict:
         """
         Advance reservoir mass balance by dt_s using explicit Euler with a
         sub-stepped correction so storage never goes negative (mass conservation

@@ -1,4 +1,5 @@
 """Versioned portable scene packages, shared by MCP and the dashboard API."""
+
 from __future__ import annotations
 
 import hashlib
@@ -22,7 +23,7 @@ class StrictModel(BaseModel):
 class SpillwayGeometry(StrictModel):
     bays: int = Field(default=9, ge=1, le=40)
     bay_width_m: float = Field(default=12, ge=1, le=40)
-    pier_width_m: float = Field(default=2.8, ge=.5, le=12)
+    pier_width_m: float = Field(default=2.8, ge=0.5, le=12)
     height_m: float = Field(default=32, ge=5, le=150)
     chute_length_m: float = Field(default=44, ge=8, le=180)
     deck_width_m: float = Field(default=8, ge=2, le=25)
@@ -71,9 +72,14 @@ class ScenePackage(StrictModel):
             raise ValueError("Asset filenames must be unique")
         if sum(asset.role == "model" for asset in self.assets) > 1:
             raise ValueError("Use one assembled GLB per package")
-        if any(asset.role == "environment" and not asset.filename.endswith(".hdr") for asset in self.assets):
+        if any(
+            asset.role == "environment" and not asset.filename.endswith(".hdr")
+            for asset in self.assets
+        ):
             raise ValueError("Environment assets must be HDR")
-        if self.gate_bindings and not any(asset.role == "model" for asset in self.assets):
+        if self.gate_bindings and not any(
+            asset.role == "model" for asset in self.assets
+        ):
             raise ValueError("Named node bindings require an authored GLB")
         for attr in ("gate_id", "node"):
             values = [getattr(binding, attr) for binding in self.gate_bindings]
@@ -84,7 +90,8 @@ class ScenePackage(StrictModel):
 
 def reference_package() -> ScenePackage:
     return ScenePackage(
-        package_id="spillway-reference", title="Spillway architectural study",
+        package_id="spillway-reference",
+        title="Spillway architectural study",
         classification="reconstructed",
         source="User-supplied spillway photograph: visual reference only; site and dimensions unverified.",
         assumptions=[
@@ -98,7 +105,9 @@ def reference_package() -> ScenePackage:
 
 def package_path(package_id: str) -> Path:
     if not re.fullmatch(r"[a-z0-9][a-z0-9-]{0,63}", package_id):
-        raise ValueError("Invalid package ID; use lowercase letters, digits and hyphens")
+        raise ValueError(
+            "Invalid package ID; use lowercase letters, digits and hyphens"
+        )
     result = (STORE / package_id).resolve()
     if not result.is_relative_to(STORE.resolve()):
         raise ValueError("Package path escapes registry")
@@ -122,19 +131,30 @@ def inspect_glb(path: Path) -> dict:
         header = stream.read(20)
         if len(header) != 20:
             raise ValueError("Truncated GLB header")
-        magic, version, length, chunk_length, chunk_type = struct.unpack("<4sIIII", header)
-        if magic != b"glTF" or version != 2 or length != path.stat().st_size or chunk_type != 0x4E4F534A:
+        magic, version, length, chunk_length, chunk_type = struct.unpack(
+            "<4sIIII", header
+        )
+        if (
+            magic != b"glTF"
+            or version != 2
+            or length != path.stat().st_size
+            or chunk_type != 0x4E4F534A
+        ):
             raise ValueError("Expected a valid glTF 2 binary file")
         if chunk_length > 16 * 1024 * 1024:
             raise ValueError("GLB JSON chunk exceeds 16 MiB")
         document = json.loads(stream.read(chunk_length))
     for item in document.get("buffers", []) + document.get("images", []):
         if "uri" in item:
-            raise ValueError("GLB must embed all buffers and images; external and data URIs are rejected")
-    return {"nodes": [node.get("name", "") for node in document.get("nodes", [])],
-            "meshes": len(document.get("meshes", [])),
-            "materials": len(document.get("materials", [])),
-            "extensions": document.get("extensionsUsed", [])}
+            raise ValueError(
+                "GLB must embed all buffers and images; external and data URIs are rejected"
+            )
+    return {
+        "nodes": [node.get("name", "") for node in document.get("nodes", [])],
+        "meshes": len(document.get("meshes", [])),
+        "materials": len(document.get("materials", [])),
+        "extensions": document.get("extensionsUsed", []),
+    }
 
 
 def validate_assets(package: ScenePackage, directory: Path) -> dict:
@@ -153,19 +173,33 @@ def validate_assets(package: ScenePackage, directory: Path) -> dict:
             raise ValueError("Model assets must be GLB; other roles cannot be GLB")
         info = inspect_glb(path) if path.suffix == ".glb" else {}
         if asset.role == "model":
-            absent = [binding.node for binding in package.gate_bindings if binding.node not in info["nodes"]]
+            absent = [
+                binding.node
+                for binding in package.gate_bindings
+                if binding.node not in info["nodes"]
+            ]
             if absent:
                 raise ValueError(f"Gate nodes missing from GLB: {absent}")
-        result.append({"filename": asset.filename, "bytes": path.stat().st_size, **info})
-    return {"valid": True, "package_id": package.package_id, "assets": result,
-            "classification": package.classification, "units": package.units,
-            "reference_width_m": package.geometry.bays * (package.geometry.bay_width_m + package.geometry.pier_width_m) + package.geometry.pier_width_m}
+        result.append(
+            {"filename": asset.filename, "bytes": path.stat().st_size, **info}
+        )
+    return {
+        "valid": True,
+        "package_id": package.package_id,
+        "assets": result,
+        "classification": package.classification,
+        "units": package.units,
+        "reference_width_m": package.geometry.bays
+        * (package.geometry.bay_width_m + package.geometry.pier_width_m)
+        + package.geometry.pier_width_m,
+    }
 
 
 def import_package(inbox_folder: str) -> dict:
     """Copy a validated package to a new immutable directory; never overwrite."""
     import shutil
     import tempfile
+
     if not re.fullmatch(r"[a-z0-9][a-z0-9-]{0,63}", inbox_folder):
         raise ValueError("Use a single folder name under data/scene-inbox")
     source = (INBOX / inbox_folder).resolve()
@@ -190,7 +224,9 @@ def import_package(inbox_folder: str) -> dict:
         for asset in package.assets:
             shutil.copyfile(source / asset.filename, staging / asset.filename)
         validate_assets(package, staging)
-        (staging / "scene.json").write_text(package.model_dump_json(indent=2), encoding="utf-8")
+        (staging / "scene.json").write_text(
+            package.model_dump_json(indent=2), encoding="utf-8"
+        )
         staging.rename(destination)
     return {**report, "preview_path": f"/studio.html?package={package.package_id}"}
 
@@ -198,7 +234,16 @@ def import_package(inbox_folder: str) -> dict:
 def list_packages(offset: int = 0, limit: int = 20) -> dict:
     ids = ["spillway-reference"]
     if STORE.exists():
-        ids += sorted(path.parent.name for path in STORE.glob("*/scene.json") if not path.parent.name.startswith("."))
-    selected = ids[offset:offset + limit]
-    return {"items": [{"package_id": key, "title": load_package(key).title} for key in selected],
-            "total": len(ids), "next_offset": offset + limit if offset + limit < len(ids) else None}
+        ids += sorted(
+            path.parent.name
+            for path in STORE.glob("*/scene.json")
+            if not path.parent.name.startswith(".")
+        )
+    selected = ids[offset : offset + limit]
+    return {
+        "items": [
+            {"package_id": key, "title": load_package(key).title} for key in selected
+        ],
+        "total": len(ids),
+        "next_offset": offset + limit if offset + limit < len(ids) else None,
+    }

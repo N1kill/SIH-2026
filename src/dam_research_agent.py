@@ -1,4 +1,5 @@
 """Deep Agents runtime for generic, evidence-backed dam research."""
+
 from __future__ import annotations
 
 import json
@@ -13,8 +14,14 @@ from pydantic import ValidationError
 import requests
 
 from .dam_research import (
-    ArchivedEvidence, DamResearchSeed, EvidenceWorkspace, RESEARCH_TRACKS,
-    compile_findings, extract_text, fetch_public_source, make_research_plan,
+    ArchivedEvidence,
+    DamResearchSeed,
+    EvidenceWorkspace,
+    RESEARCH_TRACKS,
+    compile_findings,
+    extract_text,
+    fetch_public_source,
+    make_research_plan,
 )
 from .project import Project, ROOT
 
@@ -77,8 +84,15 @@ def _load_runtime():
             "Dam research agent dependencies are missing. Install requirements.txt "
             "(deepagents and langchain-openai)."
         ) from exc
-    return (create_deep_agent, FilesystemBackend, TodoListMiddleware, init_chat_model,
-            InMemoryRateLimiter, tool, MemorySaver)
+    return (
+        create_deep_agent,
+        FilesystemBackend,
+        TodoListMiddleware,
+        init_chat_model,
+        InMemoryRateLimiter,
+        tool,
+        MemorySaver,
+    )
 
 
 def _collect_urls(value: Any, output: dict[str, str]) -> None:
@@ -93,7 +107,9 @@ def _collect_urls(value: Any, output: dict[str, str]) -> None:
             _collect_urls(child, output)
 
 
-def _focused_excerpt(text: str, terms: list[str], limit: int = 8000) -> tuple[str, list[str]]:
+def _focused_excerpt(
+    text: str, terms: list[str], limit: int = 8000
+) -> tuple[str, list[str]]:
     """Return bounded source text centered on dam-name matches when possible."""
     matches: list[tuple[int, str]] = []
     folded = text.casefold()
@@ -147,97 +163,159 @@ def provider_web_search(query: str, provider: str | None = None) -> dict:
                 return provider_web_search(query, candidate)
             except Exception as exc:
                 errors.append(f"{candidate}: {type(exc).__name__}: {exc}")
-        raise RuntimeError("All configured search providers failed: " + " | ".join(errors))
+        raise RuntimeError(
+            "All configured search providers failed: " + " | ".join(errors)
+        )
     if selected == "openai":
         from openai import OpenAI
+
         client = OpenAI()
         response = client.responses.create(
             model=os.getenv("DAM_SEARCH_MODEL", "gpt-5-mini"),
             tools=[{"type": "web_search"}],
-            input=("Search the public web for authoritative evidence relevant to this "
-                   "dam research query. Return factual findings with source links.\n" + query),
+            input=(
+                "Search the public web for authoritative evidence relevant to this "
+                "dam research query. Return factual findings with source links.\n"
+                + query
+            ),
         )
         payload = response.model_dump()
         urls: dict[str, str] = {}
         _collect_urls(payload, urls)
-        return {"provider": "openai", "summary": response.output_text,
-                "sources": [{"title": title, "url": url} for url, title in urls.items()]}
+        return {
+            "provider": "openai",
+            "summary": response.output_text,
+            "sources": [{"title": title, "url": url} for url, title in urls.items()],
+        }
     if selected == "google":
         from google import genai
         from google.genai import types
+
         api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
         client = genai.Client(api_key=api_key) if api_key else genai.Client()
         response = client.models.generate_content(
             model=os.getenv("DAM_SEARCH_MODEL", "gemini-3.6-flash"),
-            contents=("Search the public web for authoritative evidence relevant to this "
-                      "dam research query. Return factual findings with citations.\n" + query),
+            contents=(
+                "Search the public web for authoritative evidence relevant to this "
+                "dam research query. Return factual findings with citations.\n" + query
+            ),
             config=types.GenerateContentConfig(
                 tools=[types.Tool(google_search=types.GoogleSearch())]
             ),
         )
         sources: dict[str, str] = {}
         metadata = getattr(response.candidates[0], "grounding_metadata", None)
-        for chunk in (getattr(metadata, "grounding_chunks", None) or []):
+        for chunk in getattr(metadata, "grounding_chunks", None) or []:
             web = getattr(chunk, "web", None)
             if web and web.uri:
                 sources[web.uri] = web.title or web.uri
-        return {"provider": "google", "summary": response.text,
-                "sources": [{"title": title, "url": url} for url, title in sources.items()]}
+        return {
+            "provider": "google",
+            "summary": response.text,
+            "sources": [{"title": title, "url": url} for url, title in sources.items()],
+        }
     if selected == "ollama":
         if not os.getenv("OLLAMA_API_KEY"):
             return provider_web_search(query, "searxng")
         from ollama import web_search
+
         response = web_search(query=query, max_results=5)
-        items = getattr(response, "results", response.get("results", []) if isinstance(response, dict) else [])
+        items = getattr(
+            response,
+            "results",
+            response.get("results", []) if isinstance(response, dict) else [],
+        )
         sources = []
         for item in items:
             if isinstance(item, dict):
-                title, url, content = item.get("title", ""), item.get("url", ""), item.get("content", "")
+                title, url, content = (
+                    item.get("title", ""),
+                    item.get("url", ""),
+                    item.get("content", ""),
+                )
             else:
                 title = getattr(item, "title", "")
                 url = getattr(item, "url", "")
                 content = getattr(item, "content", "")
             if url:
                 sources.append({"title": title or url, "url": url, "content": content})
-        return {"provider": "ollama", "summary": json.dumps(sources, ensure_ascii=False),
-                "sources": [{"title": item["title"], "url": item["url"]} for item in sources]}
+        return {
+            "provider": "ollama",
+            "summary": json.dumps(sources, ensure_ascii=False),
+            "sources": [
+                {"title": item["title"], "url": item["url"]} for item in sources
+            ],
+        }
     if selected == "searxng":
-        base_url=os.getenv("SEARXNG_URL","http://localhost:8888").rstrip("/")
-        normalized=" ".join(query.replace("_"," ").split())
-        search_queries=[normalized]
-        dam_match=re.search(r"[A-Za-z0-9][A-Za-z0-9-]*(?:\s+[IVX0-9-]+)?\s+Dam",normalized,re.I)
-        if dam_match and dam_match.group(0).casefold()!=normalized.casefold():
+        base_url = os.getenv("SEARXNG_URL", "http://localhost:8888").rstrip("/")
+        normalized = " ".join(query.replace("_", " ").split())
+        search_queries = [normalized]
+        dam_match = re.search(
+            r"[A-Za-z0-9][A-Za-z0-9-]*(?:\s+[IVX0-9-]+)?\s+Dam", normalized, re.I
+        )
+        if dam_match and dam_match.group(0).casefold() != normalized.casefold():
             search_queries.append(f'"{dam_match.group(0)}"')
-        sources=[]
+        sources = []
         for search_query in search_queries:
-            response=requests.get(
+            response = requests.get(
                 f"{base_url}/search",
-                params={"q":search_query,"format":"json","categories":"general"},
-                timeout=30,headers={"User-Agent":"InundaX evidence research/1.0"},
+                params={"q": search_query, "format": "json", "categories": "general"},
+                timeout=30,
+                headers={"User-Agent": "InundaX evidence research/1.0"},
             )
-            response.raise_for_status();payload=response.json()
-            for item in payload.get("results",[])[:5]:
-                url=item.get("url","")
-                if url.startswith(("http://","https://")):
-                    sources.append({"title":item.get("title") or url,"url":url,
-                                    "content":item.get("content","")})
-            if sources:break
-        if not sources:raise RuntimeError("SearXNG returned no usable results")
-        return {"provider":"searxng","summary":json.dumps(sources,ensure_ascii=False),
-                "sources":[{"title":item["title"],"url":item["url"]} for item in sources]}
-    raise ValueError("DAM_SEARCH_PROVIDER must be auto, openai, google, ollama, or searxng")
+            response.raise_for_status()
+            payload = response.json()
+            for item in payload.get("results", [])[:5]:
+                url = item.get("url", "")
+                if url.startswith(("http://", "https://")):
+                    sources.append(
+                        {
+                            "title": item.get("title") or url,
+                            "url": url,
+                            "content": item.get("content", ""),
+                        }
+                    )
+            if sources:
+                break
+        if not sources:
+            raise RuntimeError("SearXNG returned no usable results")
+        return {
+            "provider": "searxng",
+            "summary": json.dumps(sources, ensure_ascii=False),
+            "sources": [
+                {"title": item["title"], "url": item["url"]} for item in sources
+            ],
+        }
+    raise ValueError(
+        "DAM_SEARCH_PROVIDER must be auto, openai, google, ollama, or searxng"
+    )
 
 
-def build_agent(seed: DamResearchSeed, project: Project | None = None,
-                model_name: str | None = None,
-                progress_callback: ProgressCallback | None = None):
+def build_agent(
+    seed: DamResearchSeed,
+    project: Project | None = None,
+    model_name: str | None = None,
+    progress_callback: ProgressCallback | None = None,
+):
     """Build a CLI-only Deep Agent; no filesystem backend is exposed by the web API."""
-    (create_deep_agent, FilesystemBackend, TodoListMiddleware, init_chat_model,
-     InMemoryRateLimiter, tool, MemorySaver) = _load_runtime()
+    (
+        create_deep_agent,
+        FilesystemBackend,
+        TodoListMiddleware,
+        init_chat_model,
+        InMemoryRateLimiter,
+        tool,
+        MemorySaver,
+    ) = _load_runtime()
     workspace = EvidenceWorkspace(seed)
     staged = workspace.load_records()
-    runtime_stats={"searches":0,"search_failures":0,"source_reads":0,
-                   "archive_rejections":0,"last_error":None}
+    runtime_stats = {
+        "searches": 0,
+        "search_failures": 0,
+        "source_reads": 0,
+        "archive_rejections": 0,
+        "last_error": None,
+    }
     delay_s = float(os.getenv("DAM_RESEARCH_RATE_LIMIT_DELAY_S", "12.5"))
     search_lock = threading.Lock()
     last_search = [0.0]
@@ -246,7 +324,7 @@ def build_agent(seed: DamResearchSeed, project: Project | None = None,
     def search_web(query: str) -> str:
         """Search the live public web and return grounded findings plus source URLs."""
         _emit(progress_callback, "search_started", query=query)
-        runtime_stats["searches"]+=1
+        runtime_stats["searches"] += 1
         try:
             with search_lock:
                 wait = delay_s - (time.monotonic() - last_search[0])
@@ -255,14 +333,24 @@ def build_agent(seed: DamResearchSeed, project: Project | None = None,
                 result = provider_web_search(query)
                 last_search[0] = time.monotonic()
             _emit(
-                progress_callback, "search_completed", query=query,
-                provider=result.get("provider"), source_count=len(result.get("sources", [])),
+                progress_callback,
+                "search_completed",
+                query=query,
+                provider=result.get("provider"),
+                source_count=len(result.get("sources", [])),
             )
             return json.dumps(result, ensure_ascii=False)
-        except Exception as exc:  # Provider exceptions are useful feedback to the agent.
-            runtime_stats["search_failures"]+=1;runtime_stats["last_error"]=f"{type(exc).__name__}: {exc}"
-            _emit(progress_callback, "search_failed", query=query,
-                  error=f"{type(exc).__name__}: {exc}")
+        except (
+            Exception
+        ) as exc:  # Provider exceptions are useful feedback to the agent.
+            runtime_stats["search_failures"] += 1
+            runtime_stats["last_error"] = f"{type(exc).__name__}: {exc}"
+            _emit(
+                progress_callback,
+                "search_failed",
+                query=query,
+                error=f"{type(exc).__name__}: {exc}",
+            )
             return json.dumps({"error": f"{type(exc).__name__}: {exc}"})
 
     @tool
@@ -273,34 +361,58 @@ def build_agent(seed: DamResearchSeed, project: Project | None = None,
         size are validated. The returned text is inspection material, not evidence;
         call archive_dam_evidence to persist and hash an accepted source.
         """
-        _emit(progress_callback,"source_read_started",source_url=source_url)
+        _emit(progress_callback, "source_read_started", source_url=source_url)
         try:
-            data,content_type,final_url=fetch_public_source(source_url)
-            text=extract_text(data,content_type)
-            if not text:raise ValueError("Source has no extractable text")
-            runtime_stats["source_reads"]+=1
-            excerpt,matched_terms=_focused_excerpt(
-                text,[seed.dam_name,*seed.aliases],limit=8000
+            data, content_type, final_url = fetch_public_source(source_url)
+            text = extract_text(data, content_type)
+            if not text:
+                raise ValueError("Source has no extractable text")
+            runtime_stats["source_reads"] += 1
+            excerpt, matched_terms = _focused_excerpt(
+                text, [seed.dam_name, *seed.aliases], limit=8000
             )
-            _emit(progress_callback,"source_read_completed",source_url=final_url,
-                  content_type=content_type,characters=len(text))
-            return json.dumps({"source_url":final_url,"content_type":content_type,
-                               "characters":len(text),"matched_terms":matched_terms,
-                               "text":excerpt},ensure_ascii=False)
+            _emit(
+                progress_callback,
+                "source_read_completed",
+                source_url=final_url,
+                content_type=content_type,
+                characters=len(text),
+            )
+            return json.dumps(
+                {
+                    "source_url": final_url,
+                    "content_type": content_type,
+                    "characters": len(text),
+                    "matched_terms": matched_terms,
+                    "text": excerpt,
+                },
+                ensure_ascii=False,
+            )
         except Exception as exc:
-            runtime_stats["last_error"]=f"{type(exc).__name__}: {exc}"
-            _emit(progress_callback,"source_read_failed",source_url=source_url,
-                  error=runtime_stats["last_error"])
-            return json.dumps({"error":runtime_stats["last_error"]})
+            runtime_stats["last_error"] = f"{type(exc).__name__}: {exc}"
+            _emit(
+                progress_callback,
+                "source_read_failed",
+                source_url=source_url,
+                error=runtime_stats["last_error"],
+            )
+            return json.dumps({"error": runtime_stats["last_error"]})
 
     @tool
     def archive_dam_evidence(
-        title: str, source_url: str, publisher_or_author: str,
-        evidence_category: str, source_tier: str, license_or_usage_status: str,
-        exact_quote: str, quality_note: str,
-        relevant_measurements_json: str = "{}", estimated_uncertainty_json: str = "{}",
+        title: str,
+        source_url: str,
+        publisher_or_author: str,
+        evidence_category: str,
+        source_tier: str,
+        license_or_usage_status: str,
+        exact_quote: str,
+        quality_note: str,
+        relevant_measurements_json: str = "{}",
+        estimated_uncertainty_json: str = "{}",
         geographic_coordinates_or_crs: str = "Not stated",
-        status: str = "discovery_only", source_locator: str = "Page/section not stated",
+        status: str = "discovery_only",
+        source_locator: str = "Page/section not stated",
         notes: str = "",
     ) -> str:
         """Archive one public source and record only quote-supported evidence.
@@ -318,47 +430,85 @@ def build_agent(seed: DamResearchSeed, project: Project | None = None,
         spillway_width_m, spillway_crest_elevation_m, catchment_area_km2.
         """
         try:
-            category_aliases={
-                "identity":"identity_geometry","geometry":"identity_geometry",
-                "structural_integrity":"safety_context","dam_safety":"safety_context",
-                "safety":"safety_context","reservoir":"reservoir_hydrology",
-                "hydrology":"reservoir_hydrology","spillway":"spillway_breach_history",
-                "breach_history":"spillway_breach_history",
+            category_aliases = {
+                "identity": "identity_geometry",
+                "geometry": "identity_geometry",
+                "structural_integrity": "safety_context",
+                "dam_safety": "safety_context",
+                "safety": "safety_context",
+                "reservoir": "reservoir_hydrology",
+                "hydrology": "reservoir_hydrology",
+                "spillway": "spillway_breach_history",
+                "breach_history": "spillway_breach_history",
             }
-            allowed_categories={"identity_geometry","reservoir_hydrology",
-                                "spillway_breach_history","safety_context","imagery","other"}
-            evidence_category=category_aliases.get(evidence_category,evidence_category)
-            if evidence_category not in allowed_categories:evidence_category="other"
-            tier_aliases={"primary":"discovery_only","secondary":"discovery_only",
-                          "tertiary":"discovery_only","government":"official_primary"}
-            source_tier=tier_aliases.get(source_tier,source_tier)
-            allowed_tiers={"official_primary","primary_non_government","peer_reviewed",
-                           "reputable_secondary","discovery_only"}
-            if source_tier not in allowed_tiers:source_tier="discovery_only"
-            if source_tier=="discovery_only":status="discovery_only"
+            allowed_categories = {
+                "identity_geometry",
+                "reservoir_hydrology",
+                "spillway_breach_history",
+                "safety_context",
+                "imagery",
+                "other",
+            }
+            evidence_category = category_aliases.get(
+                evidence_category, evidence_category
+            )
+            if evidence_category not in allowed_categories:
+                evidence_category = "other"
+            tier_aliases = {
+                "primary": "discovery_only",
+                "secondary": "discovery_only",
+                "tertiary": "discovery_only",
+                "government": "official_primary",
+            }
+            source_tier = tier_aliases.get(source_tier, source_tier)
+            allowed_tiers = {
+                "official_primary",
+                "primary_non_government",
+                "peer_reviewed",
+                "reputable_secondary",
+                "discovery_only",
+            }
+            if source_tier not in allowed_tiers:
+                source_tier = "discovery_only"
+            if source_tier == "discovery_only":
+                status = "discovery_only"
             candidate = ArchivedEvidence(
-                title=title, source_url=source_url,
+                title=title,
+                source_url=source_url,
                 publisher_or_author=publisher_or_author,
-                evidence_category=evidence_category, source_tier=source_tier,
+                evidence_category=evidence_category,
+                source_tier=source_tier,
                 license_or_usage_status=license_or_usage_status,
-                exact_quote=exact_quote, quality_note=quality_note,
+                exact_quote=exact_quote,
+                quality_note=quality_note,
                 relevant_measurements=json.loads(relevant_measurements_json),
                 estimated_uncertainty=json.loads(estimated_uncertainty_json),
                 geographic_coordinates_or_crs=geographic_coordinates_or_crs,
-                status=status, source_locator=source_locator, notes=notes or None,
+                status=status,
+                source_locator=source_locator,
+                notes=notes or None,
             )
             record = workspace.archive(candidate)
             staged.append(record)
             workspace.save_records(staged)
             _emit(
-                progress_callback, "source_archived", title=record.title,
-                evidence_id=record.id, category=candidate.evidence_category,
+                progress_callback,
+                "source_archived",
+                title=record.title,
+                evidence_id=record.id,
+                category=candidate.evidence_category,
                 evidence_count=len(staged),
             )
-            return json.dumps({"archived": True, "evidence_id": record.id,
-                               "artifact_path": record.artifact_path})
+            return json.dumps(
+                {
+                    "archived": True,
+                    "evidence_id": record.id,
+                    "artifact_path": record.artifact_path,
+                }
+            )
         except (ValueError, ValidationError, json.JSONDecodeError) as exc:
-            runtime_stats["archive_rejections"]+=1;runtime_stats["last_error"]=str(exc)
+            runtime_stats["archive_rejections"] += 1
+            runtime_stats["last_error"] = str(exc)
             _emit(progress_callback, "archive_rejected", title=title, error=str(exc))
             return json.dumps({"archived": False, "error": str(exc)})
 
@@ -388,37 +538,62 @@ def build_agent(seed: DamResearchSeed, project: Project | None = None,
     model_delay_s = float(os.getenv("DAM_MODEL_RATE_LIMIT_DELAY_S", "0.5"))
     model_options["rate_limiter"] = InMemoryRateLimiter(
         requests_per_second=(1.0 / model_delay_s if model_delay_s > 0 else 1000.0),
-        check_every_n_seconds=0.5, max_bucket_size=1,
+        check_every_n_seconds=0.5,
+        max_bucket_size=1,
     )
     model = init_chat_model(model=model_id, **model_options)
     tools = [search_web, read_public_source, archive_dam_evidence]
-    subagents = [{
-        "name": name,
-        "description": prompt,
-        "system_prompt": system_prompt + "\n\nYour bounded assignment: " + prompt,
-        "tools": tools,
-    } for name, prompt in SPECIALISTS.items()] if not model_id.startswith("ollama:") else []
+    subagents = (
+        [
+            {
+                "name": name,
+                "description": prompt,
+                "system_prompt": system_prompt
+                + "\n\nYour bounded assignment: "
+                + prompt,
+                "tools": tools,
+            }
+            for name, prompt in SPECIALISTS.items()
+        ]
+        if not model_id.startswith("ollama:")
+        else []
+    )
     backend = FilesystemBackend(root_dir=str(workspace.directory), virtual_mode=True)
     agent = create_deep_agent(
-        name="dam-evidence-coordinator", model=model, tools=tools,
-        system_prompt=system_prompt, subagents=subagents,
-        middleware=[TodoListMiddleware()], backend=backend,
+        name="dam-evidence-coordinator",
+        model=model,
+        tools=tools,
+        system_prompt=system_prompt,
+        subagents=subagents,
+        middleware=[TodoListMiddleware()],
+        backend=backend,
         checkpointer=MemorySaver(),
     )
     return agent, workspace, runtime_stats
 
 
-def run_research(seed: DamResearchSeed, project: Project | None = None,
-                 model_name: str | None = None, thread_id: str | None = None,
-                 progress_callback: ProgressCallback | None = None) -> dict:
+def run_research(
+    seed: DamResearchSeed,
+    project: Project | None = None,
+    model_name: str | None = None,
+    thread_id: str | None = None,
+    progress_callback: ProgressCallback | None = None,
+) -> dict:
     selected_model = model_name or os.getenv("DAM_RESEARCH_MODEL", "openai:gpt-5-mini")
     if selected_model.startswith("ollama:"):
         from .dam_research_local import run_local_research
+
         return run_local_research(seed, project, selected_model, progress_callback)
-    _emit(progress_callback, "planning", dam_id=seed.dam_id,
-          message="Preparing four-track evidence plan")
+    _emit(
+        progress_callback,
+        "planning",
+        dam_id=seed.dam_id,
+        message="Preparing four-track evidence plan",
+    )
     plan = make_research_plan(seed, project)
-    agent, workspace, runtime_stats = build_agent(seed, project, model_name, progress_callback)
+    agent, workspace, runtime_stats = build_agent(
+        seed, project, model_name, progress_callback
+    )
     workspace.write_seed()
     plan_path = workspace.directory / "research-plan.json"
     plan_path.write_text(json.dumps(plan, indent=2), encoding="utf-8")
@@ -430,8 +605,12 @@ def run_research(seed: DamResearchSeed, project: Project | None = None,
     )
     error, summary = None, None
     try:
-        _emit(progress_callback, "agent_started", track_count=len(RESEARCH_TRACKS),
-              message="Coordinator running; specialist searches may take several minutes")
+        _emit(
+            progress_callback,
+            "agent_started",
+            track_count=len(RESEARCH_TRACKS),
+            message="Coordinator running; specialist searches may take several minutes",
+        )
         result = agent.invoke(
             {"messages": [{"role": "user", "content": prompt}]},
             config={"configurable": {"thread_id": thread_id or f"dam-{seed.dam_id}"}},
@@ -444,18 +623,25 @@ def run_research(seed: DamResearchSeed, project: Project | None = None,
     _emit(progress_callback, "compiling", message="Compiling evidence and conflicts")
     records = workspace.load_records()
     if not error and not records:
-        error=(f"No evidence was archived. {runtime_stats['search_failures']} of "
-               f"{runtime_stats['searches']} searches failed; "
-               f"{runtime_stats['archive_rejections']} candidate records were rejected.")
-        if runtime_stats["last_error"]:error+=f" Last error: {runtime_stats['last_error']}"
+        error = (
+            f"No evidence was archived. {runtime_stats['search_failures']} of "
+            f"{runtime_stats['searches']} searches failed; "
+            f"{runtime_stats['archive_rejections']} candidate records were rejected."
+        )
+        if runtime_stats["last_error"]:
+            error += f" Last error: {runtime_stats['last_error']}"
     findings = compile_findings(seed, records, project)
     findings_path = workspace.directory / "research-findings.json"
     findings_path.write_text(json.dumps(findings, indent=2), encoding="utf-8")
     manifest_path = workspace.directory / "agent-evidence.json"
     result = {
         "status": "failed" if error else "complete",
-        "manifest": str(manifest_path.relative_to(ROOT)) if manifest_path.is_file() else None,
+        "manifest": str(manifest_path.relative_to(ROOT))
+        if manifest_path.is_file()
+        else None,
         "findings": str(findings_path.relative_to(ROOT)),
-        "evidence_count": len(records), "summary": summary, "error": error,
+        "evidence_count": len(records),
+        "summary": summary,
+        "error": error,
     }
     return result

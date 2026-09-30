@@ -1,4 +1,5 @@
 """Validated scenario inputs and explicit, traceable demonstration assumptions."""
+
 from pathlib import Path
 import json
 import math
@@ -43,7 +44,9 @@ class GateSpec(Inputs):
 
 class MaterialZoneSpec(Inputs):
     zone_id: str = Field(pattern=r"^[a-zA-Z0-9_-]{1,64}$")
-    role: Literal["core", "filter", "shell", "drainage", "foundation", "armour", "unknown"]
+    role: Literal[
+        "core", "filter", "shell", "drainage", "foundation", "armour", "unknown"
+    ]
     density: EvidenceValue = Field(default_factory=EvidenceValue)
     cohesion: EvidenceValue = Field(default_factory=EvidenceValue)
     friction_angle: EvidenceValue = Field(default_factory=EvidenceValue)
@@ -104,10 +107,14 @@ class Project(Inputs):
     def validate_evidence_geometry(self):
         if self.crest_coordinates is not None:
             if len(self.crest_coordinates) < 2 or len(set(self.crest_coordinates)) < 2:
-                raise ValueError("Crest coordinates require at least two distinct WGS84 points")
+                raise ValueError(
+                    "Crest coordinates require at least two distinct WGS84 points"
+                )
             for longitude, latitude in self.crest_coordinates:
                 if not -180 <= longitude <= 180 or not -80 <= latitude <= 84:
-                    raise ValueError("Crest coordinates must be valid WGS84 longitude/latitude pairs")
+                    raise ValueError(
+                        "Crest coordinates must be valid WGS84 longitude/latitude pairs"
+                    )
         if self.stage_storage is not None:
             if len(self.stage_storage) < 2:
                 raise ValueError("Stage-storage data require at least two points")
@@ -118,9 +125,14 @@ class Project(Inputs):
             if any(b <= a for a, b in zip(elevations, elevations[1:])):
                 raise ValueError("Stage elevations must be strictly increasing")
             if storages[0] < 0 or any(b <= a for a, b in zip(storages, storages[1:])):
-                raise ValueError("Stage storage must be nonnegative and strictly increasing")
-        if (self.initial_water_level_m is not None and self.maximum_water_level_m is not None
-                and self.initial_water_level_m > self.maximum_water_level_m):
+                raise ValueError(
+                    "Stage storage must be nonnegative and strictly increasing"
+                )
+        if (
+            self.initial_water_level_m is not None
+            and self.maximum_water_level_m is not None
+            and self.initial_water_level_m > self.maximum_water_level_m
+        ):
             raise ValueError("Initial water level cannot exceed maximum water level")
         return self
 
@@ -164,7 +176,10 @@ class Scenario(Inputs):
             raise ValueError("Maximum breach width must be at least the initial width")
         if self.duration_s / self.dt_s > 100000:
             raise ValueError("Choose dt/duration requiring at most 100000 macro steps")
-        if list(self.risk_depths_m) != sorted(self.risk_depths_m) or min(self.risk_depths_m) <= 0:
+        if (
+            list(self.risk_depths_m) != sorted(self.risk_depths_m)
+            or min(self.risk_depths_m) <= 0
+        ):
             raise ValueError("Risk depth thresholds must be positive and increasing")
         return self
 
@@ -183,7 +198,9 @@ Scenario.model_rebuild()
 def input_path(value: str) -> Path:
     path = (ROOT / value).resolve()
     if not path.is_relative_to(ROOT):
-        raise ValueError("Input paths must be inside the project; copy supplied data into data/raw")
+        raise ValueError(
+            "Input paths must be inside the project; copy supplied data into data/raw"
+        )
     if not path.is_file():
         raise ValueError(f"Input file does not exist: {value}")
     return path
@@ -195,19 +212,31 @@ def projects() -> dict[str, Project]:
     for key, dam in legacy.items():
         is_machhu = key == "machhu-ii"
         result[key] = Project(
-            dam_id=key, dam_name=dam["dam_name"], latitude=dam["lat"], longitude=dam["lon"],
-            dam_height_m=dam["dam_height_m"], dam_length_m=3542 if is_machhu else dam.get("crest_length_m"),
+            dam_id=key,
+            dam_name=dam["dam_name"],
+            latitude=dam["lat"],
+            longitude=dam["lon"],
+            dam_height_m=dam["dam_height_m"],
+            dam_length_m=3542 if is_machhu else dam.get("crest_length_m"),
             reservoir_capacity_m3=dam["reservoir_volume_m3"],
             dem_path="data/processed/dem_conditioned.tif" if is_machhu else None,
             river_path="data/raw/rivers/hydrorivers_clip.shp" if is_machhu else None,
             land_use_path="data/raw/lulc/lulc_raw.tif" if is_machhu else None,
             dam_type="earthfill" if is_machhu else None,
             catchment_area_km2=1928 if is_machhu else None,
-            provenance=[{"source": "config.json and data/raw/dams/nrld_machhu.csv", "verified_survey": False}],
-            assumptions=["Bed elevation sampled from DEM is an approximation, not surveyed bathymetry.",
-                         "Dam axis inferred from downstream bearing unless crest coordinates are supplied.",
-                         "Power-law stage/storage relation calibrated to configured capacity; exponent 1.7.",
-                         "Unspecified spillway is disabled; rainfall runoff is a uniform-duration SCS-CN inflow."])
+            provenance=[
+                {
+                    "source": "config.json and data/raw/dams/nrld_machhu.csv",
+                    "verified_survey": False,
+                }
+            ],
+            assumptions=[
+                "Bed elevation sampled from DEM is an approximation, not surveyed bathymetry.",
+                "Dam axis inferred from downstream bearing unless crest coordinates are supplied.",
+                "Power-law stage/storage relation calibrated to configured capacity; exponent 1.7.",
+                "Unspecified spillway is disabled; rainfall runoff is a uniform-duration SCS-CN inflow.",
+            ],
+        )
     for path in sorted((ROOT / "data/projects").glob("*.json")):
         project = Project.model_validate_json(path.read_text(encoding="utf-8"))
         result[project.dam_id] = project

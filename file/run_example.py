@@ -73,11 +73,17 @@ def main():
         erodibility_coeff=4.0e-5,
         ultimate_shear_capacity_pa=4000.0,
     )
-    geometry = BreachGeometry(bottom_width_m=2.0, bottom_elevation_m=5.0,
-                               side_slope_h_per_v=1.0, dam_height_m=30.0)
+    geometry = BreachGeometry(
+        bottom_width_m=2.0,
+        bottom_elevation_m=5.0,
+        side_slope_h_per_v=1.0,
+        dam_height_m=30.0,
+    )
     breach = PhysicallyBasedBreachGrowth(
-        material=material, geometry=geometry,
-        dam_crest_elevation_m=30.0, initiation_elevation_m=28.5,
+        material=material,
+        geometry=geometry,
+        dam_crest_elevation_m=30.0,
+        initiation_elevation_m=28.5,
         # In a real run this comes from the DEM/surveyed channel-bed
         # elevation under the dam, not left to default to the initial
         # breach-bottom guess.
@@ -86,19 +92,28 @@ def main():
 
     sph_params = SPHParams(particle_spacing_m=0.3)
     sph = SPHBreachSolver(sph_params)
-    sph.add_boundary_line((-6, 0), (6, 0))       # channel bed at breach
-    sph.add_boundary_line((-6, 0), (-6, 8))      # left wall stub
+    sph.add_boundary_line((-6, 0), (6, 0))  # channel bed at breach
+    sph.add_boundary_line((-6, 0), (-6, 8))  # left wall stub
 
     grid = MockGridAdapter(length_m=5000, dx_m=50)
 
     sim = BreachCouplingSimulation(
-        reservoir=reservoir, breach=breach, sph=sph, grid=grid,
-        dam_length_m=120.0, breach_x_m=0.0,
+        reservoir=reservoir,
+        breach=breach,
+        sph=sph,
+        grid=grid,
+        dam_length_m=120.0,
+        breach_x_m=0.0,
     )
-    sim.add_structure(StructuralObject(
-        name="downstream_bridge", x_m=1500, y_m=0,
-        frontal_area_m2=25.0, failure_force_kN=800.0,
-    ))
+    sim.add_structure(
+        StructuralObject(
+            name="downstream_bridge",
+            x_m=1500,
+            y_m=0,
+            frontal_area_m2=25.0,
+            failure_force_kN=800.0,
+        )
+    )
 
     dt = 5.0  # seconds, macro coupling step
     inflow = 40.0  # m3/s baseflow into reservoir
@@ -106,13 +121,15 @@ def main():
     for step_i in range(15):
         rec = sim.step(dt, inflow_m3s=inflow)
         if step_i % 10 == 0:
-            print(f"t={rec['time_s']:6.0f}s  "
-                  f"res_elev={rec['reservoir_elevation_m']:.2f}m  "
-                  f"breach_w={rec['breach_bottom_width_m']:.2f}m  "
-                  f"Q={rec['breach_outflow_m3s']:.1f}m3/s  "
-                  f"sph_v={rec['sph_mean_velocity_ms']:.2f}m/s  "
-                  f"particles={rec['sph_n_particles']}  "
-                  f"bridge_failed={rec['structures'][0]['failed']}")
+            print(
+                f"t={rec['time_s']:6.0f}s  "
+                f"res_elev={rec['reservoir_elevation_m']:.2f}m  "
+                f"breach_w={rec['breach_bottom_width_m']:.2f}m  "
+                f"Q={rec['breach_outflow_m3s']:.1f}m3/s  "
+                f"sph_v={rec['sph_mean_velocity_ms']:.2f}m/s  "
+                f"particles={rec['sph_n_particles']}  "
+                f"bridge_failed={rec['structures'][0]['failed']}"
+            )
 
     print("\nDone. Final breach width:", sim.breach.geometry.bottom_width_m, "m")
     print("Final reservoir storage:", sim.reservoir.storage_m3, "m3")

@@ -14,6 +14,10 @@ __pycache__/
 
 # Local Node tooling
 node_modules/
+frontend/dist/
+frontend-dam/dist/
+frontend/.chrome-review/
+frontend/ui-review.png
 
 # IDE & OS
 .vscode/
@@ -36,6 +40,7 @@ download_log.txt
 powershell.bat
 powershell.cmd
 scratch/
+.tmp/
 docs/
 !docs/
 !docs/IMPLEMENTATION.md
@@ -64,42 +69,3 @@ outputs/simulation/delft3d_fm/DFM_OUTPUT_*/
 *.cache
 outputs/3d/dashboard/*.json
 outputs/3d/*.json
-
-# Virtual Environment
-.venv/
-env/
-venv/
-ENV/
-
-# Python cache
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.pytest_cache/
-
-# Local Node tooling
-node_modules/
-
-# IDE & OS
-.vscode/
-.idea/
-.DS_Store
-Thumbs.db
-
-# Archives and legacy folders
-archives/
-data/dam/
-data/river/
-data/*.zip
-nul
-
-# Temporary / Log files
-*.log
-*.tmp
-download_log.txt
-powershell.bat
-powershell.cmd
-scratch/
-docs/
-frontend-dam/*.py

@@ -57,6 +57,7 @@ STREAM_EVERY_N_STEPS = 3
 @dataclass
 class SimulationConfig:
     """All tunables for a single simulation run."""
+
     dam_height_m: float = DEFAULT_DAM_HEIGHT_M
     dam_length_m: float = DEFAULT_DAM_LENGTH_M
     dam_crest_elevation_m: float = DEFAULT_DAM_CREST_ELEVATION_M
@@ -166,22 +167,26 @@ def _build_simulation(cfg: SimulationConfig) -> BreachCouplingSimulation:
         breach_x_m=0.0,
         sph_slice_width_m=cfg.sph_slice_width_m,
     )
-    sim.add_structure(StructuralObject(
-        name=cfg.bridge_name,
-        x_m=cfg.bridge_x_m,
-        y_m=cfg.bridge_y_m,
-        frontal_area_m2=cfg.bridge_frontal_area_m2,
-        failure_force_kN=cfg.bridge_failure_force_kN,
-        height_m=cfg.bridge_height_m,
-        base_width_m=cfg.bridge_base_width_m,
-        foundation_area_m2=cfg.bridge_foundation_area_m2,
-        dead_weight_kN=cfg.bridge_dead_weight_kN,
-        allowable_bearing_kPa=cfg.bridge_allowable_bearing_kPa,
-    ))
+    sim.add_structure(
+        StructuralObject(
+            name=cfg.bridge_name,
+            x_m=cfg.bridge_x_m,
+            y_m=cfg.bridge_y_m,
+            frontal_area_m2=cfg.bridge_frontal_area_m2,
+            failure_force_kN=cfg.bridge_failure_force_kN,
+            height_m=cfg.bridge_height_m,
+            base_width_m=cfg.bridge_base_width_m,
+            foundation_area_m2=cfg.bridge_foundation_area_m2,
+            dead_weight_kN=cfg.bridge_dead_weight_kN,
+            allowable_bearing_kPa=cfg.bridge_allowable_bearing_kPa,
+        )
+    )
     return sim
 
 
-def generate_downstream_hydrograph(cfg: Optional[SimulationConfig] = None) -> list[tuple[float, float]]:
+def generate_downstream_hydrograph(
+    cfg: Optional[SimulationConfig] = None,
+) -> list[tuple[float, float]]:
     """Generate the FM forcing hydrograph without advancing the visual SPH slice.
 
     The far-field solver needs mass-conserving released discharge, which is
@@ -232,15 +237,22 @@ def generate_downstream_hydrograph(cfg: Optional[SimulationConfig] = None) -> li
         breach_state = breach.step(cfg.dt_s, reservoir.elevation_m)
         breach_q = breach_state.get("outflow_m3s", 0.0)
         state = reservoir.step(cfg.dt_s, cfg.inflow_m3s, breach_q)
-        hydrograph.append((
-            float(reservoir.time_s),
-            float(state["breach_outflow_m3s"] + state["spillway_outflow_m3s"] + state["overtopping_outflow_m3s"]),
-        ))
+        hydrograph.append(
+            (
+                float(reservoir.time_s),
+                float(
+                    state["breach_outflow_m3s"]
+                    + state["spillway_outflow_m3s"]
+                    + state["overtopping_outflow_m3s"]
+                ),
+            )
+        )
     return hydrograph
 
 
-def _sample_fluid_particles(sph: SPHBreachSolver,
-                             max_count: int = MAX_STREAMED_PARTICLES) -> list:
+def _sample_fluid_particles(
+    sph: SPHBreachSolver, max_count: int = MAX_STREAMED_PARTICLES
+) -> list:
     """Deterministic stride-sample of fluid-only particles for streaming.
 
     Returns at most ``max_count`` particles.  Uses a fixed stride so the
@@ -261,20 +273,21 @@ def _sample_fluid_particles(sph: SPHBreachSolver,
 
     particles = []
     for idx in selected:
-        particles.append({
-            "id": int(idx),
-            "x": round(float(sph.pos[idx, 0]), 3),
-            "y": round(float(sph.pos[idx, 1]), 3),
-            "vx": round(float(sph.vel[idx, 0]), 2),
-            "vy": round(float(sph.vel[idx, 1]), 2),
-        })
+        particles.append(
+            {
+                "id": int(idx),
+                "x": round(float(sph.pos[idx, 0]), 3),
+                "y": round(float(sph.pos[idx, 1]), 3),
+                "vx": round(float(sph.vel[idx, 0]), 2),
+                "vy": round(float(sph.vel[idx, 1]), 2),
+            }
+        )
     return particles
 
 
-def build_physics_frame(record: dict,
-                        sph: SPHBreachSolver,
-                        step_index: int,
-                        include_particles: bool) -> dict:
+def build_physics_frame(
+    record: dict, sph: SPHBreachSolver, step_index: int, include_particles: bool
+) -> dict:
     """Shape a coupling-step record into the WebSocket frame format."""
     frame = {
         "type": "physics_frame",
@@ -337,17 +350,22 @@ class PhysicsService:
 
         if self.step_index >= self.cfg.total_steps:
             self.completed = True
-            return {"type": "simulation_complete",
-                    "simulation": {"time_s": self.sim.reservoir.time_s,
-                                   "time_hours": round(self.sim.reservoir.time_s / 3600, 4),
-                                   "status": "completed"}}
+            return {
+                "type": "simulation_complete",
+                "simulation": {
+                    "time_s": self.sim.reservoir.time_s,
+                    "time_hours": round(self.sim.reservoir.time_s / 3600, 4),
+                    "status": "completed",
+                },
+            }
 
         record = self.sim.step(self.cfg.dt_s, inflow_m3s=self.cfg.inflow_m3s)
         self.step_index += 1
 
-        include_particles = (self.step_index % STREAM_EVERY_N_STEPS == 0)
-        frame = build_physics_frame(record, self.sim.sph,
-                                    self.step_index, include_particles)
+        include_particles = self.step_index % STREAM_EVERY_N_STEPS == 0
+        frame = build_physics_frame(
+            record, self.sim.sph, self.step_index, include_particles
+        )
         self._snapshot.append(frame)
         return frame
 

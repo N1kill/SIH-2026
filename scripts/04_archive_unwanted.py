@@ -5,7 +5,9 @@ import pathlib
 import shutil
 import logging
 
-logging.basicConfig(level=logging.INFO, format="[%(asctime)s] %(levelname)s: %(message)s")
+logging.basicConfig(
+    level=logging.INFO, format="[%(asctime)s] %(levelname)s: %(message)s"
+)
 
 PROJECT_ROOT = pathlib.Path(__file__).resolve().parents[1]
 ARCHIVES_DIR = PROJECT_ROOT / "archives"
@@ -43,9 +45,13 @@ for src, dest in stray_folders:
                     shutil.copy2(item, target)
                     try:
                         item.unlink()
-                        logging.info(f"Moved: {item.name} -> {dest.relative_to(PROJECT_ROOT)}")
+                        logging.info(
+                            f"Moved: {item.name} -> {dest.relative_to(PROJECT_ROOT)}"
+                        )
                     except Exception:
-                        logging.info(f"Copied (in-use): {item.name} -> {dest.relative_to(PROJECT_ROOT)}")
+                        logging.info(
+                            f"Copied (in-use): {item.name} -> {dest.relative_to(PROJECT_ROOT)}"
+                        )
                 elif item.is_dir():
                     shutil.copytree(item, target, dirs_exist_ok=True)
                     try:

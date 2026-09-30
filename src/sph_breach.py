@@ -36,9 +36,9 @@ G_VEC = np.array([0.0, -9.81])
 @dataclass
 class SPHParams:
     particle_spacing_m: float = 0.25
-    smoothing_length_factor: float = 1.3     # h = factor * spacing
+    smoothing_length_factor: float = 1.3  # h = factor * spacing
     rest_density: float = 1000.0
-    sound_speed: float = 30.0                # artificial (weakly-compressible), not real 1480 m/s
+    sound_speed: float = 30.0  # artificial (weakly-compressible), not real 1480 m/s
     gamma_tait: float = 7.0
     artificial_visc_alpha: float = 0.3
     artificial_visc_beta: float = 0.6
@@ -51,12 +51,12 @@ class SPHParams:
 
     @property
     def particle_mass(self) -> float:
-        return self.rest_density * self.particle_spacing_m ** 2  # 2D areal mass
+        return self.rest_density * self.particle_spacing_m**2  # 2D areal mass
 
 
 def cubic_spline_kernel(r: np.ndarray, h: float) -> np.ndarray:
     q = r / h
-    alpha_d = 10.0 / (7.0 * np.pi * h ** 2)  # 2D normalization
+    alpha_d = 10.0 / (7.0 * np.pi * h**2)  # 2D normalization
     w = np.zeros_like(q)
     m1 = q <= 1.0
     m2 = (q > 1.0) & (q <= 2.0)
@@ -68,7 +68,7 @@ def cubic_spline_kernel(r: np.ndarray, h: float) -> np.ndarray:
 def cubic_spline_grad(rij: np.ndarray, r: np.ndarray, h: float) -> np.ndarray:
     """Gradient of the kernel, returned as (N,2) vectors."""
     q = r / h
-    alpha_d = 10.0 / (7.0 * np.pi * h ** 2)
+    alpha_d = 10.0 / (7.0 * np.pi * h**2)
     dw_dq = np.zeros_like(q)
     m1 = q <= 1.0
     m2 = (q > 1.0) & (q <= 2.0)
@@ -97,8 +97,9 @@ class SPHBreachSolver:
 
     # ---------- setup ----------
 
-    def seed_reservoir_block(self, width_m: float, depth_m: float,
-                              origin_xy=(0.0, 0.0)):
+    def seed_reservoir_block(
+        self, width_m: float, depth_m: float, origin_xy=(0.0, 0.0)
+    ):
         """Fill a block of fluid particles representing reservoir water
         immediately upstream of the breach, ready to discharge through it."""
         s = self.p.particle_spacing_m
@@ -141,7 +142,17 @@ class SPHBreachSolver:
             buckets.setdefault(k, []).append(i)
 
         pairs_i, pairs_j = [], []
-        offsets = [(-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 0), (0, 1), (1, -1), (1, 0), (1, 1)]
+        offsets = [
+            (-1, -1),
+            (-1, 0),
+            (-1, 1),
+            (0, -1),
+            (0, 0),
+            (0, 1),
+            (1, -1),
+            (1, 0),
+            (1, 1),
+        ]
         for k, idxs in buckets.items():
             neigh_idxs = []
             for off in offsets:
@@ -167,17 +178,21 @@ class SPHBreachSolver:
 
     def _tait_pressure(self, density: np.ndarray) -> np.ndarray:
         p = self.p
-        B = p.rest_density * p.sound_speed ** 2 / p.gamma_tait
+        B = p.rest_density * p.sound_speed**2 / p.gamma_tait
         return B * ((density / p.rest_density) ** p.gamma_tait - 1.0)
 
     def step(self, dt_s: float = None) -> dict:
         """Advance one CFL/acceleration-limited substep; report actual elapsed time."""
         if dt_s is not None and (not np.isfinite(dt_s) or dt_s <= 0):
             raise ValueError("SPH timestep must be finite and positive")
-        speed = float(np.max(np.linalg.norm(self.vel, axis=1))) if len(self.vel) else 0.
-        dt_sph = min(dt_s if dt_s is not None else float("inf"),
-                     self.p.dt_cfl_factor*self.p.h/(self.p.sound_speed+speed+1e-6))
-        
+        speed = (
+            float(np.max(np.linalg.norm(self.vel, axis=1))) if len(self.vel) else 0.0
+        )
+        dt_sph = min(
+            dt_s if dt_s is not None else float("inf"),
+            self.p.dt_cfl_factor * self.p.h / (self.p.sound_speed + speed + 1e-6),
+        )
+
         p = self.p
         h = p.h
         cutoff = 2 * h
@@ -192,27 +207,32 @@ class SPHBreachSolver:
         grad_w = cubic_spline_grad(rij, r, h)  # grad at i due to j
 
         # --- density (summation + self term) ---
-        density = np.full(n, p.particle_mass * cubic_spline_kernel(np.array([0.0]), h)[0])
+        density = np.full(
+            n, p.particle_mass * cubic_spline_kernel(np.array([0.0]), h)[0]
+        )
         np.add.at(density, i, p.particle_mass * w)
         np.add.at(density, j, p.particle_mass * w)
         density = np.maximum(density, 0.2 * p.rest_density)
         self.density = density
-        self.pressure = np.maximum(self._tait_pressure(density), 0.)
+        self.pressure = np.maximum(self._tait_pressure(density), 0.0)
 
         # --- pressure + artificial viscosity forces ---
         vij = self.vel[i] - self.vel[j]
         rho_i, rho_j = density[i], density[j]
         pres_i, pres_j = self.pressure[i], self.pressure[j]
 
-        pressure_term = (pres_i / rho_i ** 2 + pres_j / rho_j ** 2)
+        pressure_term = pres_i / rho_i**2 + pres_j / rho_j**2
 
         vr_dot = np.sum(vij * rij, axis=1)
         rho_bar = 0.5 * (rho_i + rho_j)
-        mu_ij = (h * vr_dot) / (r ** 2 + 0.01 * h ** 2)
+        mu_ij = (h * vr_dot) / (r**2 + 0.01 * h**2)
         pi_visc = np.where(
             vr_dot < 0,
-            (-p.artificial_visc_alpha * p.sound_speed * mu_ij
-             + p.artificial_visc_beta * mu_ij ** 2) / rho_bar,
+            (
+                -p.artificial_visc_alpha * p.sound_speed * mu_ij
+                + p.artificial_visc_beta * mu_ij**2
+            )
+            / rho_bar,
             0.0,
         )
 
@@ -248,7 +268,7 @@ class SPHBreachSolver:
             dt_s = p.dt_cfl_factor * h / (p.sound_speed + max_speed + 1e-6)
 
         max_accel = float(np.max(np.linalg.norm(accel, axis=1)))
-        dt_sph = min(dt_sph, .2*np.sqrt(h/max(max_accel,1e-9)))
+        dt_sph = min(dt_sph, 0.2 * np.sqrt(h / max(max_accel, 1e-9)))
         # Symplectic Euler, bounded by both acoustic and acceleration limits.
         fluid = ~self.is_boundary
         self.vel[fluid] += accel[fluid] * dt_sph
@@ -265,7 +285,9 @@ class SPHBreachSolver:
             "time_s": self.time_s,
             "n_particles": n,
             "dt_s": dt_sph,
-            "max_speed_ms": float(np.max(np.linalg.norm(self.vel, axis=1))) if n else 0.0,
+            "max_speed_ms": float(np.max(np.linalg.norm(self.vel, axis=1)))
+            if n
+            else 0.0,
             "max_pressure_pa": float(np.max(self.pressure)) if n else 0.0,
         }
 
@@ -289,8 +311,9 @@ class SPHBreachSolver:
         )
         self.vel[hit_bed, 0] *= 0.92
 
-    def _remove_particles_outside_domain(self, x_max: float = 15.0, y_max: float = 20.0,
-                                          max_particles: int = 4000):
+    def _remove_particles_outside_domain(
+        self, x_max: float = 15.0, y_max: float = 20.0, max_particles: int = 4000
+    ):
         """
         Keeps this solver bounded to the near-field breach zone, per the
         project's scoping decision (SPH at the breach only, not the whole
@@ -301,8 +324,11 @@ class SPHBreachSolver:
         """
         fluid = ~self.is_boundary
         keep = np.ones(len(self.pos), dtype=bool)
-        out_of_domain = fluid & ((self.pos[:, 0] > x_max) | (self.pos[:, 1] > y_max)
-                                  | (self.pos[:, 1] < -2.0))
+        out_of_domain = fluid & (
+            (self.pos[:, 0] > x_max)
+            | (self.pos[:, 1] > y_max)
+            | (self.pos[:, 1] < -2.0)
+        )
         keep &= ~out_of_domain
         if keep.sum() != len(keep):
             self.pos = self.pos[keep]
@@ -346,17 +372,23 @@ class SPHBreachSolver:
         fluid = ~self.is_boundary
         near_gate = fluid & (np.abs(self.pos[:, 0] - gate_x_m) < dx_m)
         if not near_gate.any():
-            return {"flux_m3s_per_m": 0.0, "mean_velocity_ms": 0.0,
-                     "spray_fraction": 0.0}
+            return {
+                "flux_m3s_per_m": 0.0,
+                "mean_velocity_ms": 0.0,
+                "spray_fraction": 0.0,
+            }
         vx = self.vel[near_gate, 0]
         moving_through = vx > 0
-        flux = np.sum(vx[moving_through]) * self.p.particle_spacing_m ** 2 / (2*dx_m)
+        flux = np.sum(vx[moving_through]) * self.p.particle_spacing_m**2 / (2 * dx_m)
         mean_v = float(np.mean(vx[moving_through])) if moving_through.any() else 0.0
         # crude spray proxy: particles with a large vertical velocity component
         # relative to horizontal, i.e. ballistic droplets rather than sheet flow
         vy = self.vel[near_gate, 1]
-        spray = np.mean(np.abs(vy[moving_through]) > np.abs(vx[moving_through])) \
-            if moving_through.any() else 0.0
+        spray = (
+            np.mean(np.abs(vy[moving_through]) > np.abs(vx[moving_through]))
+            if moving_through.any()
+            else 0.0
+        )
         return {
             "flux_m3s_per_m": float(flux),
             "mean_velocity_ms": mean_v,

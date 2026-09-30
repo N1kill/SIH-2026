@@ -29,7 +29,9 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 MODEL_DIR = PROJECT_ROOT / "outputs" / "simulation" / "delft3d_fm"
 DEM_PATH = PROJECT_ROOT / "data" / "processed" / "dem_conditioned.tif"
 CONFIG_PATH = PROJECT_ROOT / "config.json"
-DASHBOARD_RESULT_PATH = PROJECT_ROOT / "outputs" / "3d" / "dashboard" / "delft3d_fm_latest.json"
+DASHBOARD_RESULT_PATH = (
+    PROJECT_ROOT / "outputs" / "3d" / "dashboard" / "delft3d_fm_latest.json"
+)
 
 
 def find_dflowfm_cli() -> Path:
@@ -59,8 +61,11 @@ def default_hydrograph(duration_s: int, dt_s: int) -> list[tuple[float, float]]:
     fallback exists solely to validate the Delft3D-FM input deck and CLI.
     """
     times = np.arange(0, duration_s + dt_s, dt_s, dtype=float)
-    q = np.where(times < duration_s * 0.25, 200.0 * times / (duration_s * 0.25),
-                 200.0 * np.exp(-(times - duration_s * 0.25) / max(duration_s * 0.5, 1)))
+    q = np.where(
+        times < duration_s * 0.25,
+        200.0 * times / (duration_s * 0.25),
+        200.0 * np.exp(-(times - duration_s * 0.25) / max(duration_s * 0.5, 1)),
+    )
     return list(zip(times.tolist(), q.tolist()))
 
 
@@ -73,8 +78,14 @@ def read_hydrograph(path: Path) -> list[tuple[float, float]]:
     return values
 
 
-def write_ugrid_mesh(dem_path: Path, lat: float, lon: float, cell_m: float,
-                     half_width_m: float, model_dir: Path) -> tuple[Path, tuple[float, float], float, float, tuple[float, float, float, float]]:
+def write_ugrid_mesh(
+    dem_path: Path,
+    lat: float,
+    lon: float,
+    cell_m: float,
+    half_width_m: float,
+    model_dir: Path,
+) -> tuple[Path, tuple[float, float], float, float, tuple[float, float, float, float]]:
     """Create a quad UGRID mesh and node bathymetry around the dam toe."""
     with rasterio.open(dem_path) as src:
         transformer = Transformer.from_crs("EPSG:4326", src.crs, always_xy=True)
@@ -90,7 +101,11 @@ def write_ugrid_mesh(dem_path: Path, lat: float, lon: float, cell_m: float,
         xx, yy = np.meshgrid(xs, ys)
         node_xy = np.column_stack((xx.ravel(), yy.ravel()))
         z = np.fromiter((sample[0] for sample in src.sample(node_xy)), dtype=np.float64)
-        valid = z[np.isfinite(z) & (z != src.nodata)] if src.nodata is not None else z[np.isfinite(z)]
+        valid = (
+            z[np.isfinite(z) & (z != src.nodata)]
+            if src.nodata is not None
+            else z[np.isfinite(z)]
+        )
         z[~np.isfinite(z)] = float(np.nanmedian(valid))
         if src.nodata is not None:
             z[z == src.nodata] = float(np.nanmedian(valid))
@@ -130,10 +145,16 @@ def write_ugrid_mesh(dem_path: Path, lat: float, lon: float, cell_m: float,
         x_var[:] = node_xy[:, 0]
         y_var[:] = node_xy[:, 1]
         z_var[:] = z
-        nc.createVariable("NetLink", "i4", ("nNetLink", "nNetLinkPts"))[:] = np.asarray(links, dtype=np.int32)
+        nc.createVariable("NetLink", "i4", ("nNetLink", "nNetLinkPts"))[:] = np.asarray(
+            links, dtype=np.int32
+        )
         nc.createVariable("NetLinkType", "i4", ("nNetLink",))[:] = 2
-        nc.createVariable("NetElemNode", "i4", ("nNetElem", "nNetElemMaxNode"))[:] = np.asarray(faces, dtype=np.int32) + 1
-        nc.createVariable("BndLink", "i4", ("nBndLink",))[:] = np.asarray(boundary_links, dtype=np.int32)
+        nc.createVariable("NetElemNode", "i4", ("nNetElem", "nNetElemMaxNode"))[:] = (
+            np.asarray(faces, dtype=np.int32) + 1
+        )
+        nc.createVariable("BndLink", "i4", ("nBndLink",))[:] = np.asarray(
+            boundary_links, dtype=np.int32
+        )
         nc.Conventions = "CF-1.4:Deltares-0.1"
 
     # Lowest outer edge is the physically sensible open downstream boundary.
@@ -145,12 +166,24 @@ def write_ugrid_mesh(dem_path: Path, lat: float, lon: float, cell_m: float,
     }
     outlet = min(edge_values, key=lambda key: float(np.mean(edge_values[key])))
     outlet_level = float(np.min(edge_values[outlet]) + 0.05)
-    write_outlet_polyline(model_dir / "downstream.pli", outlet, left, right, bottom, top)
-    dam_bed_level = float(z[np.argmin(np.sum((node_xy - np.array((dam_x, dam_y))) ** 2, axis=1))])
-    return net_path, (dam_x, dam_y), outlet_level, dam_bed_level, (left, right, bottom, top)
+    write_outlet_polyline(
+        model_dir / "downstream.pli", outlet, left, right, bottom, top
+    )
+    dam_bed_level = float(
+        z[np.argmin(np.sum((node_xy - np.array((dam_x, dam_y))) ** 2, axis=1))]
+    )
+    return (
+        net_path,
+        (dam_x, dam_y),
+        outlet_level,
+        dam_bed_level,
+        (left, right, bottom, top),
+    )
 
 
-def write_outlet_polyline(path: Path, edge: str, left: float, right: float, bottom: float, top: float) -> None:
+def write_outlet_polyline(
+    path: Path, edge: str, left: float, right: float, bottom: float, top: float
+) -> None:
     points = {
         "west": ((left, bottom), (left, top)),
         "east": ((right, bottom), (right, top)),
@@ -163,31 +196,63 @@ def write_outlet_polyline(path: Path, edge: str, left: float, right: float, bott
     )
 
 
-def write_forcings(model_dir: Path, source_xy: tuple[float, float], outlet_level: float,
-                   hydrograph: list[tuple[float, float]]) -> None:
-    source_bc = ["[General]", "fileVersion = 1.01", "fileType = boundConds", "", "[Forcing]",
-                 "name = dam_release", "function = timeSeries", "timeInterpolation = linear",
-                 "quantity = time", "unit = seconds since 2001-01-01 00:00:00",
-                 "quantity = sourcesink_discharge", "unit = m3 s-1"]
+def write_forcings(
+    model_dir: Path,
+    source_xy: tuple[float, float],
+    outlet_level: float,
+    hydrograph: list[tuple[float, float]],
+) -> None:
+    source_bc = [
+        "[General]",
+        "fileVersion = 1.01",
+        "fileType = boundConds",
+        "",
+        "[Forcing]",
+        "name = dam_release",
+        "function = timeSeries",
+        "timeInterpolation = linear",
+        "quantity = time",
+        "unit = seconds since 2001-01-01 00:00:00",
+        "quantity = sourcesink_discharge",
+        "unit = m3 s-1",
+    ]
     source_bc.extend(f"{time_s:.1f} {q:.6f}" for time_s, q in hydrograph)
-    source_bc.extend(["", "[Forcing]", "name = downstream_0001", "function = timeSeries",
-                      "timeInterpolation = linear", "quantity = time",
-                      "unit = seconds since 2001-01-01 00:00:00", "quantity = waterlevelbnd", "unit = m"])
+    source_bc.extend(
+        [
+            "",
+            "[Forcing]",
+            "name = downstream_0001",
+            "function = timeSeries",
+            "timeInterpolation = linear",
+            "quantity = time",
+            "unit = seconds since 2001-01-01 00:00:00",
+            "quantity = waterlevelbnd",
+            "unit = m",
+        ]
+    )
     source_bc.extend(f"{time_s:.1f} {outlet_level:.4f}" for time_s, _ in hydrograph)
-    (model_dir / "forcings.bc").write_text("\n".join(source_bc) + "\n", encoding="ascii")
+    (model_dir / "forcings.bc").write_text(
+        "\n".join(source_bc) + "\n", encoding="ascii"
+    )
     x, y = source_xy
     (model_dir / "forcings.ext").write_text(
         "[General]\nfileVersion = 2.02\nfileType = extForce\n\n"
         "[SourceSink]\nid = dam_release\nname = Dam release\n"
         "numCoordinates = 1\nxCoordinates = %.3f\nyCoordinates = %.3f\n"
         "discharge = forcings.bc\n\n"
-        "[Boundary]\nquantity = waterlevelbnd\nlocationFile = downstream.pli\nforcingFile = forcings.bc\n" % (x, y),
+        "[Boundary]\nquantity = waterlevelbnd\nlocationFile = downstream.pli\nforcingFile = forcings.bc\n"
+        % (x, y),
         encoding="ascii",
     )
 
 
-def write_dam_and_gates(model_dir: Path, dam_xy: tuple[float, float], bounds: tuple[float, float, float, float],
-                        cell_m: float, crest_level: float) -> None:
+def write_dam_and_gates(
+    model_dir: Path,
+    dam_xy: tuple[float, float],
+    bounds: tuple[float, float, float, float],
+    cell_m: float,
+    crest_level: float,
+) -> None:
     """Create an FM thin-dam barrier with a real gated crossing at its centre."""
     dam_x, dam_y = dam_xy
     left, right, _, _ = bounds
@@ -239,13 +304,19 @@ def write_mdu(model_dir: Path, duration_s: float) -> Path:
     return mdu_path
 
 
-def build_model(hydrograph: list[tuple[float, float]], cell_m: float, half_width_m: float,
-                dam_location: tuple[float, float] | None = None) -> Path:
+def build_model(
+    hydrograph: list[tuple[float, float]],
+    cell_m: float,
+    half_width_m: float,
+    dam_location: tuple[float, float] | None = None,
+) -> Path:
     if not DEM_PATH.is_file():
         raise FileNotFoundError(f"conditioned DEM missing: {DEM_PATH}")
     MODEL_DIR.mkdir(parents=True, exist_ok=True)
     lat, lon = dam_location or load_dam_location()
-    _, dam_xy, outlet_level, dam_bed_level, bounds = write_ugrid_mesh(DEM_PATH, lat, lon, cell_m, half_width_m, MODEL_DIR)
+    _, dam_xy, outlet_level, dam_bed_level, bounds = write_ugrid_mesh(
+        DEM_PATH, lat, lon, cell_m, half_width_m, MODEL_DIR
+    )
     # The reservoir-side source is upstream of the barrier.  It cannot reach
     # the downstream domain except through the FM gate structure.
     source_xy = (dam_xy[0], dam_xy[1] + max(cell_m, 30.0))
@@ -264,11 +335,12 @@ def run_model(mdu_path: Path, threads: int) -> None:
     cache_path = mdu_path.parent / "machhu_dambreak.cache"
     if cache_path.exists():
         cache_path.unlink()
-    environment=os.environ.copy()
+    environment = os.environ.copy()
     try:
         from pyproj import datadir
-        environment.setdefault("PROJ_DATA",datadir.get_data_dir())
-        environment.setdefault("PROJ_LIB",datadir.get_data_dir())
+
+        environment.setdefault("PROJ_DATA", datadir.get_data_dir())
+        environment.setdefault("PROJ_LIB", datadir.get_data_dir())
     except ImportError:
         pass
     result = subprocess.run(
@@ -281,10 +353,21 @@ def run_model(mdu_path: Path, threads: int) -> None:
     (mdu_path.parent / "dflowfm_stdout.log").write_text(result.stdout, encoding="utf-8")
     (mdu_path.parent / "dflowfm_stderr.log").write_text(result.stderr, encoding="utf-8")
     diagnostic = output_dir / "machhu_dambreak.dia"
-    diagnostic_text = diagnostic.read_text(encoding="utf-8", errors="replace") if diagnostic.exists() else ""
+    diagnostic_text = (
+        diagnostic.read_text(encoding="utf-8", errors="replace")
+        if diagnostic.exists()
+        else ""
+    )
     map_path = output_dir / "machhu_dambreak_map.nc"
-    if result.returncode or "** ERROR" in result.stdout or "** ERROR" in diagnostic_text or not map_path.is_file():
-        raise RuntimeError(f"D-Flow FM failed; see {mdu_path.parent / 'dflowfm_stderr.log'}")
+    if (
+        result.returncode
+        or "** ERROR" in result.stdout
+        or "** ERROR" in diagnostic_text
+        or not map_path.is_file()
+    ):
+        raise RuntimeError(
+            f"D-Flow FM failed; see {mdu_path.parent / 'dflowfm_stderr.log'}"
+        )
     export_dashboard_wet_cells(map_path, DASHBOARD_RESULT_PATH)
 
 
@@ -314,40 +397,63 @@ def export_dashboard_wet_cells(map_path: Path, output_path: Path) -> None:
                 continue
             u = float(velocity_x[index, face_index])
             v = float(velocity_y[index, face_index])
-            wet_cells.append({
-                "corners": [[round(float(node_x[node]), 3), round(float(node_y[node]), 3)] for node in valid_nodes],
-                "surface_elevation_m": round(float(levels[index, face_index]), 4),
-                "depth_m": round(float(depths[index, face_index]), 4),
-                "velocity_x_ms": round(u, 4),
-                "velocity_y_ms": round(v, 4),
-                "velocity_ms": round(float(np.hypot(u, v)), 4),
-            })
+            wet_cells.append(
+                {
+                    "corners": [
+                        [round(float(node_x[node]), 3), round(float(node_y[node]), 3)]
+                        for node in valid_nodes
+                    ],
+                    "surface_elevation_m": round(float(levels[index, face_index]), 4),
+                    "depth_m": round(float(depths[index, face_index]), 4),
+                    "velocity_x_ms": round(u, 4),
+                    "velocity_y_ms": round(v, 4),
+                    "velocity_ms": round(float(np.hypot(u, v)), 4),
+                }
+            )
         return {"time_s": round(float(times[index]), 3), "wet_cells": wet_cells}
 
     frames = [frame_at(index) for index in range(len(times))]
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(json.dumps({
-        "solver": "D-Flow FM",
-        "time_s": float(times[-1]),
-        "coordinate_bounds": {
-            "min_x": float(node_x.min()), "max_x": float(node_x.max()),
-            "min_y": float(node_y.min()), "max_y": float(node_y.max()),
-        },
-        "wet_cells": frames[-1]["wet_cells"],
-        "frames": frames,
-    }, separators=(",", ":")), encoding="utf-8")
+    output_path.write_text(
+        json.dumps(
+            {
+                "solver": "D-Flow FM",
+                "time_s": float(times[-1]),
+                "coordinate_bounds": {
+                    "min_x": float(node_x.min()),
+                    "max_x": float(node_x.max()),
+                    "min_y": float(node_y.min()),
+                    "max_y": float(node_y.max()),
+                },
+                "wet_cells": frames[-1]["wet_cells"],
+                "frames": frames,
+            },
+            separators=(",", ":"),
+        ),
+        encoding="utf-8",
+    )
 
 
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--hydrograph", type=Path, help="CSV with time_s,discharge_m3s")
-    parser.add_argument("--smoke-test", action="store_true", help="use a 15-minute test hydrograph")
+    parser.add_argument(
+        "--smoke-test", action="store_true", help="use a 15-minute test hydrograph"
+    )
     parser.add_argument("--cell-m", type=float, default=25.0)
-    parser.add_argument("--half-width-m", type=float, default=6000.0,
-                        help="half-width of the FM/Three.js shared DEM domain")
-    parser.add_argument("--lat", type=float, help="dam latitude; pair with --lon for a custom dam")
-    parser.add_argument("--lon", type=float, help="dam longitude; pair with --lat for a custom dam")
+    parser.add_argument(
+        "--half-width-m",
+        type=float,
+        default=6000.0,
+        help="half-width of the FM/Three.js shared DEM domain",
+    )
+    parser.add_argument(
+        "--lat", type=float, help="dam latitude; pair with --lon for a custom dam"
+    )
+    parser.add_argument(
+        "--lon", type=float, help="dam longitude; pair with --lat for a custom dam"
+    )
     parser.add_argument("--threads", type=int, default=4)
     parser.add_argument("--build-only", action="store_true")
     args = parser.parse_args()
@@ -355,7 +461,11 @@ def main() -> None:
         parser.error("pass --hydrograph from the physics service, or --smoke-test")
     if (args.lat is None) != (args.lon is None):
         parser.error("--lat and --lon must be supplied together")
-    hydrograph = read_hydrograph(args.hydrograph) if args.hydrograph else default_hydrograph(900, 60)
+    hydrograph = (
+        read_hydrograph(args.hydrograph)
+        if args.hydrograph
+        else default_hydrograph(900, 60)
+    )
     location = (args.lat, args.lon) if args.lat is not None else None
     mdu = build_model(hydrograph, args.cell_m, args.half_width_m, location)
     print(f"Built D-Flow FM model: {mdu}")

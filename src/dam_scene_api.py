@@ -1,4 +1,5 @@
 """Read-only scene delivery: authored files stay behind package validation."""
+
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import FileResponse
 from .dam_scene import list_packages, load_package, package_path, validate_assets

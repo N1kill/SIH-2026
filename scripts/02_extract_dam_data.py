@@ -20,7 +20,9 @@ except ImportError:
     sys.stderr.write("pdfplumber not installed – run `pip install pdfplumber` first\n")
     sys.exit(1)
 
-logging.basicConfig(level=logging.INFO, format="[%(asctime)s] %(levelname)s: %(message)s")
+logging.basicConfig(
+    level=logging.INFO, format="[%(asctime)s] %(levelname)s: %(message)s"
+)
 
 PROJECT_ROOT = pathlib.Path(__file__).resolve().parents[1]
 DATA_RAW_DAMS = PROJECT_ROOT / "data" / "raw" / "dams"
@@ -48,7 +50,7 @@ if PDF_PATH.is_file():
             text = page.extract_text() or ""
             if "machhu" in text.lower():
                 machhu_pages.append(i)
-                logging.info(f"  Found 'Machhu' on page {i+1}")
+                logging.info(f"  Found 'Machhu' on page {i + 1}")
 
         # Phase 2: Extract tables from those pages only
         if machhu_pages:
@@ -67,7 +69,10 @@ if PDF_PATH.is_file():
                     # Try to capture header
                     if header is None and table:
                         first_row = [cell.strip() if cell else "" for cell in table[0]]
-                        if any(kw in " ".join(first_row).lower() for kw in ["state", "dam", "river", "height"]):
+                        if any(
+                            kw in " ".join(first_row).lower()
+                            for kw in ["state", "dam", "river", "height"]
+                        ):
                             header = first_row
         else:
             logging.warning("No pages with 'Machhu' found via text search.")
@@ -94,9 +99,7 @@ if not machhu_rows:
     logging.warning("Could not extract Machhu rows from PDF. Using documented values.")
     # These values are from CWC National Register of Large Dams (NRLD) records
     # and the mission brief for Machhu-II Dam, Morbi, Gujarat.
-    header = [
-        "field", "value", "unit", "source"
-    ]
+    header = ["field", "value", "unit", "source"]
     machhu_rows = [
         ["dam_name", "Machhu Dam-II", "", "CWC NRLD / Mission Brief"],
         ["state", "Gujarat", "", "CWC NRLD"],
@@ -117,10 +120,25 @@ if not machhu_rows:
         ["river_length", "130", "km", "Mission Brief"],
         ["purpose", "Irrigation", "", "CWC NRLD"],
         ["breach_date", "1979-08-11", "", "Historical record"],
-        ["breach_cause", "Overtopping due to extreme rainfall", "", "Historical/Literature"],
-        ["peak_inflow_estimated", "5663", "m3/s", "Literature (Wahl 1998 / Indian sources)"],
+        [
+            "breach_cause",
+            "Overtopping due to extreme rainfall",
+            "",
+            "Historical/Literature",
+        ],
+        [
+            "peak_inflow_estimated",
+            "5663",
+            "m3/s",
+            "Literature (Wahl 1998 / Indian sources)",
+        ],
         ["designed_spillway_capacity", "5663", "m3/s", "CWC NRLD (original design)"],
-        ["flood_height_morbi", "6.1", "m sustained (~20ft) / 3.7-9.1m surge", "Historical accounts (Sandesara & Wooten 2011)"],
+        [
+            "flood_height_morbi",
+            "6.1",
+            "m sustained (~20ft) / 3.7-9.1m surge",
+            "Historical accounts (Sandesara & Wooten 2011)",
+        ],
     ]
     logging.info("Created Machhu-II CSV from documented values.")
 else:

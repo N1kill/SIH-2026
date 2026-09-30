@@ -34,6 +34,7 @@ class StorageElevationCurve:
     `is_synthetic` is set True so downstream reporting can flag it as an
     assumption rather than surveyed bathymetry.
     """
+
     elevations_m: Optional[np.ndarray] = None
     storages_m3: Optional[np.ndarray] = None
     areas_m2: Optional[np.ndarray] = None
@@ -51,8 +52,17 @@ class StorageElevationCurve:
             order = np.argsort(self.elevations_m)
             self.elevations_m = np.asarray(self.elevations_m)[order]
             self.storages_m3 = np.asarray(self.storages_m3)[order]
-            if len(order) < 2 or not np.isfinite(self.elevations_m).all() or not np.isfinite(self.storages_m3).all() or np.any(np.diff(self.elevations_m) <= 0) or np.any(np.diff(self.storages_m3) <= 0) or self.storages_m3[0] < 0:
-                raise ValueError("Survey stage-storage points must be finite, strictly increasing, and nonnegative")
+            if (
+                len(order) < 2
+                or not np.isfinite(self.elevations_m).all()
+                or not np.isfinite(self.storages_m3).all()
+                or np.any(np.diff(self.elevations_m) <= 0)
+                or np.any(np.diff(self.storages_m3) <= 0)
+                or self.storages_m3[0] < 0
+            ):
+                raise ValueError(
+                    "Survey stage-storage points must be finite, strictly increasing, and nonnegative"
+                )
             if self.areas_m2 is not None:
                 self.areas_m2 = np.asarray(self.areas_m2)[order]
 
@@ -67,7 +77,7 @@ class StorageElevationCurve:
         if not self.is_synthetic:
             return float(np.interp(elevation_m, self.elevations_m, self.storages_m3))
         h_above_bed = max(elevation_m - self.bed_elevation_m, 0.0)
-        return float(self.coeff * h_above_bed ** self.exponent)
+        return float(self.coeff * h_above_bed**self.exponent)
 
     def surface_area(self, elevation_m: float) -> float:
         """dS/dh at this elevation -- used to convert flow rates to level change."""
@@ -83,7 +93,7 @@ class ReservoirState:
     curve: StorageElevationCurve
     dam_crest_elevation_m: float
     spillway_crest_elevation_m: float
-    spillway_coeff_cd: float = 1.7          # broad-crested weir coefficient
+    spillway_coeff_cd: float = 1.7  # broad-crested weir coefficient
     spillway_width_m: float = 20.0
     gate_count: int = 0
     open_gate_count: int = 0
@@ -108,13 +118,18 @@ class ReservoirState:
         if head <= 0:
             return 0.0
         if self.gate_states:
-            return float(sum(
-                float(gate.get("discharge_coefficient") or self.gate_discharge_coeff) *
-                float(gate.get("width_m") or 0.0) * float(gate.get("opening_m") or 0.0) *
-                np.sqrt(2 * 9.81 * head)
-                for gate in self.gate_states
-                if gate.get("command_status") == "available"
-            ))
+            return float(
+                sum(
+                    float(
+                        gate.get("discharge_coefficient") or self.gate_discharge_coeff
+                    )
+                    * float(gate.get("width_m") or 0.0)
+                    * float(gate.get("opening_m") or 0.0)
+                    * np.sqrt(2 * 9.81 * head)
+                    for gate in self.gate_states
+                    if gate.get("command_status") == "available"
+                )
+            )
         if self.gate_count > 0:
             # Free/submerged sluice-gate approximation: Q = Cd A sqrt(2gH).
             # Gate state is explicit, so a rendered closed gate cannot
@@ -123,7 +138,7 @@ class ReservoirState:
             area_m2 = open_gates * self.gate_width_m * self.gate_opening_m
             return self.gate_discharge_coeff * area_m2 * np.sqrt(2 * 9.81 * head)
         # Standard weir equation: Q = Cd * L * H^1.5
-        return self.spillway_coeff_cd * self.spillway_width_m * head ** 1.5
+        return self.spillway_coeff_cd * self.spillway_width_m * head**1.5
 
     def spillway_exit_velocity_ms(self) -> float:
         """Velocity at an open sluice gate or broad-crested spillway."""
@@ -131,8 +146,11 @@ class ReservoirState:
         if head <= 0:
             return 0.0
         if self.gate_states:
-            area = sum(float(gate.get("width_m") or 0.0) * float(gate.get("opening_m") or 0.0)
-                       for gate in self.gate_states if gate.get("command_status") == "available")
+            area = sum(
+                float(gate.get("width_m") or 0.0) * float(gate.get("opening_m") or 0.0)
+                for gate in self.gate_states
+                if gate.get("command_status") == "available"
+            )
             return self.spillway_outflow_m3s() / max(area, 1e-6) if area > 0 else 0.0
         if self.gate_count > 0:
             if self.open_gate_count <= 0 or self.gate_opening_m <= 0:
@@ -141,8 +159,9 @@ class ReservoirState:
         area_m2 = max(self.spillway_width_m * max(head, 0.1), 1e-6)
         return self.spillway_outflow_m3s() / area_m2
 
-    def overtopping_outflow_m3s(self, discharge_coeff: float = 1.7,
-                                 crest_length_m: float = 100.0) -> float:
+    def overtopping_outflow_m3s(
+        self, discharge_coeff: float = 1.7, crest_length_m: float = 100.0
+    ) -> float:
         """Flow over the dam crest itself once the reservoir exceeds crest elevation
         but before/without a structural breach forming. Distinct from the breach
         outflow computed in breach.py."""
@@ -150,16 +169,26 @@ class ReservoirState:
         head = max(h - self.dam_crest_elevation_m, 0.0)
         if head <= 0:
             return 0.0
-        return discharge_coeff * crest_length_m * head ** 1.5
+        return discharge_coeff * crest_length_m * head**1.5
 
-    def step(self, dt_s: float, inflow_m3s: float, breach_outflow_m3s: float,
-              seepage_m3s: float = 0.0, include_overtopping: bool = True) -> dict:
+    def step(
+        self,
+        dt_s: float,
+        inflow_m3s: float,
+        breach_outflow_m3s: float,
+        seepage_m3s: float = 0.0,
+        include_overtopping: bool = True,
+    ) -> dict:
         """
         Advance reservoir mass balance by dt_s using explicit Euler with a
         sub-stepped correction so storage never goes negative (mass conservation
         is enforced exactly, not just approximately).
         """
-        if not np.isfinite([dt_s, inflow_m3s, breach_outflow_m3s, seepage_m3s]).all() or dt_s <= 0 or min(inflow_m3s, breach_outflow_m3s, seepage_m3s) < 0:
+        if (
+            not np.isfinite([dt_s, inflow_m3s, breach_outflow_m3s, seepage_m3s]).all()
+            or dt_s <= 0
+            or min(inflow_m3s, breach_outflow_m3s, seepage_m3s) < 0
+        ):
             raise ValueError("Timestep must be positive and flows finite/nonnegative")
         spill_q = self.spillway_outflow_m3s()
         over_q = self.overtopping_outflow_m3s() if include_overtopping else 0.0

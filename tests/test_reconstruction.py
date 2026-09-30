@@ -1,4 +1,5 @@
 """Evidence and approval-gate tests for approximate reconstruction."""
+
 import unittest
 
 from src.project import Project, ROOT
@@ -27,8 +28,12 @@ class ReconstructionTests(unittest.TestCase):
 
     def test_project_rejects_bad_stage_storage(self):
         base = {
-            "dam_id": "test", "dam_name": "Test", "latitude": 22,
-            "longitude": 70, "dam_height_m": 10, "reservoir_capacity_m3": 100,
+            "dam_id": "test",
+            "dam_name": "Test",
+            "latitude": 22,
+            "longitude": 70,
+            "dam_height_m": 10,
+            "reservoir_capacity_m3": 100,
         }
         with self.assertRaises(ValueError):
             Project(**base, stage_storage=[(1, 10), (1, 20)])

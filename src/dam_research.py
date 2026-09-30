@@ -4,6 +4,7 @@ The LLM/search runtime lives in :mod:`src.dam_research_agent`.  This module is
 deliberately deterministic: it validates sparse dam seeds, archives bounded public
 sources, verifies quoted evidence, hashes every artifact, and reports conflicts.
 """
+
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -32,17 +33,33 @@ RESEARCH_DISCLAIMER = (
 )
 MAX_SOURCE_BYTES = 20 * 1024 * 1024
 ALLOWED_CONTENT_TYPES = {
-    "application/json", "application/pdf", "application/xml", "application/geo+json",
-    "text/csv", "text/html", "text/plain", "text/xml",
+    "application/json",
+    "application/pdf",
+    "application/xml",
+    "application/geo+json",
+    "text/csv",
+    "text/html",
+    "text/plain",
+    "text/xml",
 }
 
 # Canonical SI-valued fields understood by the project schema. Agents may retain
 # additional measurements in evidence records, but only these can enter a patch.
 PROJECT_FIELDS = {
-    "latitude", "longitude", "dam_type", "dam_height_m", "dam_length_m",
-    "crest_width_m", "crest_elevation_m", "reservoir_capacity_m3",
-    "reservoir_surface_area_m2", "initial_water_level_m", "maximum_water_level_m",
-    "spillway_width_m", "spillway_crest_elevation_m", "catchment_area_km2",
+    "latitude",
+    "longitude",
+    "dam_type",
+    "dam_height_m",
+    "dam_length_m",
+    "crest_width_m",
+    "crest_elevation_m",
+    "reservoir_capacity_m3",
+    "reservoir_surface_area_m2",
+    "initial_water_level_m",
+    "maximum_water_level_m",
+    "spillway_width_m",
+    "spillway_crest_elevation_m",
+    "catchment_area_km2",
 }
 RESEARCH_TRACKS = {
     "identity_geometry": (
@@ -87,8 +104,10 @@ class DamResearchSeed(BaseModel):
     @classmethod
     def from_project(cls, project: Project, project_path: str | None = None):
         return cls(
-            dam_id=project.dam_id, dam_name=project.dam_name,
-            latitude=project.latitude, longitude=project.longitude,
+            dam_id=project.dam_id,
+            dam_name=project.dam_name,
+            latitude=project.latitude,
+            longitude=project.longitude,
             river=_provenance_hint(project.provenance, "river"),
             project_path=project_path,
         )
@@ -110,12 +129,19 @@ class ArchivedEvidence(BaseModel):
     source_url: str
     publisher_or_author: str = Field(min_length=2, max_length=300)
     evidence_category: Literal[
-        "identity_geometry", "reservoir_hydrology", "spillway_breach_history",
-        "safety_context", "imagery", "other",
+        "identity_geometry",
+        "reservoir_hydrology",
+        "spillway_breach_history",
+        "safety_context",
+        "imagery",
+        "other",
     ]
     source_tier: Literal[
-        "official_primary", "primary_non_government", "peer_reviewed",
-        "reputable_secondary", "discovery_only",
+        "official_primary",
+        "primary_non_government",
+        "peer_reviewed",
+        "reputable_secondary",
+        "discovery_only",
     ]
     license_or_usage_status: str = Field(min_length=2, max_length=500)
     geographic_coordinates_or_crs: str = "Not stated"
@@ -138,7 +164,9 @@ class ArchivedEvidence(BaseModel):
     @model_validator(mode="after")
     def conservative_status(self):
         if self.status == "verified" and self.source_tier not in {
-            "official_primary", "primary_non_government", "peer_reviewed"
+            "official_primary",
+            "primary_non_government",
+            "peer_reviewed",
         }:
             raise ValueError("Secondary/discovery sources cannot be marked verified")
         unknown = set(self.relevant_measurements) - PROJECT_FIELDS
@@ -174,8 +202,11 @@ def extract_text(data: bytes, content_type: str, artifact: Path | None = None) -
     """Extract searchable text without pretending OCR has occurred."""
     if content_type == "application/pdf":
         import pdfplumber
+
         with pdfplumber.open(artifact or io.BytesIO(data)) as document:
-            return _clean_text(" ".join(page.extract_text() or "" for page in document.pages))
+            return _clean_text(
+                " ".join(page.extract_text() or "" for page in document.pages)
+            )
     decoded = data.decode("utf-8", errors="replace")
     if content_type == "text/html":
         parser = _TextExtractor()
@@ -191,7 +222,9 @@ def _assert_public_host(url: str) -> None:
     if parsed.username or parsed.password:
         raise ValueError("Credential-bearing URLs are not allowed")
     try:
-        addresses = socket.getaddrinfo(parsed.hostname, parsed.port or 443, type=socket.SOCK_STREAM)
+        addresses = socket.getaddrinfo(
+            parsed.hostname, parsed.port or 443, type=socket.SOCK_STREAM
+        )
     except socket.gaierror as exc:
         raise ValueError(f"Source host cannot be resolved: {parsed.hostname}") from exc
     for address in addresses:
@@ -205,14 +238,21 @@ def _safe_slug(value: str, limit: int = 70) -> str:
     return slug or "source"
 
 
-def fetch_public_source(url: str, max_bytes: int = MAX_SOURCE_BYTES) -> tuple[bytes, str, str]:
+def fetch_public_source(
+    url: str, max_bytes: int = MAX_SOURCE_BYTES
+) -> tuple[bytes, str, str]:
     """Fetch a bounded public document while rechecking every redirect target."""
     current = url
     headers = {"User-Agent": "InundaX-dam-evidence-agent/1.0 (+public research)"}
     for _ in range(6):
         _assert_public_host(current)
-        response = requests.get(current, headers=headers, timeout=(10, 45), stream=True,
-                                allow_redirects=False)
+        response = requests.get(
+            current,
+            headers=headers,
+            timeout=(10, 45),
+            stream=True,
+            allow_redirects=False,
+        )
         if response.status_code in {301, 302, 303, 307, 308}:
             location = response.headers.get("Location")
             if not location:
@@ -222,7 +262,9 @@ def fetch_public_source(url: str, max_bytes: int = MAX_SOURCE_BYTES) -> tuple[by
         response.raise_for_status()
         content_type = response.headers.get("Content-Type", "").split(";", 1)[0].lower()
         if content_type not in ALLOWED_CONTENT_TYPES:
-            raise ValueError(f"Unsupported evidence content type: {content_type or 'missing'}")
+            raise ValueError(
+                f"Unsupported evidence content type: {content_type or 'missing'}"
+            )
         declared = response.headers.get("Content-Length")
         if declared and int(declared) > max_bytes:
             raise ValueError(f"Source exceeds {max_bytes} bytes")
@@ -252,17 +294,26 @@ class EvidenceWorkspace:
         data, content_type, final_url = fetch_public_source(candidate.source_url)
         return self.archive_bytes(candidate, data, content_type, final_url)
 
-    def archive_bytes(self, candidate: ArchivedEvidence, data: bytes,
-                      content_type: str, final_url: str | None = None) -> EvidenceRecord:
+    def archive_bytes(
+        self,
+        candidate: ArchivedEvidence,
+        data: bytes,
+        content_type: str,
+        final_url: str | None = None,
+    ) -> EvidenceRecord:
         """Archive already-fetched bytes; exposed separately for deterministic tests."""
         if content_type not in ALLOWED_CONTENT_TYPES:
             raise ValueError(f"Unsupported evidence content type: {content_type}")
         digest = hashlib.sha256(data).hexdigest()
         suffix = {
-            "application/pdf": ".pdf", "application/json": ".json",
-            "application/geo+json": ".geojson", "text/csv": ".csv",
-            "text/html": ".html", "text/plain": ".txt",
-            "application/xml": ".xml", "text/xml": ".xml",
+            "application/pdf": ".pdf",
+            "application/json": ".json",
+            "application/geo+json": ".geojson",
+            "text/csv": ".csv",
+            "text/html": ".html",
+            "text/plain": ".txt",
+            "application/xml": ".xml",
+            "text/xml": ".xml",
         }[content_type]
         stem = f"{_safe_slug(candidate.title)}-{digest[:12]}"
         artifact = self.sources / f"{stem}{suffix}"
@@ -277,8 +328,12 @@ class EvidenceWorkspace:
             artifact.write_bytes(data)
         text_path = self.sources / f"{stem}.extracted.txt"
         text_path.write_text(text, encoding="utf-8")
-        claim_digest = hashlib.sha256((candidate.evidence_category + quote).encode()).hexdigest()[:8]
-        record_id = _safe_slug(candidate.title, 55) + "-" + digest[:8] + "-" + claim_digest
+        claim_digest = hashlib.sha256(
+            (candidate.evidence_category + quote).encode()
+        ).hexdigest()[:8]
+        record_id = (
+            _safe_slug(candidate.title, 55) + "-" + digest[:8] + "-" + claim_digest
+        )
         relative = artifact.relative_to(self.root).as_posix()
         note = (
             f"{candidate.quality_note} Exact quote verified at {candidate.source_locator}. "
@@ -286,15 +341,19 @@ class EvidenceWorkspace:
             f"final_url={final_url or candidate.source_url}; extracted_text={text_path.relative_to(self.root).as_posix()}"
         )
         return EvidenceRecord(
-            id=record_id, title=candidate.title, source_url=final_url or candidate.source_url,
+            id=record_id,
+            title=candidate.title,
+            source_url=final_url or candidate.source_url,
             publisher_or_author=candidate.publisher_or_author,
             retrieval_date=datetime.now(timezone.utc).date().isoformat(),
             license_or_usage_status=candidate.license_or_usage_status,
-            artifact_path=relative, file_sha256=sha256_file(artifact),
+            artifact_path=relative,
+            file_sha256=sha256_file(artifact),
             geographic_coordinates_or_crs=candidate.geographic_coordinates_or_crs,
             relevant_measurements=candidate.relevant_measurements,
             estimated_uncertainty=candidate.estimated_uncertainty,
-            status=candidate.status, quality_note=note,
+            status=candidate.status,
+            quality_note=note,
             notes=f"Exact quote: {candidate.exact_quote}\n{candidate.notes or ''}",
         )
 
@@ -302,7 +361,9 @@ class EvidenceWorkspace:
         path = self.directory / "agent-evidence.json"
         if not path.is_file():
             return []
-        return EvidenceManifest.model_validate_json(path.read_text(encoding="utf-8")).items
+        return EvidenceManifest.model_validate_json(
+            path.read_text(encoding="utf-8")
+        ).items
 
     def save_records(self, records: list[EvidenceRecord]) -> Path:
         by_key: dict[tuple[str, str, str], EvidenceRecord] = {}
@@ -336,8 +397,11 @@ def missing_project_fields(project: Project | None) -> list[str]:
 
 def make_research_plan(seed: DamResearchSeed, project: Project | None = None) -> dict:
     identity = ", ".join(filter(None, [seed.dam_name, seed.region, seed.country]))
-    location = (f"{seed.latitude}, {seed.longitude}" if seed.latitude is not None
-                else "coordinates unknown")
+    location = (
+        f"{seed.latitude}, {seed.longitude}"
+        if seed.latitude is not None
+        else "coordinates unknown"
+    )
     aliases = ", ".join(seed.aliases) or "none supplied"
     tracks = []
     for name, objective in RESEARCH_TRACKS.items():
@@ -346,14 +410,22 @@ def make_research_plan(seed: DamResearchSeed, project: Project | None = None) ->
             f'"{seed.dam_name}" dam filetype:pdf {seed.country or ""}'.strip(),
             f'"{seed.dam_name}" {seed.river or "reservoir"} {seed.region or ""}'.strip(),
         ]
-        tracks.append({"name": name, "objective": objective, "starter_queries": queries})
+        tracks.append(
+            {"name": name, "objective": objective, "starter_queries": queries}
+        )
     return {
-        "schema_version": 1, "dam_id": seed.dam_id, "identity": identity,
-        "location_hint": location, "aliases": aliases,
+        "schema_version": 1,
+        "dam_id": seed.dam_id,
+        "identity": identity,
+        "location_hint": location,
+        "aliases": aliases,
         "missing_project_fields": missing_project_fields(project),
-        "tracks": tracks, "source_priority": [
-            "dam owner/operator and regulator", "national/state water and dam-safety agencies",
-            "official environmental/engineering reports", "peer-reviewed literature",
+        "tracks": tracks,
+        "source_priority": [
+            "dam owner/operator and regulator",
+            "national/state water and dam-safety agencies",
+            "official environmental/engineering reports",
+            "peer-reviewed literature",
             "reputable secondary discovery leads",
         ],
         "rules": [
@@ -366,16 +438,21 @@ def make_research_plan(seed: DamResearchSeed, project: Project | None = None) ->
     }
 
 
-def compile_findings(seed: DamResearchSeed, records: list[EvidenceRecord],
-                     project: Project | None = None) -> dict:
+def compile_findings(
+    seed: DamResearchSeed, records: list[EvidenceRecord], project: Project | None = None
+) -> dict:
     values: dict[str, list[dict]] = {}
     for item in records:
         for field, value in item.relevant_measurements.items():
             if field in PROJECT_FIELDS:
-                values.setdefault(field, []).append({
-                    "value": value, "evidence_id": item.id, "status": item.status,
-                    "source_url": item.source_url,
-                })
+                values.setdefault(field, []).append(
+                    {
+                        "value": value,
+                        "evidence_id": item.id,
+                        "status": item.status,
+                        "source_url": item.source_url,
+                    }
+                )
     conflicts, candidates = {}, {}
     for field, claims in values.items():
         unique = {json.dumps(claim["value"], sort_keys=True) for claim in claims}
@@ -384,22 +461,29 @@ def compile_findings(seed: DamResearchSeed, records: list[EvidenceRecord],
         elif any(claim["status"] == "verified" for claim in claims):
             candidates[field] = claims[0]["value"]
     existing = project.model_dump() if project else {}
-    patch = {field: value for field, value in candidates.items()
-             if existing.get(field) is None or existing.get(field) != value}
+    patch = {
+        field: value
+        for field, value in candidates.items()
+        if existing.get(field) is None or existing.get(field) != value
+    }
     candidate_project = None
     if project is None:
         initial = {
-            "dam_id": seed.dam_id, "dam_name": seed.dam_name,
-            "latitude": seed.latitude, "longitude": seed.longitude,
+            "dam_id": seed.dam_id,
+            "dam_name": seed.dam_name,
+            "latitude": seed.latitude,
+            "longitude": seed.longitude,
             **candidates,
         }
         required = ("latitude", "longitude", "dam_height_m", "reservoir_capacity_m3")
         if all(initial.get(field) is not None for field in required):
-            initial["provenance"] = [{
-                "dataset": "Dam evidence agent candidate",
-                "source": f"data/evidence/{seed.dam_id}/agent-evidence.json",
-                "status": "human-review-required",
-            }]
+            initial["provenance"] = [
+                {
+                    "dataset": "Dam evidence agent candidate",
+                    "source": f"data/evidence/{seed.dam_id}/agent-evidence.json",
+                    "status": "human-review-required",
+                }
+            ]
             initial["assumptions"] = [
                 "Public-source attributes are candidates until a named human approves them.",
                 "Unknown geometry, bathymetry and vertical datums remain unset.",
@@ -407,10 +491,12 @@ def compile_findings(seed: DamResearchSeed, records: list[EvidenceRecord],
             candidate_project = Project.model_validate(initial).model_dump()
     coverage = sorted(values)
     return {
-        "schema_version": 1, "dam_id": seed.dam_id,
+        "schema_version": 1,
+        "dam_id": seed.dam_id,
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "disclaimer": RESEARCH_DISCLAIMER,
-        "evidence_count": len(records), "covered_project_fields": coverage,
+        "evidence_count": len(records),
+        "covered_project_fields": coverage,
         "missing_project_fields": sorted(PROJECT_FIELDS - set(coverage)),
         "conflicts": conflicts,
         "candidate_project_patch": patch,

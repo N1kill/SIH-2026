@@ -21,6 +21,13 @@ DEM-clipped visual inference; neither changes the simulation or source data.
 
 ## Quick start
 
+The repository has three user-facing views: the landing page in `frontend-dam/`,
+the 2D flood map in `frontend/`, and the engineering twin in
+`outputs/3d/dashboard/`. `src/` contains the simulation and API code;
+`scripts/` contains data preparation and run commands. `data/` stores source
+and processed inputs, while `outputs/` stores generated results and the static
+twin. The root `npm run build` prepares the frontends before FastAPI starts.
+
 Python 3.11–3.13 and Node.js 20+ are supported.
 
 ```powershell

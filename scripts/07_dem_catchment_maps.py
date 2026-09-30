@@ -37,13 +37,20 @@ WATERSHED_MAP = OUTPUT_DIR / "watershed_map.png"
 def require_inputs() -> None:
     missing = [
         path
-        for path in (DEM_CONDITIONED, FLOW_ACC, STREAMS, WATERSHED_SHP, POUR_POINT_SNAPPED)
+        for path in (
+            DEM_CONDITIONED,
+            FLOW_ACC,
+            STREAMS,
+            WATERSHED_SHP,
+            POUR_POINT_SNAPPED,
+        )
         if not path.exists()
     ]
     if missing:
         formatted = "\n".join(f"  - {path}" for path in missing)
         raise FileNotFoundError(
-            "Missing catchment outputs. Run scripts/06_dem_catchment.py first.\n" + formatted
+            "Missing catchment outputs. Run scripts/06_dem_catchment.py first.\n"
+            + formatted
         )
 
 
@@ -53,22 +60,25 @@ def read_raster_for_plot(path: Path, max_dim: int = 1800, nearest: bool = False)
         out_width = max(1, int(src.width / scale))
         out_height = max(1, int(src.height / scale))
         resampling = Resampling.nearest if nearest else Resampling.bilinear
-        data = src.read(1, masked=True, out_shape=(out_height, out_width), resampling=resampling)
+        data = src.read(
+            1, masked=True, out_shape=(out_height, out_width), resampling=resampling
+        )
         extent = [src.bounds.left, src.bounds.right, src.bounds.bottom, src.bounds.top]
         return data, extent, src.crs
 
 
-def hillshade(elevation: np.ma.MaskedArray, azimuth: float = 315.0, altitude: float = 45.0) -> np.ndarray:
+def hillshade(
+    elevation: np.ma.MaskedArray, azimuth: float = 315.0, altitude: float = 45.0
+) -> np.ndarray:
     elev = np.ma.filled(elevation, np.nan).astype("float64")
     dy, dx = np.gradient(elev)
     slope = np.pi / 2.0 - np.arctan(np.hypot(dx, dy))
     aspect = np.arctan2(-dx, dy)
     azimuth_rad = np.deg2rad(azimuth)
     altitude_rad = np.deg2rad(altitude)
-    shaded = (
-        np.sin(altitude_rad) * np.sin(slope)
-        + np.cos(altitude_rad) * np.cos(slope) * np.cos(azimuth_rad - aspect)
-    )
+    shaded = np.sin(altitude_rad) * np.sin(slope) + np.cos(altitude_rad) * np.cos(
+        slope
+    ) * np.cos(azimuth_rad - aspect)
     shaded = 255.0 * (shaded + 1.0) / 2.0
     return np.clip(np.nan_to_num(shaded, nan=0.0), 0, 255)
 
@@ -97,7 +107,14 @@ def add_standard_overlays(ax, watershed, point, rivers=None) -> None:
     if rivers is not None and not rivers.empty:
         rivers.plot(ax=ax, color="#2166ac", linewidth=0.8, alpha=0.75)
     watershed.boundary.plot(ax=ax, color="#fdd835", linewidth=1.8)
-    point.plot(ax=ax, marker="*", color="#d73027", edgecolor="white", linewidth=0.8, markersize=130)
+    point.plot(
+        ax=ax,
+        marker="*",
+        color="#d73027",
+        edgecolor="white",
+        linewidth=0.8,
+        markersize=130,
+    )
 
 
 def save_dem_map() -> None:
@@ -129,7 +146,14 @@ def save_flow_accumulation_map() -> None:
     image = ax.imshow(log_acc, extent=extent, cmap="magma")
     ax.imshow(stream_overlay, extent=extent, cmap="Blues", alpha=0.85)
     watershed.boundary.plot(ax=ax, color="white", linewidth=1.4)
-    point.plot(ax=ax, marker="*", color="#00e5ff", edgecolor="black", linewidth=0.7, markersize=130)
+    point.plot(
+        ax=ax,
+        marker="*",
+        color="#00e5ff",
+        edgecolor="black",
+        linewidth=0.7,
+        markersize=130,
+    )
     fig.colorbar(image, ax=ax, shrink=0.74, label="log10(flow accumulation cells)")
     ax.set_title("Flow Accumulation and Extracted Streams")
     ax.set_xlabel("Easting (m)")
@@ -156,7 +180,12 @@ def save_watershed_map() -> None:
         ha="left",
         va="bottom",
         fontsize=11,
-        bbox={"boxstyle": "round,pad=0.35", "facecolor": "white", "edgecolor": "#555555", "alpha": 0.88},
+        bbox={
+            "boxstyle": "round,pad=0.35",
+            "facecolor": "white",
+            "edgecolor": "#555555",
+            "alpha": 0.88,
+        },
     )
     ax.set_title("Delineated Watershed and River Network")
     ax.set_xlabel("Easting (m)")
@@ -167,7 +196,12 @@ def save_watershed_map() -> None:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--output-dir", type=Path, default=OUTPUT_DIR, help="Directory for PNG map outputs")
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        default=OUTPUT_DIR,
+        help="Directory for PNG map outputs",
+    )
     return parser.parse_args()
 
 

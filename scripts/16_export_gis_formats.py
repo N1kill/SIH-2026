@@ -16,7 +16,9 @@ import numpy as np
 import rasterio
 from rasterio.features import shapes
 
-logging.basicConfig(level=logging.INFO, format="[%(asctime)s] %(levelname)s: %(message)s")
+logging.basicConfig(
+    level=logging.INFO, format="[%(asctime)s] %(levelname)s: %(message)s"
+)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 OUTPUTS_SIM = PROJECT_ROOT / "outputs" / "simulation"
@@ -44,7 +46,7 @@ def export_inundation_vectors():
 
     # Threshold: flood depth >= 0.10m
     flood_mask = (depth >= 0.10) & np.isfinite(depth) & (depth != src.nodata)
-    
+
     # Classify depth tiers: 1=Low (<0.5m), 2=Moderate (0.5-1.5m), 3=High (1.5-3.0m), 4=Extreme (>3.0m)
     tier_grid = np.zeros_like(depth, dtype=np.int16)
     tier_grid[flood_mask & (depth < 0.5)] = 1
@@ -77,7 +79,7 @@ def export_inundation_vectors():
         4: ("Extreme Hazard (>3.0m)", "#d62828", "6.32m Peak (~6.1m sustained)"),
         3: ("High Hazard (1.5–3.0m)", "#e63946", "1.5 – 3.0m"),
         2: ("Moderate Hazard (0.5–1.5m)", "#f4a261", "0.5 – 1.5m"),
-        1: ("Low Hazard (<0.5m)", "#2a9d8f", "0.1 – 0.5m")
+        1: ("Low Hazard (<0.5m)", "#2a9d8f", "0.1 – 0.5m"),
     }.items():
         # Build polygon envelope
         width = 0.003 * tier_id
@@ -96,12 +98,9 @@ def export_inundation_vectors():
                 "depth_range": d_range,
                 "color": color_hex,
                 "study_area": "Morbi Floodplain, Gujarat",
-                "source": "Machhu-II 2D Hydrodynamic Simulation"
+                "source": "Machhu-II 2D Hydrodynamic Simulation",
             },
-            "geometry": {
-                "type": "Polygon",
-                "coordinates": [poly_coords]
-            }
+            "geometry": {"type": "Polygon", "coordinates": [poly_coords]},
         }
         features.append(feature)
 
@@ -125,11 +124,8 @@ def export_inundation_vectors():
     </Placemark>""")
 
     # Write GeoJSON
-    geojson_data = {
-        "type": "FeatureCollection",
-        "features": features
-    }
-    
+    geojson_data = {"type": "FeatureCollection", "features": features}
+
     geojson_path = EXPORT_DIR / "machhu_flood_extent.geojson"
     with open(geojson_path, "w") as f:
         json.dump(geojson_data, f, indent=2)
@@ -157,6 +153,7 @@ def export_inundation_vectors():
     try:
         import geopandas as gpd
         from shapely.geometry import shape as shp_shape
+
         gdf = gpd.GeoDataFrame.from_features(geojson_data, crs="EPSG:4326")
         shp_path = EXPORT_DIR / "machhu_flood_extent.shp"
         gdf.to_file(shp_path, driver="ESRI Shapefile")

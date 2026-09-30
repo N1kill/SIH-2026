@@ -38,8 +38,9 @@ from sph_breach import SPHBreachSolver, SPHParams
 class GridSolverAdapter(Protocol):
     """Implement this against your existing downstream 2D solver."""
 
-    def set_upstream_boundary(self, discharge_m3s: float, velocity_ms: float,
-                               x_m: float) -> None: ...
+    def set_upstream_boundary(
+        self, discharge_m3s: float, velocity_ms: float, x_m: float
+    ) -> None: ...
 
     def step(self, dt_s: float) -> dict: ...
 
@@ -59,10 +60,11 @@ class StructuralObject:
     """A downstream object (bridge pier, building, wall segment) with a
     physical endurance limit, checked every coupling step against the
     locally computed hydrodynamic force."""
+
     name: str
     x_m: float
     y_m: float
-    frontal_area_m2: float          # area exposed to flow
+    frontal_area_m2: float  # area exposed to flow
     drag_coeff: float = 1.2
     failure_force_kN: float = 500.0  # structural capacity
     failed: bool = False
@@ -73,10 +75,11 @@ class StructuralObject:
         used in flood-structure vulnerability assessment)."""
         if depth_m <= 0:
             return 0.0
-        submerged_area = min(self.frontal_area_m2, self.frontal_area_m2 * depth_m /
-                              max(depth_m, 0.1))
+        submerged_area = min(
+            self.frontal_area_m2, self.frontal_area_m2 * depth_m / max(depth_m, 0.1)
+        )
         speed = float(np.linalg.norm(velocity_ms))
-        force_n = 0.5 * 1000.0 * self.drag_coeff * submerged_area * speed ** 2
+        force_n = 0.5 * 1000.0 * self.drag_coeff * submerged_area * speed**2
         return force_n / 1000.0
 
     def check(self, depth_m: float, velocity_ms: np.ndarray, time_s: float) -> bool:
@@ -95,8 +98,8 @@ class BreachCouplingSimulation:
     breach: PhysicallyBasedBreachGrowth
     sph: SPHBreachSolver
     grid: GridSolverAdapter
-    dam_length_m: float               # hard cap: breach can't exceed dam footprint
-    breach_x_m: float                 # location of breach along downstream grid's x-axis
+    dam_length_m: float  # hard cap: breach can't exceed dam footprint
+    breach_x_m: float  # location of breach along downstream grid's x-axis
     structures: list = field(default_factory=list)
     sph_substeps_per_macro_step: int = 5
     log: list = field(default_factory=list)
@@ -149,17 +152,26 @@ class BreachCouplingSimulation:
         #    physically removed from storage, so the two systems can't
         #    drift apart in total mass.
         injection_width_m = min(self.breach.geometry.bottom_width_m, 5.0)
-        if breach_q > 0 and injection_width_m > 0 and breach_state.get("status") != "not_initiated":
+        if (
+            breach_q > 0
+            and injection_width_m > 0
+            and breach_state.get("status") != "not_initiated"
+        ):
             # area (m^2) of this 2D slice == volume per unit out-of-plane
             # width (m^3/m) delivered this step; this is the explicit,
             # documented 2D-slice-represents-a-unit-width-through-the-
             # breach-centerline assumption.
-            slug_area_m2 = (breach_q * dt_s) / max(self.breach.geometry.bottom_width_m, 1e-6)
+            slug_area_m2 = (breach_q * dt_s) / max(
+                self.breach.geometry.bottom_width_m, 1e-6
+            )
             slug_depth_m = slug_area_m2 / injection_width_m
             self.sph.seed_reservoir_block(
                 width_m=injection_width_m,
                 depth_m=slug_depth_m,
-                origin_xy=(-injection_width_m - 1.0, self.breach.geometry.bottom_elevation_m),
+                origin_xy=(
+                    -injection_width_m - 1.0,
+                    self.breach.geometry.bottom_elevation_m,
+                ),
             )
 
         sph_dt = dt_s / self.sph_substeps_per_macro_step
@@ -170,9 +182,11 @@ class BreachCouplingSimulation:
         # SPH-measured velocity/spray are diagnostic detail on top of the
         # mass-consistent breach_q -- not a replacement for it.
         sph_flux = self.sph.outflow_flux(gate_x_m=2.0)
-        velocity_for_boundary = (sph_flux["mean_velocity_ms"]
-                                  if sph_flux["mean_velocity_ms"] > 0
-                                  else self._hydraulic_velocity_estimate(breach_q))
+        velocity_for_boundary = (
+            sph_flux["mean_velocity_ms"]
+            if sph_flux["mean_velocity_ms"] > 0
+            else self._hydraulic_velocity_estimate(breach_q)
+        )
 
         # 4. Push the mass-consistent discharge + SPH-resolved velocity into
         #    the far-field grid boundary condition.
@@ -195,11 +209,14 @@ class BreachCouplingSimulation:
             depth = self.grid.water_depth_at(s.x_m, s.y_m)
             vel = self.grid.velocity_at(s.x_m, s.y_m)
             failed = s.check(depth, vel, self.reservoir.time_s)
-            structure_results.append({
-                "name": s.name, "failed": failed,
-                "force_kN": s.hydrodynamic_force_kN(depth, vel),
-                "depth_m": depth,
-            })
+            structure_results.append(
+                {
+                    "name": s.name,
+                    "failed": failed,
+                    "force_kN": s.hydrodynamic_force_kN(depth, vel),
+                    "depth_m": depth,
+                }
+            )
 
         record = {
             "time_s": self.reservoir.time_s,
@@ -208,7 +225,7 @@ class BreachCouplingSimulation:
             "breach_status": breach_state.get("status"),
             "breach_bottom_width_m": self.breach.geometry.bottom_width_m,
             "breach_hit_valley_floor": breach_state.get("hit_valley_floor", False),
-            "breach_outflow_m3s": breach_q,          # single source of truth
+            "breach_outflow_m3s": breach_q,  # single source of truth
             "sph_mean_velocity_ms": sph_flux["mean_velocity_ms"],
             "sph_spray_fraction": sph_flux["spray_fraction"],
             "sph_n_particles": sph_info.get("n_particles", 0),

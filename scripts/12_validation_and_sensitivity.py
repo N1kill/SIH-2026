@@ -50,7 +50,9 @@ DEM_FILE = PROJECT_ROOT / "data" / "processed" / "dem_conditioned.tif"
 if not DEM_FILE.is_file():
     DEM_FILE = PROJECT_ROOT / "data" / "processed" / "dem_utm42.tif"
 
-logging.basicConfig(level=logging.INFO, format="[%(asctime)s] %(levelname)s: %(message)s")
+logging.basicConfig(
+    level=logging.INFO, format="[%(asctime)s] %(levelname)s: %(message)s"
+)
 OUTPUTS_SIM = PROJECT_ROOT / "outputs" / "simulation"
 OUTPUTS_GIS = PROJECT_ROOT / "outputs" / "gis"
 DOCS_DIR = PROJECT_ROOT / "docs"
@@ -94,11 +96,11 @@ def get_historical_morbi_benchmark():
 def compute_contingency_metrics(sim_depth_file, sat_extent_file):
     """Calculate 2x2 contingency matrix comparing simulated vs satellite observed flood."""
     logging.info("Loading simulation and satellite rasters for accuracy assessment...")
-    
+
     with rasterio.open(sim_depth_file) as src_sim:
         sim_depth = src_sim.read(1)
         sim_nodata = src_sim.nodata
-    
+
     with rasterio.open(sat_extent_file) as src_sat:
         sat_extent = src_sat.read(1)
         sat_nodata = src_sat.nodata
@@ -124,7 +126,11 @@ def compute_contingency_metrics(sim_depth_file, sat_extent_file):
 
     # Cohen's Kappa
     p_o = accuracy
-    p_e = ((tp + fp) * (tp + fn) + (tn + fp) * (tn + fn)) / (total_pixels ** 2) if total_pixels > 0 else 0.0
+    p_e = (
+        ((tp + fp) * (tp + fn) + (tn + fp) * (tn + fn)) / (total_pixels**2)
+        if total_pixels > 0
+        else 0.0
+    )
     kappa = float((p_o - p_e) / (1.0 - p_e)) if (1.0 - p_e) != 0 else 0.0
 
     # Spatial contingency category map:
@@ -147,7 +153,9 @@ def compute_contingency_metrics(sim_depth_file, sat_extent_file):
         "Cohens_Kappa": round(kappa, 4),
     }
 
-    logging.info(f"Accuracy Metrics: CSI = {csi:.3f} | F1 = {f1:.3f} | Hit Rate = {hit_rate:.3f} | Accuracy = {accuracy*100:.1f}%")
+    logging.info(
+        f"Accuracy Metrics: CSI = {csi:.3f} | F1 = {f1:.3f} | Hit Rate = {hit_rate:.3f} | Accuracy = {accuracy * 100:.1f}%"
+    )
     return metrics, contingency_map
 
 
@@ -170,49 +178,89 @@ def compute_sensitivity_scenarios():
     if breach_params_file.is_file():
         with open(breach_params_file, "r") as f:
             bp_data = json.load(f)
-        base_B  = bp_data.get("froehlich_2008_geometry", {}).get("B_avg_m", 156.0)
+        base_B = bp_data.get("froehlich_2008_geometry", {}).get("B_avg_m", 156.0)
         base_tf = bp_data.get("froehlich_2008_geometry", {}).get("t_f_hours", 2.50)
         base_Qp = bp_data.get("froehlich_1995_peak_flow", {}).get("Q_p_m3s", 6647.0)
-        base_Z  = bp_data.get("froehlich_2008_geometry", {}).get("Z_HV", 1.4)
+        base_Z = bp_data.get("froehlich_2008_geometry", {}).get("Z_HV", 1.4)
     else:
         logging.warning("breach_params.json not found — using Froehlich defaults.")
         base_B, base_tf, base_Qp, base_Z = 156.0, 2.50, 6647.0, 1.4
 
     # Parametric sensitivity scenarios derived from live base values
     scenarios = [
-        {"id": "base",                 "name": "Base Case",         "B_avg": base_B,           "t_f": base_tf,            "Q_p": base_Qp},
-        {"id": "width_plus25",         "name": "+25% Width",        "B_avg": base_B * 1.25,    "t_f": base_tf * 0.80,     "Q_p": base_Qp * 1.25},
-        {"id": "width_minus25",        "name": "-25% Width",        "B_avg": base_B * 0.75,    "t_f": base_tf * 1.25,     "Q_p": base_Qp * 0.75},
-        {"id": "extreme_plus50",       "name": "+50% Extreme",      "B_avg": base_B * 1.50,    "t_f": base_tf * 0.60,     "Q_p": base_Qp * 1.58},
-        {"id": "conservative_minus50", "name": "-50% Conservative", "B_avg": base_B * 0.50,    "t_f": base_tf * 1.60,     "Q_p": base_Qp * 0.50},
+        {
+            "id": "base",
+            "name": "Base Case",
+            "B_avg": base_B,
+            "t_f": base_tf,
+            "Q_p": base_Qp,
+        },
+        {
+            "id": "width_plus25",
+            "name": "+25% Width",
+            "B_avg": base_B * 1.25,
+            "t_f": base_tf * 0.80,
+            "Q_p": base_Qp * 1.25,
+        },
+        {
+            "id": "width_minus25",
+            "name": "-25% Width",
+            "B_avg": base_B * 0.75,
+            "t_f": base_tf * 1.25,
+            "Q_p": base_Qp * 0.75,
+        },
+        {
+            "id": "extreme_plus50",
+            "name": "+50% Extreme",
+            "B_avg": base_B * 1.50,
+            "t_f": base_tf * 0.60,
+            "Q_p": base_Qp * 1.58,
+        },
+        {
+            "id": "conservative_minus50",
+            "name": "-50% Conservative",
+            "B_avg": base_B * 0.50,
+            "t_f": base_tf * 1.60,
+            "Q_p": base_Qp * 0.50,
+        },
     ]
 
     for sc in scenarios:
         breach_params = {
-            "B_avg_m":        sc["B_avg"],
-            "Z_HV":           base_Z,
-            "t_f_hours":      sc["t_f"],
-            "Q_peak_m3s":     sc["Q_p"],
+            "B_avg_m": sc["B_avg"],
+            "Z_HV": base_Z,
+            "t_f_hours": sc["t_f"],
+            "Q_peak_m3s": sc["Q_p"],
             "V_reservoir_m3": config["reservoir_volume_m3"],
-            "H_dam_m":        config["dam_height_m"],
+            "H_dam_m": config["dam_height_m"],
         }
-        
+
         logging.info(f"Running physics scenario: {sc['name']}")
-        hydro_tuple = generate_unsteady_breach_hydrograph(breach_params, duration_hours=8.0, dt_seconds=120.0)
-        
+        hydro_tuple = generate_unsteady_breach_hydrograph(
+            breach_params, duration_hours=8.0, dt_seconds=120.0
+        )
+
         # 8h window captures the full breach peak (t_f ≤ 4h) and hydrodynamically relevant recession.
-        res = run_2d_hydrodynamic_simulation(DEM_FILE, hydro_tuple, breach_params, config)
-        
+        res = run_2d_hydrodynamic_simulation(
+            DEM_FILE, hydro_tuple, breach_params, config
+        )
+
         # Record gauge at primary downstream station (first non-dam-toe station, or last if no match)
         downstream_st = res["stations"].get(
-            config["downstream_stations"][1]["key"] if len(config["downstream_stations"]) > 1 else "dam_toe",
-            list(res["stations"].values())[-1]
+            config["downstream_stations"][1]["key"]
+            if len(config["downstream_stations"]) > 1
+            else "dam_toe",
+            list(res["stations"].values())[-1],
         )
         sc["peak_depth_morbi"] = round(float(np.max(downstream_st["depth"])), 2)
         cell_area = res["cell_size"] ** 2
-        sc["inund_area_km2"] = round(float(np.sum(res["max_depth"] >= 0.1) * (cell_area / 1e6)), 1)
-        logging.info(f"Scenario {sc['name']} completed: Peak={sc['peak_depth_morbi']}m, Area={sc['inund_area_km2']}km2")
-        
+        sc["inund_area_km2"] = round(
+            float(np.sum(res["max_depth"] >= 0.1) * (cell_area / 1e6)), 1
+        )
+        logging.info(
+            f"Scenario {sc['name']} completed: Peak={sc['peak_depth_morbi']}m, Area={sc['inund_area_km2']}km2"
+        )
+
     return scenarios
 
 
@@ -221,19 +269,27 @@ def compute_sensitivity_scenarios():
 # ---------------------------------------------------------------------------
 def generate_validation_plots(metrics, contingency_map, scenarios):
     """Generate contingency map and sensitivity comparison curves."""
-    
+
     # 1. Contingency Map (Spatial Accuracy)
     fig, ax = plt.subplots(figsize=(10, 8), dpi=200)
     im = ax.imshow(contingency_map, cmap="tab10", vmin=0, vmax=3)
-    
+
     # Legend
-    labels = ["Dry Land (TN)", "Hit / Agreement (TP)", "Model Inundation (FP)", "Satellite Water (FN)"]
+    labels = [
+        "Dry Land (TN)",
+        "Hit / Agreement (TP)",
+        "Model Inundation (FP)",
+        "Satellite Water (FN)",
+    ]
     colors = ["#f8f9fa", "#1d3557", "#e63946", "#457b9d"]
-    handles = [plt.Rectangle((0,0),1,1, color=c) for c in colors]
+    handles = [plt.Rectangle((0, 0), 1, 1, color=c) for c in colors]
     ax.legend(handles, labels, loc="upper right", frameon=True, fontsize=9)
 
-    ax.set_title(f"Machhu-II Dam Breach: Spatial Accuracy & Validation Map\nCSI = {metrics['Critical_Success_Index_CSI']:.3f} | F1-Score = {metrics['F1_Score']:.3f} | Overall Accuracy = {metrics['Overall_Accuracy']*100:.1f}%", 
-                 fontsize=11, fontweight="bold")
+    ax.set_title(
+        f"Machhu-II Dam Breach: Spatial Accuracy & Validation Map\nCSI = {metrics['Critical_Success_Index_CSI']:.3f} | F1-Score = {metrics['F1_Score']:.3f} | Overall Accuracy = {metrics['Overall_Accuracy'] * 100:.1f}%",
+        fontsize=11,
+        fontweight="bold",
+    )
     ax.axis("off")
     plt.tight_layout()
     plt.savefig(ACCURACY_PLOT, dpi=200)
@@ -254,11 +310,19 @@ def generate_validation_plots(metrics, contingency_map, scenarios):
     hist_bench_val, _ = get_historical_morbi_benchmark()
     color_bar = ["#2a9d8f", "#e76f51", "#457b9d", "#d62828", "#f4a261"]
     bars1 = ax1.bar(x_pos, morbi_depths, color=color_bar, edgecolor="black", alpha=0.85)
-    ax1.axhline(hist_bench_val, color="red", linestyle="--", lw=1.5, label=f"Historical Sustained Flood Level (~{hist_bench_val:.1f} m / 20 ft)")
+    ax1.axhline(
+        hist_bench_val,
+        color="red",
+        linestyle="--",
+        lw=1.5,
+        label=f"Historical Sustained Flood Level (~{hist_bench_val:.1f} m / 20 ft)",
+    )
     ax1.set_xticks(x_pos)
     ax1.set_xticklabels(names, rotation=30, ha="right", fontsize=9)
     ax1.set_ylabel("Morbi City Peak Flood Depth [m]", fontsize=10, fontweight="bold")
-    ax1.set_title("Sensitivity: Peak Flood Depth at Morbi City", fontsize=11, fontweight="bold")
+    ax1.set_title(
+        "Sensitivity: Peak Flood Depth at Morbi City", fontsize=11, fontweight="bold"
+    )
     ax1.grid(True, linestyle=":", alpha=0.6)
     ax1.legend(loc="upper left", fontsize=8)
 
@@ -267,7 +331,9 @@ def generate_validation_plots(metrics, contingency_map, scenarios):
     ax2.set_xticks(x_pos)
     ax2.set_xticklabels(names, rotation=30, ha="right", fontsize=9)
     ax2.set_ylabel("Total Inundated Area [km²]", fontsize=10, fontweight="bold")
-    ax2.set_title("Sensitivity: Total Floodplain Inundation Area", fontsize=11, fontweight="bold")
+    ax2.set_title(
+        "Sensitivity: Total Floodplain Inundation Area", fontsize=11, fontweight="bold"
+    )
     ax2.grid(True, linestyle=":", alpha=0.6)
 
     plt.tight_layout()
@@ -282,7 +348,7 @@ def generate_validation_plots(metrics, contingency_map, scenarios):
 def export_validation_report(metrics, scenarios):
     """Write markdown documentation and validation JSON."""
     bench_val, bench_str = get_historical_morbi_benchmark()
-    morbi_depth = scenarios[0]['peak_depth_morbi']
+    morbi_depth = scenarios[0]["peak_depth_morbi"]
     morbi_error_pct = abs(morbi_depth - bench_val) / bench_val * 100.0
 
     report_data = {
@@ -306,10 +372,12 @@ def export_validation_report(metrics, scenarios):
     logging.info(f"Saved validation JSON: {VALIDATION_JSON}")
 
     # Generate dynamic scenario rows
-    scenario_rows = "\n".join([
-        f"| **{sc['name']}** | {sc['B_avg']:.1f} | {sc['t_f']:.2f} | {sc['Q_p']:,.0f} | **{sc['peak_depth_morbi']:.2f}** | **{sc['inund_area_km2']:.1f}** |"
-        for sc in scenarios
-    ])
+    scenario_rows = "\n".join(
+        [
+            f"| **{sc['name']}** | {sc['B_avg']:.1f} | {sc['t_f']:.2f} | {sc['Q_p']:,.0f} | **{sc['peak_depth_morbi']:.2f}** | **{sc['inund_area_km2']:.1f}** |"
+            for sc in scenarios
+        ]
+    )
 
     # Generate Markdown documentation
     md_content = f"""# Directive 6: Model Validation & Sensitivity Analysis Report
@@ -328,12 +396,12 @@ The 2D hydrodynamic flood extent (Directive 5A) was cross-validated against Sent
 
 | Metric | Formula | Value | Interpretation |
 | :--- | :--- | :--- | :--- |
-| **Critical Success Index (CSI)** | $TP / (TP + FP + FN)$ | **{metrics['Critical_Success_Index_CSI']:.4f}** | Excellent spatial agreement across river corridor |
-| **F1-Score (Dice Coefficient)** | $2TP / (2TP + FP + FN)$ | **{metrics['F1_Score']:.4f}** | Strong overlap between simulated and satellite water |
-| **Hit Rate (Sensitivity)** | $TP / (TP + FN)$ | **{metrics['Hit_Rate_Sensitivity']:.4f}** | Captures 90%+ of observed inundated wetlands & channels |
-| **False Alarm Ratio (FAR)** | $FP / (TP + FP)$ | **{metrics['False_Alarm_Ratio_FAR']:.4f}** | Low over-prediction on higher terrace banks |
-| **Overall Accuracy** | $(TP + TN) / Total$ | **{metrics['Overall_Accuracy']*100:.2f}%** | High domain-wide classification consistency |
-| **Cohen's Kappa** | $(P_o - P_e) / (1 - P_e)$ | **{metrics['Cohens_Kappa']:.4f}** | Substantial agreement beyond chance |
+| **Critical Success Index (CSI)** | $TP / (TP + FP + FN)$ | **{metrics["Critical_Success_Index_CSI"]:.4f}** | Excellent spatial agreement across river corridor |
+| **F1-Score (Dice Coefficient)** | $2TP / (2TP + FP + FN)$ | **{metrics["F1_Score"]:.4f}** | Strong overlap between simulated and satellite water |
+| **Hit Rate (Sensitivity)** | $TP / (TP + FN)$ | **{metrics["Hit_Rate_Sensitivity"]:.4f}** | Captures 90%+ of observed inundated wetlands & channels |
+| **False Alarm Ratio (FAR)** | $FP / (TP + FP)$ | **{metrics["False_Alarm_Ratio_FAR"]:.4f}** | Low over-prediction on higher terrace banks |
+| **Overall Accuracy** | $(TP + TN) / Total$ | **{metrics["Overall_Accuracy"] * 100:.2f}%** | High domain-wide classification consistency |
+| **Cohen's Kappa** | $(P_o - P_e) / (1 - P_e)$ | **{metrics["Cohens_Kappa"]:.4f}** | Substantial agreement beyond chance |
 
 ---
 
@@ -377,8 +445,10 @@ def main():
     print("=" * 70)
 
     # 1. Compute accuracy metrics
-    metrics, contingency_map = compute_contingency_metrics(SIM_DEPTH_TIF, SAT_EXTENT_TIF)
-    
+    metrics, contingency_map = compute_contingency_metrics(
+        SIM_DEPTH_TIF, SAT_EXTENT_TIF
+    )
+
     # 2. Compute sensitivity scenarios
     scenarios = compute_sensitivity_scenarios()
 
@@ -391,15 +461,27 @@ def main():
     print("\n" + "=" * 70)
     print("  Directive 6 Completed Successfully!")
     print(f"  Primary Spatial Metrics (Active Flood Footprint):")
-    print(f"    • Critical Success Index (CSI) : {metrics['Critical_Success_Index_CSI']:.4f}")
+    print(
+        f"    • Critical Success Index (CSI) : {metrics['Critical_Success_Index_CSI']:.4f}"
+    )
     print(f"    • F1-Score / Dice Coeff        : {metrics['F1_Score']:.4f}")
-    print(f"    • Hit Rate (Sensitivity/POD)   : {metrics['Hit_Rate_Sensitivity']*100:.1f}%")
-    print(f"    • False Alarm Ratio (FAR)      : {metrics['False_Alarm_Ratio_FAR']*100:.1f}%")
+    print(
+        f"    • Hit Rate (Sensitivity/POD)   : {metrics['Hit_Rate_Sensitivity'] * 100:.1f}%"
+    )
+    print(
+        f"    • False Alarm Ratio (FAR)      : {metrics['False_Alarm_Ratio_FAR'] * 100:.1f}%"
+    )
     print(f"  Domain-Wide Metric:")
-    print(f"    • Overall Accuracy             : {metrics['Overall_Accuracy']*100:.2f}% (Trivially high due to dry-land True Negatives)")
+    print(
+        f"    • Overall Accuracy             : {metrics['Overall_Accuracy'] * 100:.2f}% (Trivially high due to dry-land True Negatives)"
+    )
     bench_val, bench_str = get_historical_morbi_benchmark()
-    print(f"    • Morbi Inundation Depth       : {scenarios[0]['peak_depth_morbi']:.2f} m (Historical benchmark {bench_str})")
-    print(f"    • Sensitivity Methodology      : Linear first-order scalings from base 2D hydrodynamic run")
+    print(
+        f"    • Morbi Inundation Depth       : {scenarios[0]['peak_depth_morbi']:.2f} m (Historical benchmark {bench_str})"
+    )
+    print(
+        f"    • Sensitivity Methodology      : Linear first-order scalings from base 2D hydrodynamic run"
+    )
     print(f"  Validation Report                : {REPORT_MD}")
     print("=" * 70)
 

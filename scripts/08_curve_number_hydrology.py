@@ -51,14 +51,14 @@ HYDROLOGY_REPORT = DATA_PROCESSED / "hydrology_report.json"
 # Hydrologic Soil Group (HSG) D CN Mappings (Clayey/Black Cotton Soil)
 # ESA WorldCover 2021 Class Mapping
 CN_MAP_HSG_D = {
-    10: 79,   # Tree cover (Forest)
-    20: 77,   # Shrubland
-    30: 80,   # Grassland
-    40: 81,   # Cropland (Agriculture)
-    50: 95,   # Built-up (Urban/Impervious)
-    60: 94,   # Bare / sparse vegetation
+    10: 79,  # Tree cover (Forest)
+    20: 77,  # Shrubland
+    30: 80,  # Grassland
+    40: 81,  # Cropland (Agriculture)
+    50: 95,  # Built-up (Urban/Impervious)
+    60: 94,  # Bare / sparse vegetation
     80: 100,  # Permanent water bodies
-    90: 85,   # Herbaceous wetland
+    90: 85,  # Herbaceous wetland
     95: 100,  # Mangroves (treated as water/wetland)
     100: 50,  # Moss and lichen
 }
@@ -72,33 +72,126 @@ D8_OFFSETS = {
     4: (1, 0),
     8: (1, -1),
     16: (0, -1),
-    32: (-1, -1)
+    32: (-1, -1),
 }
 
 # SCS Dimensionless Unit Hydrograph coordinates (t/t_p vs q/q_p)
-DUH_T_TP = np.array([
-    0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0,
-    1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.8, 2.0, 2.2, 2.4, 2.6,
-    2.8, 3.0, 3.5, 4.0, 4.5, 5.0
-])
-DUH_Q_QP = np.array([
-    0.0, 0.03, 0.10, 0.19, 0.31, 0.47, 0.66, 0.82, 0.93, 0.99, 1.00,
-    0.99, 0.93, 0.86, 0.78, 0.68, 0.56, 0.39, 0.28, 0.207, 0.147, 0.107,
-    0.077, 0.055, 0.022, 0.009, 0.004, 0.0
-])
+DUH_T_TP = np.array(
+    [
+        0.0,
+        0.1,
+        0.2,
+        0.3,
+        0.4,
+        0.5,
+        0.6,
+        0.7,
+        0.8,
+        0.9,
+        1.0,
+        1.1,
+        1.2,
+        1.3,
+        1.4,
+        1.5,
+        1.6,
+        1.8,
+        2.0,
+        2.2,
+        2.4,
+        2.6,
+        2.8,
+        3.0,
+        3.5,
+        4.0,
+        4.5,
+        5.0,
+    ]
+)
+DUH_Q_QP = np.array(
+    [
+        0.0,
+        0.03,
+        0.10,
+        0.19,
+        0.31,
+        0.47,
+        0.66,
+        0.82,
+        0.93,
+        0.99,
+        1.00,
+        0.99,
+        0.93,
+        0.86,
+        0.78,
+        0.68,
+        0.56,
+        0.39,
+        0.28,
+        0.207,
+        0.147,
+        0.107,
+        0.077,
+        0.055,
+        0.022,
+        0.009,
+        0.004,
+        0.0,
+    ]
+)
 
 # SCS Type II 24-hour Cumulative Storm Distribution
-SCS_TYPE_II = np.array([
-    0.0, 0.011, 0.022, 0.034, 0.048, 0.064, 0.080, 0.099, 0.120, 0.147, 0.181, 0.235,
-    0.663, 0.772, 0.820, 0.850, 0.872, 0.890, 0.906, 0.920, 0.933, 0.946, 0.958, 0.970, 1.0
-])
+SCS_TYPE_II = np.array(
+    [
+        0.0,
+        0.011,
+        0.022,
+        0.034,
+        0.048,
+        0.064,
+        0.080,
+        0.099,
+        0.120,
+        0.147,
+        0.181,
+        0.235,
+        0.663,
+        0.772,
+        0.820,
+        0.850,
+        0.872,
+        0.890,
+        0.906,
+        0.920,
+        0.933,
+        0.946,
+        0.958,
+        0.970,
+        1.0,
+    ]
+)
 
-def write_raster_like(reference_path: pathlib.Path, dst_path: pathlib.Path, data: np.ndarray, dtype: str, nodata: float | int) -> None:
+
+def write_raster_like(
+    reference_path: pathlib.Path,
+    dst_path: pathlib.Path,
+    data: np.ndarray,
+    dtype: str,
+    nodata: float | int,
+) -> None:
     with rasterio.open(reference_path) as src:
         profile = src.profile.copy()
-        profile.update(dtype=dtype, nodata=nodata, compress="deflate", tiled=True, bigtiff="if_safer")
+        profile.update(
+            dtype=dtype,
+            nodata=nodata,
+            compress="deflate",
+            tiled=True,
+            bigtiff="if_safer",
+        )
     with rasterio.open(dst_path, "w", **profile) as dst:
         dst.write(data.astype(dtype, copy=False), 1)
+
 
 def adjust_cn(cn2: np.ndarray, amc: int) -> np.ndarray:
     """Adjust AMC-II Curve Numbers to AMC-I or AMC-III."""
@@ -108,11 +201,19 @@ def adjust_cn(cn2: np.ndarray, amc: int) -> np.ndarray:
         return 23.0 * cn2 / (10.0 + 0.13 * cn2)
     return cn2.copy()
 
+
 def main():
     logging.info("Starting Directive 3: SCS-CN Hydrology & Inflow Hydrograph")
 
     # Check input files exist
-    for p in (WATERSHED_SHP, WATERSHED_TIF, DEM_CONDITIONED, FLOW_DIR_TIF, LULC_RAW, RAINFALL_NC):
+    for p in (
+        WATERSHED_SHP,
+        WATERSHED_TIF,
+        DEM_CONDITIONED,
+        FLOW_DIR_TIF,
+        LULC_RAW,
+        RAINFALL_NC,
+    ):
         if not p.exists():
             raise FileNotFoundError(f"Required input file missing: {p}")
 
@@ -150,7 +251,7 @@ def main():
             dst_transform=transform,
             dst_crs=crs,
             dst_nodata=0,
-            resampling=Resampling.nearest
+            resampling=Resampling.nearest,
         )
 
     # 2. Reclassify LULC to CN raster (HSG D)
@@ -201,20 +302,20 @@ def main():
             if path_len[curr_r, curr_c] >= 0:
                 reached = True
                 break
-            
+
             fd = fdir[curr_r, curr_c]
             if fd not in D8_OFFSETS:
                 break
-                
+
             dr, dc = D8_OFFSETS[fd]
             next_r, next_c = curr_r + dr, curr_c + dc
             if not ws_mask[next_r, next_c]:
                 break
-                
-            step = np.sqrt((dr * dy)**2 + (dc * dx)**2)
+
+            step = np.sqrt((dr * dy) ** 2 + (dc * dx) ** 2)
             path.append(((curr_r, curr_c), step))
             curr_r, curr_c = next_r, next_c
-            
+
         if reached:
             dist = path_len[curr_r, curr_c]
             for (pr, pc), step in reversed(path):
@@ -222,7 +323,7 @@ def main():
                 path_len[pr, pc] = dist
 
     max_L = float(np.max(path_len))
-    logging.info(f"Longest Flow Path (L): {max_L:.1f} m ({max_L/1000.0:.2f} km)")
+    logging.info(f"Longest Flow Path (L): {max_L:.1f} m ({max_L / 1000.0:.2f} km)")
 
     # 4. Spatially-averaged daily rainfall
     logging.info("Processing daily rainfall from NetCDF dataset...")
@@ -230,6 +331,7 @@ def main():
     ws_geom_4326 = ws_shp_4326.geometry.iloc[0]
 
     import xarray as xr
+
     ds = xr.open_dataset(RAINFALL_NC)
     lats = ds.lat.values
     lons = ds.lon.values
@@ -248,7 +350,9 @@ def main():
                 total_w += intersect_area
 
     if total_w == 0.0:
-        logging.warning("Watershed does not intersect IMD rainfall grid cells! Using closest grid cell.")
+        logging.warning(
+            "Watershed does not intersect IMD rainfall grid cells! Using closest grid cell."
+        )
         # Find closest coordinate
         centroid = ws_geom_4326.centroid
         lat_idx = np.argmin(np.abs(lats - centroid.y))
@@ -276,8 +380,8 @@ def main():
         dt_str = dates[d].strftime("%Y-%m-%d")
         p = daily_rain_all[d]
         # 5-day antecedent rainfall
-        ant5 = float(np.sum(daily_rain_all[d-5:d]))
-        
+        ant5 = float(np.sum(daily_rain_all[d - 5 : d]))
+
         # Growing season AMC classes
         if ant5 < 36.0:
             amc = 1
@@ -289,38 +393,42 @@ def main():
         # Adjust CN
         cn_adjusted = adjust_cn(cn2_raster, amc)
         cn_ws = cn_adjusted[ws_mask]
-        
+
         # Runoff depth calculations (SCS-CN)
         # S = 25400 / CN - 254
         s = (25400.0 / cn_ws) - 254.0
         ia = 0.2 * s
-        
+
         q_pixels = np.zeros_like(cn_ws)
         mask = p > ia
-        q_pixels[mask] = ((p - ia[mask])**2) / (p - ia[mask] + s[mask])
+        q_pixels[mask] = ((p - ia[mask]) ** 2) / (p - ia[mask] + s[mask])
         q_avg = float(np.mean(q_pixels))
 
-        daily_stats.append({
-            "date": dt_str,
-            "rainfall_mm": float(p),
-            "antecedent_5d_mm": ant5,
-            "amc": amc,
-            "runoff_mm": q_avg,
-        })
-        logging.info(f"  {dt_str} | Rain: {p:6.2f} mm | Ant5: {ant5:6.2f} mm | AMC: {amc} | Runoff: {q_avg:6.2f} mm")
+        daily_stats.append(
+            {
+                "date": dt_str,
+                "rainfall_mm": float(p),
+                "antecedent_5d_mm": ant5,
+                "amc": amc,
+                "runoff_mm": q_avg,
+            }
+        )
+        logging.info(
+            f"  {dt_str} | Rain: {p:6.2f} mm | Ant5: {ant5:6.2f} mm | AMC: {amc} | Runoff: {q_avg:6.2f} mm"
+        )
 
     # 5. Route Runoff with SCS Dimensionless Unit Hydrograph
     logging.info("Routing runoff using SCS Dimensionless Unit Hydrograph...")
-    
+
     # Potential maximum retention for base CN
     S_max = 25400.0 / cn2_avg - 254.0
-    
+
     # Lag time calculation (metric SCS equation)
-    t_lag = (max_L**0.8) * ((S_max + 25.4)**0.7) / (7069.0 * (mean_slope_pct**0.5))
+    t_lag = (max_L**0.8) * ((S_max + 25.4) ** 0.7) / (7069.0 * (mean_slope_pct**0.5))
     t_c = 1.67 * t_lag
     D = 1.0  # hourly time step
     t_p = D / 2.0 + t_lag
-    
+
     logging.info(f"Potential Max Retention (S_max): {S_max:.2f} mm")
     logging.info(f"Catchment Lag Time (t_lag): {t_lag:.2f} hours")
     logging.info(f"Time of Concentration (t_c): {t_c:.2f} hours")
@@ -329,15 +437,15 @@ def main():
     # Peak flow of unscaled UH for Q = 1 mm:
     # q_p = 0.208 * A * Q / t_p
     q_p_uh = 0.208 * area_km2 * 1.0 / t_p
-    
+
     # Build hourly Unit Hydrograph
     t_uh = np.arange(0.0, 5.0 * t_p, D)
     q_uh = np.interp(t_uh / t_p, DUH_T_TP, DUH_Q_QP) * q_p_uh
-    
+
     # Scale UH to guarantee exact runoff volume conservation (mass balance)
     vol_actual = np.sum(q_uh) * 3600.0
     vol_expected = area_km2 * 1000.0  # 1 mm over area_km2
-    q_uh *= (vol_expected / vol_actual)
+    q_uh *= vol_expected / vol_actual
 
     # Distribute daily runoff hourly using SCS Type II distribution
     hourly_runoff = np.zeros(11 * 24)
@@ -347,23 +455,25 @@ def main():
         q_day = stat["runoff_mm"]
         p_day = stat["rainfall_mm"]
         for h in range(24):
-            frac = SCS_TYPE_II[h+1] - SCS_TYPE_II[h]
+            frac = SCS_TYPE_II[h + 1] - SCS_TYPE_II[h]
             hourly_runoff[idx * 24 + h] = frac * q_day
             hourly_rainfall[idx * 24 + h] = frac * p_day
 
     # Convolve hourly runoff with Unit Hydrograph
-    inflow_unscaled = np.convolve(hourly_runoff, q_uh)[:11 * 24]
+    inflow_unscaled = np.convolve(hourly_runoff, q_uh)[: 11 * 24]
 
     # Physically derived inflow using standard SCS PRF = 484
     # NO area-scaling or force-calibration — let the result speak honestly.
     historical_area_km2 = 1928.0
-    inflow_phys = np.convolve(hourly_runoff, q_uh)[:len(hourly_runoff)]
+    inflow_phys = np.convolve(hourly_runoff, q_uh)[: len(hourly_runoff)]
     peak_inflow = float(np.max(inflow_phys))
     peak_hour = int(np.argmax(inflow_phys))
 
     # Compare honestly against historical estimate
     historical_peak_m3s = 5600.0  # CWC estimate ~5,550–5,663 m³/s
-    relative_error_pct = abs(peak_inflow - historical_peak_m3s) / historical_peak_m3s * 100.0
+    relative_error_pct = (
+        abs(peak_inflow - historical_peak_m3s) / historical_peak_m3s * 100.0
+    )
 
     logging.info("=" * 65)
     logging.info("  PHYSICALLY DERIVED SCS HYDROLOGIC INFLOW HYDROGRAPH (PRF=484)")
@@ -372,21 +482,29 @@ def main():
     logging.info(f"  Historical Catchment Area : {historical_area_km2:.1f} km²")
     logging.info(f"  Mean Curve Number (AMC-II): {cn2_avg:.2f}")
     logging.info(f"  Peak Rate Factor (PRF)   : 484.0 (Standard SCS Dimensionless UH)")
-    logging.info(f"  Derived Peak Inflow (Qp) : {peak_inflow:.2f} m³/s at Hour {peak_hour}")
+    logging.info(
+        f"  Derived Peak Inflow (Qp) : {peak_inflow:.2f} m³/s at Hour {peak_hour}"
+    )
     logging.info(f"  Historical Peak (CWC)    : {historical_peak_m3s:.0f} m³/s")
     logging.info(f"  Relative Error           : {relative_error_pct:.1f}%")
-    logging.info(f"  Total Inflow Volume      : {(np.sum(inflow_phys) * 3600.0 / 1e6):.2f} Mm³")
+    logging.info(
+        f"  Total Inflow Volume      : {(np.sum(inflow_phys) * 3600.0 / 1e6):.2f} Mm³"
+    )
     logging.info(f"  NOTE: Peak derived honestly — NOT forced to match historical")
     logging.info("=" * 65)
 
     # 6. Save hourly hydrograph series to CSV
-    date_range_hourly = pd.date_range(start="1979-08-05 00:00:00", periods=11 * 24, freq="h")
-    df_out = pd.DataFrame({
-        "datetime": date_range_hourly.strftime("%Y-%m-%d %H:%M:%S"),
-        "rainfall_mm": hourly_rainfall,
-        "runoff_mm": hourly_runoff,
-        "inflow_m3s": inflow_phys,
-    })
+    date_range_hourly = pd.date_range(
+        start="1979-08-05 00:00:00", periods=11 * 24, freq="h"
+    )
+    df_out = pd.DataFrame(
+        {
+            "datetime": date_range_hourly.strftime("%Y-%m-%d %H:%M:%S"),
+            "rainfall_mm": hourly_rainfall,
+            "runoff_mm": hourly_runoff,
+            "inflow_m3s": inflow_phys,
+        }
+    )
     df_out.to_csv(HYDROGRAPH_CSV, index=False)
     logging.info(f"Saved hourly hydrograph data to {HYDROGRAPH_CSV}")
 
@@ -398,17 +516,30 @@ def main():
     # Plot inflow hydrograph
     color_phys = "#e74c3c"
     time_hours_arr = np.arange(len(inflow_phys))
-    
-    ax1.plot(time_hours_arr, inflow_phys, label=f"Physically Derived Inflow (Area: {area_km2:.1f} km², PRF: 484)", color=color_phys, linewidth=2.5)
+
+    ax1.plot(
+        time_hours_arr,
+        inflow_phys,
+        label=f"Physically Derived Inflow (Area: {area_km2:.1f} km², PRF: 484)",
+        color=color_phys,
+        linewidth=2.5,
+    )
 
     # Add historical comparison line
-    ax1.axhline(y=historical_peak_m3s, color="#3498db", linestyle="--", linewidth=1.5, alpha=0.7, label=f"Historical CWC Peak Estimate ({historical_peak_m3s:.0f} m³/s)")
+    ax1.axhline(
+        y=historical_peak_m3s,
+        color="#3498db",
+        linestyle="--",
+        linewidth=1.5,
+        alpha=0.7,
+        label=f"Historical CWC Peak Estimate ({historical_peak_m3s:.0f} m³/s)",
+    )
 
     ax1.set_xlabel("Hours since August 5, 1979, 00:00")
     ax1.set_ylabel("Inflow Discharge (m³/s)", color="black")
     ax1.tick_params(axis="y", labelcolor="black")
     ax1.grid(True, linestyle=":", alpha=0.6)
-    
+
     # Set y-axis limit with some padding
     y_max = max(peak_inflow, historical_peak_m3s) * 1.15
     ax1.set_ylim(0, y_max)
@@ -424,13 +555,22 @@ def main():
     )
     # Second y-axis for daily rainfall bars
     ax2 = ax1.twinx()
-    
+
     # Calculate daily bars (each day spans 24 hours, placed at the middle of the day)
     rain_days = [stat["rainfall_mm"] for stat in daily_stats]
     bar_x = np.arange(11) * 24 + 12
-    
+
     color_rain = "#2ecc71"
-    ax2.bar(bar_x, rain_days, width=22, alpha=0.25, color=color_rain, label="Daily Rainfall (mm)", edgecolor=color_rain, linewidth=1)
+    ax2.bar(
+        bar_x,
+        rain_days,
+        width=22,
+        alpha=0.25,
+        color=color_rain,
+        label="Daily Rainfall (mm)",
+        edgecolor=color_rain,
+        linewidth=1,
+    )
     ax2.set_ylabel("Daily Average Rainfall (mm)", color="#27ae60")
     ax2.tick_params(axis="y", labelcolor="#27ae60")
     ax2.set_ylim(0, max(rain_days) * 2.5)  # keep rainfall bars at the top/background
@@ -441,8 +581,13 @@ def main():
     lines2, labels2 = ax2.get_legend_handles_labels()
     ax1.legend(lines1 + lines2, labels1 + labels2, loc="upper right", framealpha=0.9)
 
-    plt.title("Machhu-II Dam Catchment Inflow Hydrograph (August 5–15, 1979)", fontsize=13, fontweight="bold", pad=15)
-    
+    plt.title(
+        "Machhu-II Dam Catchment Inflow Hydrograph (August 5–15, 1979)",
+        fontsize=13,
+        fontweight="bold",
+        pad=15,
+    )
+
     # Set x-ticks to display dates
     xtick_positions = np.arange(0, 11 * 24 + 1, 24)
     xtick_labels = [stat["date"] for stat in daily_stats] + ["1979-08-16"]
@@ -477,7 +622,7 @@ def main():
             "peak_time_hours_since_aug05": peak_hour,
             "peak_datetime": peak_datetime,
             "note": "Peak derived using standard SCS PRF=484, not forced to match historical.",
-        }
+        },
     }
     with open(HYDROLOGY_REPORT, "w") as f:
         json.dump(report, f, indent=2)

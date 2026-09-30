@@ -1,4 +1,5 @@
 """Deterministic tests for the generic dam research evidence pipeline."""
+
 import tempfile
 import unittest
 from pathlib import Path
@@ -7,12 +8,18 @@ from unittest.mock import patch
 import requests
 
 from src.dam_research import (
-    ArchivedEvidence, DamResearchSeed, EvidenceWorkspace,
-    compile_findings, make_research_plan,
+    ArchivedEvidence,
+    DamResearchSeed,
+    EvidenceWorkspace,
+    compile_findings,
+    make_research_plan,
 )
 from src.dam_research_agent import _focused_excerpt, provider_web_search
 from src.dam_research_local import (
-    ExtractedClaim, nonfatal_source_error, run_local_research, source_access_policy,
+    ExtractedClaim,
+    nonfatal_source_error,
+    run_local_research,
+    source_access_policy,
 )
 
 
@@ -37,14 +44,24 @@ def candidate(**updates):
 
 class DamResearchTests(unittest.TestCase):
     def test_restricted_publishers_are_skipped_before_fetch(self):
-        self.assertIsNotNone(source_access_policy("https://www.sciencedirect.com/article"))
-        self.assertIsNotNone(source_access_policy("https://www.diva-portal.org/report.pdf"))
+        self.assertIsNotNone(
+            source_access_policy("https://www.sciencedirect.com/article")
+        )
+        self.assertIsNotNone(
+            source_access_policy("https://www.diva-portal.org/report.pdf")
+        )
         self.assertIsNone(source_access_policy("https://water.example.gov/report.pdf"))
 
     def test_size_limited_document_is_a_nonfatal_source_skip(self):
-        self.assertIn("20 MB", nonfatal_source_error(ValueError("Source exceeds 20971520 bytes")))
-        self.assertIn("timed out", nonfatal_source_error(requests.Timeout("read timeout")))
-        self.assertIsNone(nonfatal_source_error(ValueError("Exact quote was not found")))
+        self.assertIn(
+            "20 MB", nonfatal_source_error(ValueError("Source exceeds 20971520 bytes"))
+        )
+        self.assertIn(
+            "timed out", nonfatal_source_error(requests.Timeout("read timeout"))
+        )
+        self.assertIsNone(
+            nonfatal_source_error(ValueError("Exact quote was not found"))
+        )
 
     def test_equivalent_evidence_is_deduplicated_by_source_category_and_quote(self):
         seed = DamResearchSeed(dam_id="sample", dam_name="Sample Dam")
@@ -52,12 +69,15 @@ class DamResearchTests(unittest.TestCase):
             workspace = EvidenceWorkspace(seed, Path(directory))
             body = b"The dam height is 42.0 metres."
             first = workspace.archive_bytes(candidate(), body, "text/plain")
-            second = workspace.archive_bytes(candidate(title="Renamed official register"), body, "text/plain")
+            second = workspace.archive_bytes(
+                candidate(title="Renamed official register"), body, "text/plain"
+            )
             workspace.save_records([first, second])
             self.assertEqual(len(workspace.load_records()), 1)
 
     def test_partial_tracker_freezes_elapsed_and_clears_transient_error(self):
         from server import ResearchRequest, ResearchTracker
+
         tracker = ResearchTracker()
         with patch("server.time.monotonic", return_value=10):
             tracker.begin(ResearchRequest(project_id="sample"))
@@ -74,13 +94,21 @@ class DamResearchTests(unittest.TestCase):
     @patch("src.dam_research_local.extract_claim")
     @patch("src.dam_research_local.fetch_public_source")
     @patch("src.dam_research_local.provider_web_search")
-    def test_local_workflow_archives_all_tracks_without_promoting_claims(self, search, fetch, extract):
+    def test_local_workflow_archives_all_tracks_without_promoting_claims(
+        self, search, fetch, extract
+    ):
         seed = DamResearchSeed(dam_id="sample", dam_name="Sample Dam")
         url = "https://example.gov/dam"
-        search.return_value = {"sources": [{"title": "Sample Dam registry", "url": url}]}
+        search.return_value = {
+            "sources": [{"title": "Sample Dam registry", "url": url}]
+        }
         body = b"Sample Dam has a height of 42 metres. " * 10
         fetch.return_value = (body, "text/plain", url)
-        extract.return_value = ExtractedClaim(relevant=True, exact_quote="Sample Dam has a height of 42 metres.", summary="Height recorded.")
+        extract.return_value = ExtractedClaim(
+            relevant=True,
+            exact_quote="Sample Dam has a height of 42 metres.",
+            summary="Height recorded.",
+        )
         with tempfile.TemporaryDirectory() as directory:
             result = run_local_research(seed, None, "ollama:test", root=Path(directory))
             self.assertEqual(result["status"], "partial")
@@ -88,16 +116,23 @@ class DamResearchTests(unittest.TestCase):
             records = EvidenceWorkspace(seed, Path(directory)).load_records()
             self.assertEqual(len(records), 4)
             self.assertTrue(all(r.status == "discovery_only" for r in records))
-            self.assertEqual(compile_findings(seed, records)["candidate_project_patch"], {})
+            self.assertEqual(
+                compile_findings(seed, records)["candidate_project_patch"], {}
+            )
             fetch.assert_called_once()
 
     @patch.dict("os.environ", {"DAM_RESEARCH_RATE_LIMIT_DELAY_S": "0"})
-    @patch("src.dam_research_local.provider_web_search", side_effect=RuntimeError("provider unavailable"))
+    @patch(
+        "src.dam_research_local.provider_web_search",
+        side_effect=RuntimeError("provider unavailable"),
+    )
     def test_failed_run_cannot_claim_success_from_old_evidence(self, search):
         seed = DamResearchSeed(dam_id="sample", dam_name="Sample Dam")
         with tempfile.TemporaryDirectory() as directory:
             workspace = EvidenceWorkspace(seed, Path(directory))
-            record = workspace.archive_bytes(candidate(), b"The dam height is 42.0 metres.", "text/plain")
+            record = workspace.archive_bytes(
+                candidate(), b"The dam height is 42.0 metres.", "text/plain"
+            )
             workspace.save_records([record])
             result = run_local_research(seed, None, "ollama:test", root=Path(directory))
             self.assertEqual(result["status"], "failed")
@@ -111,8 +146,14 @@ class DamResearchTests(unittest.TestCase):
             body = b"The dam height is 42.0 metres."
             record = workspace.archive_bytes(candidate(), body, "text/plain")
             with self.assertRaises(ValueError):
-                workspace.archive_bytes(candidate(exact_quote="This is an invented quote."), body, "text/plain")
-            self.assertEqual((Path(directory) / record.artifact_path).read_bytes(), body)
+                workspace.archive_bytes(
+                    candidate(exact_quote="This is an invented quote."),
+                    body,
+                    "text/plain",
+                )
+            self.assertEqual(
+                (Path(directory) / record.artifact_path).read_bytes(), body
+            )
 
     def test_source_excerpt_centers_on_dam_name(self):
         text = "Unrelated preface. " * 1000 + "Machhu-II Dam has a masonry spillway."
@@ -123,10 +164,15 @@ class DamResearchTests(unittest.TestCase):
     @patch("src.dam_research_agent.requests.get")
     def test_searxng_search_returns_direct_source_links(self, get):
         response = get.return_value
-        response.json.return_value = {"results": [{
-            "title": "Official dam register", "url": "https://example.gov/dam",
-            "content": "Registry entry",
-        }]}
+        response.json.return_value = {
+            "results": [
+                {
+                    "title": "Official dam register",
+                    "url": "https://example.gov/dam",
+                    "content": "Registry entry",
+                }
+            ]
+        }
         result = provider_web_search("sample dam", "searxng")
         response.raise_for_status.assert_called_once()
         self.assertEqual(result["provider"], "searxng")
@@ -168,9 +214,13 @@ class DamResearchTests(unittest.TestCase):
                 candidate(), b"The dam height is 42.0 metres.", "text/plain"
             )
             second = workspace.archive_bytes(
-                candidate(title="Second official register", exact_quote="Height: 41 metres.",
-                          relevant_measurements={"dam_height_m": 41.0}),
-                b"Height: 41 metres.", "text/plain",
+                candidate(
+                    title="Second official register",
+                    exact_quote="Height: 41 metres.",
+                    relevant_measurements={"dam_height_m": 41.0},
+                ),
+                b"Height: 41 metres.",
+                "text/plain",
             )
             report = compile_findings(seed, [first, second])
             self.assertIn("dam_height_m", report["conflicts"])

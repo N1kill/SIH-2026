@@ -18,7 +18,9 @@ import logging
 from datetime import datetime
 
 # Configure logging
-logging.basicConfig(level=logging.INFO, format="[%(asctime)s] %(levelname)s: %(message)s")
+logging.basicConfig(
+    level=logging.INFO, format="[%(asctime)s] %(levelname)s: %(message)s"
+)
 
 # Project root (SIH directory, one level up from scripts/)
 PROJECT_ROOT = pathlib.Path(__file__).resolve().parents[1]
@@ -40,6 +42,7 @@ for name, path in SUBFOLDERS.items():
 # ---------------------------------------------------------------------------
 import time as _time
 
+
 def _retry(func, description: str, max_attempts: int = 3, backoff: float = 5.0):
     """Call *func()* up to *max_attempts* times with exponential backoff."""
     for attempt in range(1, max_attempts + 1):
@@ -47,11 +50,16 @@ def _retry(func, description: str, max_attempts: int = 3, backoff: float = 5.0):
             return func()
         except Exception as e:
             if attempt == max_attempts:
-                logging.error(f"{description}: all {max_attempts} attempts failed – {e}")
+                logging.error(
+                    f"{description}: all {max_attempts} attempts failed – {e}"
+                )
                 raise
             wait = backoff * (2 ** (attempt - 1))
-            logging.warning(f"{description}: attempt {attempt} failed ({e}). Retrying in {wait:.0f}s …")
+            logging.warning(
+                f"{description}: attempt {attempt} failed ({e}). Retrying in {wait:.0f}s …"
+            )
             _time.sleep(wait)
+
 
 # ---------------------------------------------------------------------------
 # 1. DEM download via OpenTopography
@@ -88,6 +96,7 @@ def download_dem(api_key: str, bbox: tuple, out_path: pathlib.Path):
 
     _retry(_do, "DEM download")
 
+
 # ---------------------------------------------------------------------------
 # 2. Rainfall via imdlib
 # ---------------------------------------------------------------------------
@@ -104,6 +113,7 @@ def download_rainfall(year: int, out_path: pathlib.Path):
         logging.info(f"Rainfall data for {year} saved to {out_path}")
 
     _retry(_do, f"Rainfall {year}")
+
 
 # ---------------------------------------------------------------------------
 # 3. River network – HydroRIVERS Asia shapefile
@@ -134,6 +144,7 @@ def download_hydrorivers(out_dir: pathlib.Path):
 
     _retry(_do, "HydroRIVERS download")
 
+
 # ---------------------------------------------------------------------------
 # 4. Dam register – NRLD PDF (manual step)
 # ---------------------------------------------------------------------------
@@ -144,6 +155,7 @@ def note_dam_register_manual():
         "save it to /data/raw/dams/nrld_2023.pdf, and extract the Machhu‑II rows "
         "into /data/raw/dams/nrld_machhu.csv."
     )
+
 
 # ---------------------------------------------------------------------------
 # Helper: check if a download step can be skipped
@@ -156,6 +168,7 @@ def _already_done(path: pathlib.Path, min_bytes: int = 1024) -> bool:
         return True
     return False
 
+
 # ---------------------------------------------------------------------------
 # Main execution
 # ---------------------------------------------------------------------------
@@ -166,7 +179,9 @@ if __name__ == "__main__":
     # 1. DEM
     dem_path = SUBFOLDERS["dem"] / "dem_raw.tif"
     if _already_done(dem_path):
-        logging.info(f"SKIP DEM – already exists: {dem_path} ({dem_path.stat().st_size / 1e6:.1f} MB)")
+        logging.info(
+            f"SKIP DEM – already exists: {dem_path} ({dem_path.stat().st_size / 1e6:.1f} MB)"
+        )
     else:
         try:
             download_dem(API_KEY, BBOX, dem_path)
@@ -176,7 +191,9 @@ if __name__ == "__main__":
     # 2. Rainfall for 1979
     rainfall_path = SUBFOLDERS["rainfall"] / "imd_1979.nc"
     if _already_done(rainfall_path):
-        logging.info(f"SKIP Rainfall – already exists: {rainfall_path} ({rainfall_path.stat().st_size / 1e6:.1f} MB)")
+        logging.info(
+            f"SKIP Rainfall – already exists: {rainfall_path} ({rainfall_path.stat().st_size / 1e6:.1f} MB)"
+        )
     else:
         try:
             download_rainfall(1979, rainfall_path)

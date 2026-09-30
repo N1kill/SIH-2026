@@ -48,8 +48,9 @@ from .sph_breach import SPHBreachSolver, SPHParams
 class GridSolverAdapter(Protocol):
     """Implement this against your existing downstream 2D solver."""
 
-    def set_upstream_boundary(self, discharge_m3s: float, velocity_ms: float,
-                               x_m: float) -> None: ...
+    def set_upstream_boundary(
+        self, discharge_m3s: float, velocity_ms: float, x_m: float
+    ) -> None: ...
 
     def step(self, dt_s: float) -> dict: ...
 
@@ -70,10 +71,11 @@ class StructuralObject:
     simplified load-bearing model checked against the locally computed flood
     depth and velocity. It is suitable for scenario testing, not design
     certification by a structural engineer."""
+
     name: str
     x_m: float
     y_m: float
-    frontal_area_m2: float          # area exposed to flow
+    frontal_area_m2: float  # area exposed to flow
     drag_coeff: float = 1.2
     failure_force_kN: float = 500.0  # structural capacity
     height_m: float = 5.0
@@ -100,32 +102,30 @@ class StructuralObject:
         width_m = self.frontal_area_m2 / max(self.height_m, 1e-6)
         submerged_area = width_m * submerged_height
         speed = float(np.linalg.norm(velocity_ms))
-        drag_kN = (
-            0.5 * rho * self.drag_coeff * submerged_area * speed ** 2 /
-            1000.0
-        )
-        hydrostatic_kN = (
-            0.5 * rho * gravity * width_m * submerged_height ** 2 /
-            1000.0
-        )
+        drag_kN = 0.5 * rho * self.drag_coeff * submerged_area * speed**2 / 1000.0
+        hydrostatic_kN = 0.5 * rho * gravity * width_m * submerged_height**2 / 1000.0
         uplift_kN = (
-            rho * gravity * self.foundation_area_m2 * submerged_height *
-            self.uplift_reduction_factor / 1000.0
+            rho
+            * gravity
+            * self.foundation_area_m2
+            * submerged_height
+            * self.uplift_reduction_factor
+            / 1000.0
         )
         effective_weight_kN = max(0.0, self.dead_weight_kN - uplift_kN)
         bearing_kPa = effective_weight_kN / max(self.foundation_area_m2, 1e-6)
         drag_lever_m = submerged_height * 0.5
         hydrostatic_lever_m = submerged_height / 3.0
         overturning_moment_kNm = (
-            drag_kN * drag_lever_m +
-            hydrostatic_kN * hydrostatic_lever_m
+            drag_kN * drag_lever_m + hydrostatic_kN * hydrostatic_lever_m
         )
         resisting_moment_kNm = effective_weight_kN * self.base_width_m * 0.5
         # JSON has no representation for Infinity.  ``None`` means the
         # water exerts no overturning moment (dry / zero-load condition).
         overturning_fs = (
             resisting_moment_kNm / overturning_moment_kNm
-            if overturning_moment_kNm > 1e-6 else None
+            if overturning_moment_kNm > 1e-6
+            else None
         )
         horizontal_load_kN = drag_kN + hydrostatic_kN
 
@@ -153,8 +153,10 @@ class StructuralObject:
             reason = "horizontal_capacity"
         elif state["bearing_kPa"] > self.allowable_bearing_kPa:
             reason = "bearing_capacity"
-        elif (state["overturning_fs"] is not None and
-              state["overturning_fs"] < self.minimum_overturning_fs):
+        elif (
+            state["overturning_fs"] is not None
+            and state["overturning_fs"] < self.minimum_overturning_fs
+        ):
             reason = "overturning"
 
         if reason:
@@ -170,8 +172,8 @@ class BreachCouplingSimulation:
     breach: PhysicallyBasedBreachGrowth
     sph: SPHBreachSolver
     grid: GridSolverAdapter
-    dam_length_m: float               # hard cap: breach can't exceed dam footprint
-    breach_x_m: float                 # location of breach along downstream grid's x-axis
+    dam_length_m: float  # hard cap: breach can't exceed dam footprint
+    breach_x_m: float  # location of breach along downstream grid's x-axis
     structures: list = field(default_factory=list)
     sph_substeps_per_macro_step: int = 5
     log: list = field(default_factory=list)
@@ -245,7 +247,11 @@ class BreachCouplingSimulation:
         #    That 2D area is then laid out as a rectangular slug of
         #    ``injection_width_m`` x ``slug_depth_m`` at the inlet.
         injection_width_m = min(self.breach.geometry.bottom_width_m, 5.0)
-        if breach_q > 0 and injection_width_m > 0 and breach_state.get("status") != "not_initiated":
+        if (
+            breach_q > 0
+            and injection_width_m > 0
+            and breach_state.get("status") != "not_initiated"
+        ):
             slice_area_m2 = (breach_q * dt_s) / max(self.sph_slice_width_m, 1e-6)
             slug_depth_m = slice_area_m2 / injection_width_m
             self.sph.seed_reservoir_block(
@@ -265,9 +271,11 @@ class BreachCouplingSimulation:
         # SPH-measured velocity/spray are diagnostic detail on top of the
         # mass-consistent breach_q -- not a replacement for it.
         sph_flux = self.sph.outflow_flux(gate_x_m=2.0)
-        velocity_for_boundary = (sph_flux["mean_velocity_ms"]
-                                  if sph_flux["mean_velocity_ms"] > 0
-                                  else self._hydraulic_velocity_estimate(breach_q))
+        velocity_for_boundary = (
+            sph_flux["mean_velocity_ms"]
+            if sph_flux["mean_velocity_ms"] > 0
+            else self._hydraulic_velocity_estimate(breach_q)
+        )
 
         # 4. Push every released component into the far-field boundary. The
         # local SPH slice resolves breach flow only; gate and overtopping
@@ -276,7 +284,9 @@ class BreachCouplingSimulation:
         # reached the downstream model.
         gate_velocity = self.reservoir.spillway_exit_velocity_ms()
         overtopping_velocity = np.sqrt(
-            2 * 9.81 * max(
+            2
+            * 9.81
+            * max(
                 self.reservoir.elevation_m - self.reservoir.dam_crest_elevation_m,
                 0.0,
             )
@@ -284,11 +294,13 @@ class BreachCouplingSimulation:
         total_downstream_q = breach_q + spillway_q + overtopping_q
         velocity_for_boundary = (
             (
-                breach_q * velocity_for_boundary +
-                spillway_q * gate_velocity +
-                overtopping_q * overtopping_velocity
-            ) / total_downstream_q
-            if total_downstream_q > 0 else 0.0
+                breach_q * velocity_for_boundary
+                + spillway_q * gate_velocity
+                + overtopping_q * overtopping_velocity
+            )
+            / total_downstream_q
+            if total_downstream_q > 0
+            else 0.0
         )
         self.grid.set_upstream_boundary(
             discharge_m3s=total_downstream_q,
@@ -310,11 +322,14 @@ class BreachCouplingSimulation:
             vel = self.grid.velocity_at(s.x_m, s.y_m)
             failed = s.check(depth, vel, self.reservoir.time_s)
             load = s.load_state(depth, vel)
-            structure_results.append({
-                "name": s.name, "failed": failed,
-                "failure_reason": s.failure_reason,
-                **load,
-            })
+            structure_results.append(
+                {
+                    "name": s.name,
+                    "failed": failed,
+                    "failure_reason": s.failure_reason,
+                    **load,
+                }
+            )
 
         record = {
             "time_s": self.reservoir.time_s,
@@ -323,7 +338,7 @@ class BreachCouplingSimulation:
             "breach_status": breach_state.get("status"),
             "breach_bottom_width_m": self.breach.geometry.bottom_width_m,
             "breach_bottom_elevation_m": self.breach.geometry.bottom_elevation_m,
-            "breach_outflow_m3s": breach_q,          # single source of truth
+            "breach_outflow_m3s": breach_q,  # single source of truth
             "spillway_outflow_m3s": spillway_q,
             "overtopping_outflow_m3s": overtopping_q,
             "downstream_inflow_m3s": total_downstream_q,

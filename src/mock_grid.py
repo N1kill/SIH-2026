@@ -24,8 +24,9 @@ class MockGridAdapter:
         self._boundary_q = 0.0
         self._boundary_v = 0.0
 
-    def set_upstream_boundary(self, discharge_m3s: float, velocity_ms: float,
-                               x_m: float) -> None:
+    def set_upstream_boundary(
+        self, discharge_m3s: float, velocity_ms: float, x_m: float
+    ) -> None:
         self._boundary_q = discharge_m3s
         self._boundary_v = velocity_ms
 

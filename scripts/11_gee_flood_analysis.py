@@ -32,7 +32,9 @@ from rasterio.transform import from_bounds
 from scipy.ndimage import gaussian_filter
 
 # Configure logging
-logging.basicConfig(level=logging.INFO, format="[%(asctime)s] %(levelname)s: %(message)s")
+logging.basicConfig(
+    level=logging.INFO, format="[%(asctime)s] %(levelname)s: %(message)s"
+)
 
 # Project directories
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -62,9 +64,13 @@ def generate_satellite_flood_extent(ref_dem_path):
     Applies SAR backscatter thresholding (Otsu threshold on VV/VH backscatter).
     Uses Live GEE API with headless fallback.
     """
-    cached_s1_file = PROJECT_ROOT / "data" / "raw" / "satellite" / "cached_sentinel1.tif"
+    cached_s1_file = (
+        PROJECT_ROOT / "data" / "raw" / "satellite" / "cached_sentinel1.tif"
+    )
     if not cached_s1_file.is_file():
-        raise FileNotFoundError("No observed SAR raster: supply data/raw/satellite/cached_sentinel1.tif. Missing observations must not become an empty observed flood mask.")
+        raise FileNotFoundError(
+            "No observed SAR raster: supply data/raw/satellite/cached_sentinel1.tif. Missing observations must not become an empty observed flood mask."
+        )
     logging.info(f"Loading reference grid geometry from: {ref_dem_path}")
     with rasterio.open(ref_dem_path) as src:
         dem = src.read(1)
@@ -79,31 +85,48 @@ def generate_satellite_flood_extent(ref_dem_path):
     # Network context is handled by src.observations. This operation requires
     # an actual local SAR raster and never triggers interactive authentication.
     # Fallback to locally cached genuine Sentinel-1 GeoTIFF
-    cached_s1_file = PROJECT_ROOT / "data" / "raw" / "satellite" / "cached_sentinel1.tif"
+    cached_s1_file = (
+        PROJECT_ROOT / "data" / "raw" / "satellite" / "cached_sentinel1.tif"
+    )
     sar_backscatter_db = np.full(dem.shape, np.nan, dtype=np.float32)
-    
+
     if cached_s1_file.is_file():
         logging.info(f"Loading cached real Sentinel-1 GeoTIFF from {cached_s1_file}")
         with rasterio.open(cached_s1_file) as s_src:
             cached_data = s_src.read(1)
             from rasterio.warp import reproject, Resampling
+
             if s_src.crs is None:
                 raise ValueError("SAR raster requires a CRS")
-            reproject(source=cached_data,destination=sar_backscatter_db,
-                src_transform=s_src.transform,src_crs=s_src.crs,src_nodata=s_src.nodata,
-                dst_transform=transform,dst_crs=crs,dst_nodata=np.nan,resampling=Resampling.bilinear)
+            reproject(
+                source=cached_data,
+                destination=sar_backscatter_db,
+                src_transform=s_src.transform,
+                src_crs=s_src.crs,
+                src_nodata=s_src.nodata,
+                dst_transform=transform,
+                dst_crs=crs,
+                dst_nodata=np.nan,
+                resampling=Resampling.bilinear,
+            )
     else:
-        logging.warning("Cached Sentinel-1 file not found. Generating empty mask as fallback to avoid fake data.")
+        logging.warning(
+            "Cached Sentinel-1 file not found. Generating empty mask as fallback to avoid fake data."
+        )
         # We explicitly DO NOT generate synthetic data here per user request.
 
     # Explicit fixed exploratory threshold, not an Otsu estimate or validated flood classifier.
     otsu_threshold = -17.0
     water_mask = (sar_backscatter_db < otsu_threshold).astype(np.uint8)
-    
-    water_mask_clean = (gaussian_filter(water_mask.astype(float), sigma=0.5) > 0.35).astype(np.uint8)
+
+    water_mask_clean = (
+        gaussian_filter(water_mask.astype(float), sigma=0.5) > 0.35
+    ).astype(np.uint8)
     water_mask_clean[~np.isfinite(sar_backscatter_db)] = 255
     satellite_water_area_km2 = float(np.sum(water_mask_clean == 1) * cell_area_km2)
-    logging.info(f"Derived satellite water surface area: {satellite_water_area_km2:.2f} km� (Machhu AOI)")
+    logging.info(
+        f"Derived satellite water surface area: {satellite_water_area_km2:.2f} km� (Machhu AOI)"
+    )
 
     profile = {
         "driver": "GTiff",
@@ -116,10 +139,12 @@ def generate_satellite_flood_extent(ref_dem_path):
         "transform": transform,
         "compress": "lzw",
     }
-    
+
     with rasterio.open(OUTPUT_GEE_TIF, "w", **profile) as dst:
         dst.write(water_mask_clean, 1)
-        dst.set_band_description(1, "Satellite / GEE Observed Flood Extent (1=Water, 0=Non-Water)")
+        dst.set_band_description(
+            1, "Satellite / GEE Observed Flood Extent (1=Water, 0=Non-Water)"
+        )
     logging.info(f"Saved satellite flood GeoTIFF: {OUTPUT_GEE_TIF}")
 
     return {
@@ -141,14 +166,22 @@ def generate_satellite_plots(sat_data):
 
     # 1. SAR Backscatter map
     im1 = ax1.imshow(sat_data["sar_backscatter"], cmap="gray", vmin=-25, vmax=-5)
-    ax1.set_title("Sentinel-1 SAR Backscatter intensity (VV/VH dB)", fontsize=11, fontweight="bold")
+    ax1.set_title(
+        "Sentinel-1 SAR Backscatter intensity (VV/VH dB)",
+        fontsize=11,
+        fontweight="bold",
+    )
     ax1.axis("off")
     cbar1 = plt.colorbar(im1, ax=ax1, fraction=0.035, pad=0.04)
     cbar1.set_label("Backscatter sigma-0 [dB]", fontsize=9)
 
     # 2. Classified Satellite Flood Extent
     im2 = ax2.imshow(sat_data["water_mask"], cmap="Blues", vmin=0, vmax=1)
-    ax2.set_title("GEE / Satellite Inundation Extent (Otsu Thresholded)", fontsize=11, fontweight="bold")
+    ax2.set_title(
+        "GEE / Satellite Inundation Extent (Otsu Thresholded)",
+        fontsize=11,
+        fontweight="bold",
+    )
     ax2.axis("off")
     cbar2 = plt.colorbar(im2, ax=ax2, fraction=0.035, pad=0.04, ticks=[0, 1])
     cbar2.ax.set_yticklabels(["Dry Land", "Inundated Water"])
@@ -175,7 +208,7 @@ def export_summary(sat_data):
         "outputs": {
             "flood_extent_tif": str(OUTPUT_GEE_TIF),
             "validation_plot": str(OUTPUT_PLOT),
-        }
+        },
     }
     with open(OUTPUT_JSON, "w") as f:
         json.dump(summary, f, indent=2)

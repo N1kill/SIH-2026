@@ -32,7 +32,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 import rasterio
 
-logging.basicConfig(level=logging.INFO, format="[%(asctime)s] %(levelname)s: %(message)s")
+logging.basicConfig(
+    level=logging.INFO, format="[%(asctime)s] %(levelname)s: %(message)s"
+)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 OUTPUTS_SIM = PROJECT_ROOT / "outputs" / "simulation"
@@ -88,7 +90,7 @@ def compute_damage_exposure(depth_path, velocity_path):
     total_inund_km2 = area_low_km2 + area_mod_km2 + area_high_km2 + area_extreme_km2
 
     # Demographics & Population Exposure (Morbi District: ~1,250 persons/km² in peri-urban valley)
-    pop_density_rural = 450.0   # persons/km²
+    pop_density_rural = 450.0  # persons/km²
     pop_density_urban = 2800.0  # persons/km² average along urban floodplain
 
     pop_low = int(area_low_km2 * pop_density_rural)
@@ -108,11 +110,22 @@ def compute_damage_exposure(depth_path, velocity_path):
 
     # Economic Loss Estimation (INR Crores, ₹)
     # Stage-damage vulnerability factors:
-    loss_residential_cr = round(buildings_affected * 0.035 * 1.5, 2)    # Structural damage & contents
-    loss_commercial_cr = round(total_inund_km2 * 8.5, 2)               # Morbi ceramic & manufacturing units
-    loss_infra_cr = round(road_inundated_km * 0.45 + bridges_submerged * 4.0, 2)  # Roads, power, bridges
-    loss_agriculture_cr = round(crop_area_ha * 0.0075, 2)              # Kharif crop loss (Cotton, Groundnut)
-    total_economic_loss_cr = round(loss_residential_cr + loss_commercial_cr + loss_infra_cr + loss_agriculture_cr, 2)
+    loss_residential_cr = round(
+        buildings_affected * 0.035 * 1.5, 2
+    )  # Structural damage & contents
+    loss_commercial_cr = round(
+        total_inund_km2 * 8.5, 2
+    )  # Morbi ceramic & manufacturing units
+    loss_infra_cr = round(
+        road_inundated_km * 0.45 + bridges_submerged * 4.0, 2
+    )  # Roads, power, bridges
+    loss_agriculture_cr = round(
+        crop_area_ha * 0.0075, 2
+    )  # Kharif crop loss (Cotton, Groundnut)
+    total_economic_loss_cr = round(
+        loss_residential_cr + loss_commercial_cr + loss_infra_cr + loss_agriculture_cr,
+        2,
+    )
 
     hazard_grid = np.zeros_like(depth, dtype=np.uint8)
     hazard_grid[low_mask] = 1
@@ -158,19 +171,29 @@ def compute_damage_exposure(depth_path, velocity_path):
 # ---------------------------------------------------------------------------
 def generate_damage_plots(results, hazard_grid):
     """Generate multi-panel damage maps and economic loss breakdown charts."""
-    
+
     # 1. Flood Hazard Intensity Map
     fig, ax = plt.subplots(figsize=(10, 8), dpi=200)
     masked_h = np.ma.masked_where(hazard_grid == 0, hazard_grid)
     im = ax.imshow(masked_h, cmap="YlOrRd", vmin=1, vmax=4)
-    
-    labels = ["Low (<0.5m)", "Moderate (0.5–1.5m)", "High (1.5–3.0m)", "Extreme (>3.0m / Life Threat)"]
-    cbar = plt.colorbar(im, ax=ax, fraction=0.035, pad=0.04, ticks=[1.375, 2.125, 2.875, 3.625])
+
+    labels = [
+        "Low (<0.5m)",
+        "Moderate (0.5–1.5m)",
+        "High (1.5–3.0m)",
+        "Extreme (>3.0m / Life Threat)",
+    ]
+    cbar = plt.colorbar(
+        im, ax=ax, fraction=0.035, pad=0.04, ticks=[1.375, 2.125, 2.875, 3.625]
+    )
     cbar.ax.set_yticklabels(labels, fontsize=9)
     cbar.set_label("Flood Hazard Severity Level", fontsize=10, fontweight="bold")
-    
-    ax.set_title(f"Machhu-II Dam Breach: Flood Hazard & Exposure Map\nTotal Inundation: {results['hazard_areas_km2']['total_inundation_area_km2']} km² | Population Exposed: {results['population_exposure']['total_population_exposed']:,}", 
-                 fontsize=11, fontweight="bold")
+
+    ax.set_title(
+        f"Machhu-II Dam Breach: Flood Hazard & Exposure Map\nTotal Inundation: {results['hazard_areas_km2']['total_inundation_area_km2']} km² | Population Exposed: {results['population_exposure']['total_population_exposed']:,}",
+        fontsize=11,
+        fontweight="bold",
+    )
     ax.axis("off")
     plt.tight_layout()
     plt.savefig(HAZARD_MAP, dpi=200)
@@ -179,25 +202,65 @@ def generate_damage_plots(results, hazard_grid):
 
     # 2. Economic Loss & Sector Breakdown Chart
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(13, 5), dpi=200)
-    
+
     # Pie chart: Sector breakdown
     losses = results["economic_loss_inr_crores"]
-    sector_labels = ["Residential", "Commercial / Industrial", "Infrastructure", "Agriculture"]
-    sector_values = [losses["residential_housing"], losses["commercial_industrial"], losses["infrastructure_transport"], losses["agriculture_crops"]]
+    sector_labels = [
+        "Residential",
+        "Commercial / Industrial",
+        "Infrastructure",
+        "Agriculture",
+    ]
+    sector_values = [
+        losses["residential_housing"],
+        losses["commercial_industrial"],
+        losses["infrastructure_transport"],
+        losses["agriculture_crops"],
+    ]
     sector_colors = ["#e76f51", "#2a9d8f", "#457b9d", "#e9c46a"]
-    
-    ax1.pie(sector_values, labels=sector_labels, colors=sector_colors, autopct="%1.1f%%", startangle=140,
-            textprops={"fontsize": 9, "fontweight": "bold"})
-    ax1.set_title(f"Economic Loss by Sector\nTotal: ₹{losses['total_estimated_loss_cr']:,.2f} Crores", fontsize=11, fontweight="bold")
+
+    ax1.pie(
+        sector_values,
+        labels=sector_labels,
+        colors=sector_colors,
+        autopct="%1.1f%%",
+        startangle=140,
+        textprops={"fontsize": 9, "fontweight": "bold"},
+    )
+    ax1.set_title(
+        f"Economic Loss by Sector\nTotal: ₹{losses['total_estimated_loss_cr']:,.2f} Crores",
+        fontsize=11,
+        fontweight="bold",
+    )
 
     # Bar chart: Population exposure by hazard level
     pop = results["population_exposure"]
-    pop_categories = ["Low (<0.5m)", "Moderate (0.5–1.5m)", "High (1.5–3m)", "Extreme (>3m)"]
-    pop_vals = [pop["low_risk"], pop["moderate_risk"], pop["high_risk"], pop["extreme_risk_danger_to_life"]]
-    
-    ax2.bar(pop_categories, pop_vals, color=["#a8dadc", "#e9c46a", "#f4a261", "#d62828"], edgecolor="black", alpha=0.85)
+    pop_categories = [
+        "Low (<0.5m)",
+        "Moderate (0.5–1.5m)",
+        "High (1.5–3m)",
+        "Extreme (>3m)",
+    ]
+    pop_vals = [
+        pop["low_risk"],
+        pop["moderate_risk"],
+        pop["high_risk"],
+        pop["extreme_risk_danger_to_life"],
+    ]
+
+    ax2.bar(
+        pop_categories,
+        pop_vals,
+        color=["#a8dadc", "#e9c46a", "#f4a261", "#d62828"],
+        edgecolor="black",
+        alpha=0.85,
+    )
     ax2.set_ylabel("Exposed Population", fontsize=10, fontweight="bold")
-    ax2.set_title(f"Population Exposure by Risk Category\nTotal Exposed: {pop['total_population_exposed']:,} Persons", fontsize=11, fontweight="bold")
+    ax2.set_title(
+        f"Population Exposure by Risk Category\nTotal Exposed: {pop['total_population_exposed']:,} Persons",
+        fontsize=11,
+        fontweight="bold",
+    )
     ax2.grid(True, linestyle=":", alpha=0.6)
     for i, v in enumerate(pop_vals):
         ax2.text(i, v + 200, f"{v:,}", ha="center", fontsize=8, fontweight="bold")
@@ -248,14 +311,14 @@ def export_damage_report(results):
 
 | Impact Category | Metric / Quantity | Units |
 | :--- | :--- | :--- |
-| **Total Inundated Floodplain Area** | **{haz['total_inundation_area_km2']:.2f}** | $\\text{{km}}^2$ |
-| **High & Extreme Hazard Zone ($>1.5\\text{{ m}}$)** | **{(haz['high_hazard_1_5_to_3_0m'] + haz['extreme_hazard_gt_3_0m']):.2f}** | $\\text{{km}}^2$ |
-| **Total Population Exposed** | **{pop['total_population_exposed']:,}** | Persons |
-| **High / Immediate Life Threat Population** | **{pop['extreme_risk_danger_to_life']:,}** | Persons |
-| **Buildings & Housing Units Affected** | **{inf['buildings_structures_affected']:,}** | Structures (Estimated) |
-| **Road Network Cutoff / Submerged** | **{inf['road_network_inundated_km']:.1f}** | $\\text{{km}}$ (Estimated) |
-| **Inundated Agricultural Cropland** | **{inf['cropland_inundated_ha']:,}** | Hectares (Estimated) |
-| **Total Estimated Economic Damage** | **₹{eco['total_estimated_loss_cr']:,.2f}** | Crores (INR) |
+| **Total Inundated Floodplain Area** | **{haz["total_inundation_area_km2"]:.2f}** | $\\text{{km}}^2$ |
+| **High & Extreme Hazard Zone ($>1.5\\text{{ m}}$)** | **{(haz["high_hazard_1_5_to_3_0m"] + haz["extreme_hazard_gt_3_0m"]):.2f}** | $\\text{{km}}^2$ |
+| **Total Population Exposed** | **{pop["total_population_exposed"]:,}** | Persons |
+| **High / Immediate Life Threat Population** | **{pop["extreme_risk_danger_to_life"]:,}** | Persons |
+| **Buildings & Housing Units Affected** | **{inf["buildings_structures_affected"]:,}** | Structures (Estimated) |
+| **Road Network Cutoff / Submerged** | **{inf["road_network_inundated_km"]:.1f}** | $\\text{{km}}$ (Estimated) |
+| **Inundated Agricultural Cropland** | **{inf["cropland_inundated_ha"]:,}** | Hectares (Estimated) |
+| **Total Estimated Economic Damage** | **₹{eco["total_estimated_loss_cr"]:,.2f}** | Crores (INR) |
 
 ---
 
@@ -263,10 +326,10 @@ def export_damage_report(results):
 
 | Flood Hazard Level | Inundation Depth ($h$) | Inundated Area (km²) | Population Exposed | Vulnerability & Action Level |
 | :--- | :---: | :---: | :---: | :--- |
-| **Low** | $< 0.5\\text{{ m}}$ | {haz['low_hazard_lt_0_5m']:.2f} | {pop['low_risk']:,} | Minor waterlogging; pedestrian caution |
-| **Moderate** | $0.5 - 1.5\\text{{ m}}$ | {haz['moderate_hazard_0_5_to_1_5m']:.2f} | {pop['moderate_risk']:,} | Ground floor flooding; vehicular movement stopped |
-| **High** | $1.5 - 3.0\\text{{ m}}$ | {haz['high_hazard_1_5_to_3_0m']:.2f} | {pop['high_risk']:,} | Severe structural hazard; mandatory vertical evacuation |
-| **Extreme** | $> 3.0\\text{{ m}}$ or $h \\cdot v \\ge 1.5$ | {haz['extreme_hazard_gt_3_0m']:.2f} | {pop['extreme_risk_danger_to_life']:,} | Direct life threat / structural collapse danger |
+| **Low** | $< 0.5\\text{{ m}}$ | {haz["low_hazard_lt_0_5m"]:.2f} | {pop["low_risk"]:,} | Minor waterlogging; pedestrian caution |
+| **Moderate** | $0.5 - 1.5\\text{{ m}}$ | {haz["moderate_hazard_0_5_to_1_5m"]:.2f} | {pop["moderate_risk"]:,} | Ground floor flooding; vehicular movement stopped |
+| **High** | $1.5 - 3.0\\text{{ m}}$ | {haz["high_hazard_1_5_to_3_0m"]:.2f} | {pop["high_risk"]:,} | Severe structural hazard; mandatory vertical evacuation |
+| **Extreme** | $> 3.0\\text{{ m}}$ or $h \\cdot v \\ge 1.5$ | {haz["extreme_hazard_gt_3_0m"]:.2f} | {pop["extreme_risk_danger_to_life"]:,} | Direct life threat / structural collapse danger |
 
 ---
 
@@ -274,16 +337,16 @@ def export_damage_report(results):
 
 | Sector | Estimated Damage (₹ Crores) | Percentage | Key Drivers |
 | :--- | :---: | :---: | :--- |
-| **Commercial & Industrial** | ₹{eco['commercial_industrial']:,.2f} Cr | {eco['commercial_industrial']/eco['total_estimated_loss_cr']*100:.1f}% | Morbi ceramic cluster, industrial machinery, export goods |
-| **Residential & Housing** | ₹{eco['residential_housing']:,.2f} Cr | {eco['residential_housing']/eco['total_estimated_loss_cr']*100:.1f}% | Structural rebuilding, household property loss |
-| **Public Infrastructure** | ₹{eco['infrastructure_transport']:,.2f} Cr | {eco['infrastructure_transport']/eco['total_estimated_loss_cr']*100:.1f}% | Road repairs, bridge rehabilitation, electrical grid |
-| **Agriculture & Crops** | ₹{eco['agriculture_crops']:,.2f} Cr | {eco['agriculture_crops']/eco['total_estimated_loss_cr']*100:.1f}% | Standing Kharif crops (cotton, groundnut, sesame) |
-| **TOTAL** | **₹{eco['total_estimated_loss_cr']:,.2f} Cr** | **100.0%** | Comprehensive multi-sector impact |
+| **Commercial & Industrial** | ₹{eco["commercial_industrial"]:,.2f} Cr | {eco["commercial_industrial"] / eco["total_estimated_loss_cr"] * 100:.1f}% | Morbi ceramic cluster, industrial machinery, export goods |
+| **Residential & Housing** | ₹{eco["residential_housing"]:,.2f} Cr | {eco["residential_housing"] / eco["total_estimated_loss_cr"] * 100:.1f}% | Structural rebuilding, household property loss |
+| **Public Infrastructure** | ₹{eco["infrastructure_transport"]:,.2f} Cr | {eco["infrastructure_transport"] / eco["total_estimated_loss_cr"] * 100:.1f}% | Road repairs, bridge rehabilitation, electrical grid |
+| **Agriculture & Crops** | ₹{eco["agriculture_crops"]:,.2f} Cr | {eco["agriculture_crops"] / eco["total_estimated_loss_cr"] * 100:.1f}% | Standing Kharif crops (cotton, groundnut, sesame) |
+| **TOTAL** | **₹{eco["total_estimated_loss_cr"]:,.2f} Cr** | **100.0%** | Comprehensive multi-sector impact |
 
 ---
 
 ## 4. Emergency Management Recommendations
-1. **Priority Evacuation Zones**: Establish immediate warning triggers for the **{pop['extreme_risk_danger_to_life']:,}** residents located in the high-velocity extreme inundation corridor.
+1. **Priority Evacuation Zones**: Establish immediate warning triggers for the **{pop["extreme_risk_danger_to_life"]:,}** residents located in the high-velocity extreme inundation corridor.
 2. **Safe Evacuation Corridors**: Route emergency evacuations towards eastern and southeastern elevated ridges ($>55\\text{{m}}$ elevation) away from the low-lying Machhu river channel.
 
 ---
@@ -313,11 +376,21 @@ def main():
 
     print("\n" + "=" * 70)
     print("  Directive 7 Completed Successfully!")
-    print(f"  Total Inundation Area  : {results['hazard_areas_km2']['total_inundation_area_km2']} km²")
-    print(f"  Total Pop. Exposed     : {results['population_exposure']['total_population_exposed']:,} Persons (Density estimate)")
-    print(f"  Structures Affected    : {results['infrastructure_damage']['buildings_structures_affected']:,} (Density estimate)")
-    print(f"  Total Economic Loss    : ₹{results['economic_loss_inr_crores']['total_estimated_loss_cr']:,.2f} Crores")
-    print(f"  Methodology Note       : Figures are macro area-based density estimates (see documentation)")
+    print(
+        f"  Total Inundation Area  : {results['hazard_areas_km2']['total_inundation_area_km2']} km²"
+    )
+    print(
+        f"  Total Pop. Exposed     : {results['population_exposure']['total_population_exposed']:,} Persons (Density estimate)"
+    )
+    print(
+        f"  Structures Affected    : {results['infrastructure_damage']['buildings_structures_affected']:,} (Density estimate)"
+    )
+    print(
+        f"  Total Economic Loss    : ₹{results['economic_loss_inr_crores']['total_estimated_loss_cr']:,.2f} Crores"
+    )
+    print(
+        f"  Methodology Note       : Figures are macro area-based density estimates (see documentation)"
+    )
     print(f"  Damage Report          : {REPORT_MD}")
     print("=" * 70)
 

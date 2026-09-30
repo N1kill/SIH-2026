@@ -31,7 +31,9 @@ import numpy as np
 import rasterio
 from rasterio.crs import CRS
 
-logging.basicConfig(level=logging.INFO, format="[%(asctime)s] %(levelname)s: %(message)s")
+logging.basicConfig(
+    level=logging.INFO, format="[%(asctime)s] %(levelname)s: %(message)s"
+)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 OUTPUTS_SIM = PROJECT_ROOT / "outputs" / "simulation"
@@ -55,7 +57,7 @@ SUMMARY_JSON = OUTPUTS_SIM / "risk_analysis_summary.json"
 def compute_risk_and_evacuation(depth_file, velocity_file, arrival_file, dem_file):
     """Compute cell-by-cell composite risk score and designate evacuation priority zones."""
     logging.info("Loading rasters for risk and evacuation analysis...")
-    
+
     with rasterio.open(depth_file) as src_d:
         depth = src_d.read(1)
         transform = src_d.transform
@@ -93,7 +95,11 @@ def compute_risk_and_evacuation(depth_file, velocity_file, arrival_file, dem_fil
 
     # Composite Risk Index (CRI): Scale 0 to 100
     cri = np.zeros_like(depth, dtype=np.float32)
-    cri[valid_mask] = (0.45 * h_norm[valid_mask] + 0.35 * v_norm[valid_mask] + 0.20 * u_norm[valid_mask]) * 100.0
+    cri[valid_mask] = (
+        0.45 * h_norm[valid_mask]
+        + 0.35 * v_norm[valid_mask]
+        + 0.20 * u_norm[valid_mask]
+    ) * 100.0
 
     # Classify Risk Zones:
     # 0: Low Risk (<25), 1: Medium (25-50), 2: High (50-75), 3: Critical / Immediate Evacuation (>=75)
@@ -110,7 +116,7 @@ def compute_risk_and_evacuation(depth_file, velocity_file, arrival_file, dem_fil
 
     # Identify Safe Evacuation High-Ground Centers (>52m elevation in Morbi vicinity)
     safe_highground_mask = (~valid_mask) & (dem >= 52.0)
-    
+
     # Save Risk Map GeoTIFF
     profile = {
         "driver": "GTiff",
@@ -123,10 +129,13 @@ def compute_risk_and_evacuation(depth_file, velocity_file, arrival_file, dem_fil
         "transform": transform,
         "compress": "lzw",
     }
-    
+
     with rasterio.open(RISK_TIF, "w", **profile) as dst:
         dst.write(risk_zone, 1)
-        dst.set_band_description(1, "Composite Disaster Risk Classification (1=Low, 2=Medium, 3=High, 4=Critical Priority)")
+        dst.set_band_description(
+            1,
+            "Composite Disaster Risk Classification (1=Low, 2=Medium, 3=High, 4=Critical Priority)",
+        )
     logging.info(f"Saved risk GeoTIFF: {RISK_TIF}")
 
     results = {
@@ -135,21 +144,46 @@ def compute_risk_and_evacuation(depth_file, velocity_file, arrival_file, dem_fil
             "medium_risk": round(area_med, 2),
             "high_risk": round(area_high, 2),
             "critical_priority_evacuation": round(area_critical, 2),
-            "total_risk_area_km2": round(area_low + area_med + area_high + area_critical, 2),
+            "total_risk_area_km2": round(
+                area_low + area_med + area_high + area_critical, 2
+            ),
         },
         "evacuation_parameters": {
             "critical_lead_time_morbi_hours": 2.50,
             "high_ground_elevation_threshold_m": 52.0,
             "priority_hadr_centers": [
-                {"name": "Morbi East High Ground Shelter 1 (Illustrative)", "type": "Elevation Ridge (>55m) - Planning Benchmark", "capacity": 25000, "status": "Illustrative Planning Benchmark"},
-                {"name": "Morbi South-East Relief Camp (Illustrative)", "type": "Government Complex - Planning Benchmark", "capacity": 18000, "status": "Illustrative Planning Benchmark"},
-                {"name": "Liliya Ridge Transit Hub (Illustrative)", "type": "High Ground Transport Hub - Planning Benchmark", "capacity": 12000, "status": "Illustrative Planning Benchmark"},
+                {
+                    "name": "Morbi East High Ground Shelter 1 (Illustrative)",
+                    "type": "Elevation Ridge (>55m) - Planning Benchmark",
+                    "capacity": 25000,
+                    "status": "Illustrative Planning Benchmark",
+                },
+                {
+                    "name": "Morbi South-East Relief Camp (Illustrative)",
+                    "type": "Government Complex - Planning Benchmark",
+                    "capacity": 18000,
+                    "status": "Illustrative Planning Benchmark",
+                },
+                {
+                    "name": "Liliya Ridge Transit Hub (Illustrative)",
+                    "type": "High Ground Transport Hub - Planning Benchmark",
+                    "capacity": 12000,
+                    "status": "Illustrative Planning Benchmark",
+                },
             ],
             "evacuation_routes": [
-                {"route_id": "R1_EAST", "name": "Morbi Central to East Bypass Ridge", "status": "Primary Safe Corridor (Above Inundation)"},
-                {"route_id": "R2_SOUTH", "name": "Vankaner Elevated Highway", "status": "Secondary Inflow Cutoff Route"},
-            ]
-        }
+                {
+                    "route_id": "R1_EAST",
+                    "name": "Morbi Central to East Bypass Ridge",
+                    "status": "Primary Safe Corridor (Above Inundation)",
+                },
+                {
+                    "route_id": "R2_SOUTH",
+                    "name": "Vankaner Elevated Highway",
+                    "status": "Secondary Inflow Cutoff Route",
+                },
+            ],
+        },
     }
 
     return results, risk_zone, cri, dem
@@ -165,7 +199,11 @@ def generate_risk_plots(results, risk_zone, cri, dem):
     # 1. Composite Risk Index (Continuous Score 0-100)
     masked_cri = np.ma.masked_where(cri <= 0.1, cri)
     im1 = ax1.imshow(masked_cri, cmap="inferno", vmin=0, vmax=100)
-    ax1.set_title("Multi-Criteria Composite Risk Index (CRI 0–100)\n[Hazard 45% + Submersion 35% + Urgency 20%]", fontsize=10, fontweight="bold")
+    ax1.set_title(
+        "Multi-Criteria Composite Risk Index (CRI 0–100)\n[Hazard 45% + Submersion 35% + Urgency 20%]",
+        fontsize=10,
+        fontweight="bold",
+    )
     ax1.axis("off")
     cbar1 = plt.colorbar(im1, ax=ax1, fraction=0.035, pad=0.04)
     cbar1.set_label("Composite Risk Score", fontsize=9, fontweight="bold")
@@ -173,13 +211,19 @@ def generate_risk_plots(results, risk_zone, cri, dem):
     # 2. Categorized Emergency Evacuation Map
     masked_rz = np.ma.masked_where(risk_zone == 0, risk_zone)
     im2 = ax2.imshow(masked_rz, cmap="YlOrRd", vmin=1, vmax=4)
-    
+
     labels = ["Low Risk", "Medium Risk", "High Risk", "Critical Priority Evacuation"]
-    cbar2 = plt.colorbar(im2, ax=ax2, fraction=0.035, pad=0.04, ticks=[1.375, 2.125, 2.875, 3.625])
+    cbar2 = plt.colorbar(
+        im2, ax=ax2, fraction=0.035, pad=0.04, ticks=[1.375, 2.125, 2.875, 3.625]
+    )
     cbar2.ax.set_yticklabels(labels, fontsize=8)
     cbar2.set_label("Evacuation Priority Tier", fontsize=9, fontweight="bold")
 
-    ax2.set_title("HADR Emergency Evacuation Priority Zoning Map\n[Safe High Grounds >52m Ridge Elevation]", fontsize=10, fontweight="bold")
+    ax2.set_title(
+        "HADR Emergency Evacuation Priority Zoning Map\n[Safe High Grounds >52m Ridge Elevation]",
+        fontsize=10,
+        fontweight="bold",
+    )
     ax2.axis("off")
 
     plt.tight_layout()
@@ -226,10 +270,10 @@ $$\\text{{CRI}} = 0.45 \\cdot \\text{{Hazard (Depth}} \\times \\text{{Velocity)}
 
 | Priority Zone | CRI Range | Inundated Area (km²) | Population Action Directive | Emergency Response Strategy |
 | :--- | :---: | :---: | :--- | :--- |
-| **Zone 4: Critical Priority** | $\\ge 75$ | **{rz['critical_priority_evacuation']:.2f}** | **Immediate Mandatory Evacuation** | Rapid deployment of NDRF/SDRF boats & air rescue |
-| **Zone 3: High Risk** | $50 - 74$ | **{rz['high_risk']:.2f}** | **Vertical / Rapid Evacuation** | Relocate to verified multi-story RCC shelters |
-| **Zone 2: Medium Risk** | $25 - 49$ | **{rz['medium_risk']:.2f}** | **Preparedness & Shelter-in-Place** | Stock emergency rations, cut power lines |
-| **Zone 1: Low Risk** | $< 25$ | **{rz['low_risk']:.2f}** | **Caution & Monitoring** | Monitor municipal broadcast channels |
+| **Zone 4: Critical Priority** | $\\ge 75$ | **{rz["critical_priority_evacuation"]:.2f}** | **Immediate Mandatory Evacuation** | Rapid deployment of NDRF/SDRF boats & air rescue |
+| **Zone 3: High Risk** | $50 - 74$ | **{rz["high_risk"]:.2f}** | **Vertical / Rapid Evacuation** | Relocate to verified multi-story RCC shelters |
+| **Zone 2: Medium Risk** | $25 - 49$ | **{rz["medium_risk"]:.2f}** | **Preparedness & Shelter-in-Place** | Stock emergency rations, cut power lines |
+| **Zone 1: Low Risk** | $< 25$ | **{rz["low_risk"]:.2f}** | **Caution & Monitoring** | Monitor municipal broadcast channels |
 
 ---
 
@@ -273,17 +317,25 @@ def main():
     print("  Machhu-II Dam Breach Emergency Planning")
     print("=" * 70)
 
-    results, risk_zone, cri, dem = compute_risk_and_evacuation(DEPTH_TIF, VELOCITY_TIF, ARRIVAL_TIF, DEM_TIF)
+    results, risk_zone, cri, dem = compute_risk_and_evacuation(
+        DEPTH_TIF, VELOCITY_TIF, ARRIVAL_TIF, DEM_TIF
+    )
     generate_risk_plots(results, risk_zone, cri, dem)
     export_evacuation_plan(results)
 
     print("\n" + "=" * 70)
     print("  Directive 8 Completed Successfully!")
-    print(f"  Critical Evacuation Area : {results['risk_zones_km2']['critical_priority_evacuation']} km²")
-    print(f"  Total Risk Area          : {results['risk_zones_km2']['total_risk_area_km2']} km²")
+    print(
+        f"  Critical Evacuation Area : {results['risk_zones_km2']['critical_priority_evacuation']} km²"
+    )
+    print(
+        f"  Total Risk Area          : {results['risk_zones_km2']['total_risk_area_km2']} km²"
+    )
     print(f"  Risk GeoTIFF             : {RISK_TIF}")
     print(f"  Evacuation Plan Report   : {REPORT_MD}")
-    print(f"  Planning Note            : Shelter capacities and routes are illustrative planning benchmarks")
+    print(
+        f"  Planning Note            : Shelter capacities and routes are illustrative planning benchmarks"
+    )
     print("=" * 70)
 
 

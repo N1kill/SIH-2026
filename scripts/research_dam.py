@@ -1,4 +1,5 @@
 """Plan, run, and validate reusable public-source research for any dam."""
+
 from __future__ import annotations
 
 import argparse
@@ -10,7 +11,10 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from src.dam_research import (  # noqa: E402
-    DamResearchSeed, EvidenceWorkspace, compile_findings, make_research_plan,
+    DamResearchSeed,
+    EvidenceWorkspace,
+    compile_findings,
+    make_research_plan,
 )
 from src.dam_research_agent import run_research  # noqa: E402
 from src.project import Project, ROOT, projects  # noqa: E402
@@ -43,20 +47,31 @@ def load_project(value: str | None) -> tuple[Project | None, str | None]:
     return projects()[value], f"data/projects/{value}.json"
 
 
-def seed_from_args(args, project: Project | None, project_path: str | None) -> DamResearchSeed:
+def seed_from_args(
+    args, project: Project | None, project_path: str | None
+) -> DamResearchSeed:
     if project:
         base = DamResearchSeed.from_project(project, project_path).model_dump()
         updates = {
-            "country": args.country, "region": args.region, "river": args.river,
+            "country": args.country,
+            "region": args.region,
+            "river": args.river,
             "aliases": args.alias or [],
         }
-        return DamResearchSeed.model_validate({**base, **{k: v for k, v in updates.items() if v}})
+        return DamResearchSeed.model_validate(
+            {**base, **{k: v for k, v in updates.items() if v}}
+        )
     if not args.dam_id or not args.name:
         raise ValueError("Supply --project, or both --dam-id and --name")
     return DamResearchSeed(
-        dam_id=args.dam_id, dam_name=args.name, country=args.country,
-        region=args.region, river=args.river, latitude=args.latitude,
-        longitude=args.longitude, aliases=args.alias or [],
+        dam_id=args.dam_id,
+        dam_name=args.name,
+        country=args.country,
+        region=args.region,
+        river=args.river,
+        latitude=args.latitude,
+        longitude=args.longitude,
+        aliases=args.alias or [],
     )
 
 
@@ -73,7 +88,9 @@ def main():
     parser.add_argument("--latitude", type=float)
     parser.add_argument("--longitude", type=float)
     parser.add_argument("--alias", action="append")
-    parser.add_argument("--model", help="LangChain provider:model; defaults to DAM_RESEARCH_MODEL")
+    parser.add_argument(
+        "--model", help="LangChain provider:model; defaults to DAM_RESEARCH_MODEL"
+    )
     parser.add_argument("--thread-id")
     args = parser.parse_args()
 
@@ -85,7 +102,12 @@ def main():
         plan = make_research_plan(seed, project)
         path = workspace.directory / "research-plan.json"
         path.write_text(json.dumps(plan, indent=2), encoding="utf-8")
-        print(json.dumps({"plan": str(path.relative_to(ROOT)), "tracks": len(plan["tracks"])}, indent=2))
+        print(
+            json.dumps(
+                {"plan": str(path.relative_to(ROOT)), "tracks": len(plan["tracks"])},
+                indent=2,
+            )
+        )
     elif args.action == "run":
         result = run_research(seed, project, args.model, args.thread_id)
         print(json.dumps(result, indent=2, default=str))
@@ -93,8 +115,16 @@ def main():
             raise SystemExit(2)
     elif args.action == "validate":
         manifest = verify_evidence(workspace.directory / "agent-evidence.json")
-        print(json.dumps({"valid": True, "project_id": manifest.project_id,
-                          "evidence_count": len(manifest.items)}, indent=2))
+        print(
+            json.dumps(
+                {
+                    "valid": True,
+                    "project_id": manifest.project_id,
+                    "evidence_count": len(manifest.items),
+                },
+                indent=2,
+            )
+        )
     else:
         records = workspace.load_records()
         report = compile_findings(seed, records, project)

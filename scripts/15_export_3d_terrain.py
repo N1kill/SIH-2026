@@ -14,13 +14,17 @@ import numpy as np
 import rasterio
 from pyproj import Transformer
 
-logging.basicConfig(level=logging.INFO, format="[%(asctime)s] %(levelname)s: %(message)s")
+logging.basicConfig(
+    level=logging.INFO, format="[%(asctime)s] %(levelname)s: %(message)s"
+)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEM_TIF = PROJECT_ROOT / "data" / "processed" / "dem_conditioned.tif"
 DEPTH_TIF = PROJECT_ROOT / "outputs" / "simulation" / "depth_max.tif"
 OUTPUT_3D_DATA = PROJECT_ROOT / "outputs" / "3d" / "terrain_3d_data_base.json"
-DASHBOARD_3D_DATA = PROJECT_ROOT / "outputs" / "3d" / "dashboard" / "terrain_3d_data_base.json"
+DASHBOARD_3D_DATA = (
+    PROJECT_ROOT / "outputs" / "3d" / "dashboard" / "terrain_3d_data_base.json"
+)
 CONFIG_PATH = PROJECT_ROOT / "config.json"
 MODEL_HALF_WIDTH_M = 6000.0
 
@@ -28,7 +32,7 @@ MODEL_HALF_WIDTH_M = 6000.0
 def export_3d_terrain_grid(grid_size=120):
     """Downsample DEM and max flood depth to an optimized regular grid for 3D WebGL rendering."""
     logging.info(f"Loading DEM for 3D terrain generation: {DEM_TIF}")
-    
+
     with rasterio.open(DEM_TIF) as src:
         dem = src.read(1)
         nodata = src.nodata
@@ -43,7 +47,11 @@ def export_3d_terrain_grid(grid_size=120):
         right = min(bounds.right, dam_x + MODEL_HALF_WIDTH_M)
         bottom = max(bounds.bottom, dam_y - MODEL_HALF_WIDTH_M)
         top = min(bounds.top, dam_y + MODEL_HALF_WIDTH_M)
-        window = rasterio.windows.from_bounds(left, bottom, right, top, src.transform).round_offsets().round_lengths()
+        window = (
+            rasterio.windows.from_bounds(left, bottom, right, top, src.transform)
+            .round_offsets()
+            .round_lengths()
+        )
         dem = src.read(1, window=window)
         transform = src.window_transform(window)
         nodata = src.nodata
@@ -64,6 +72,7 @@ def export_3d_terrain_grid(grid_size=120):
 
     # Resample to grid_size x grid_size
     from scipy.ndimage import zoom
+
     zoom_r = grid_size / sub_dem.shape[0]
     zoom_c = grid_size / sub_dem.shape[1]
 
@@ -84,7 +93,12 @@ def export_3d_terrain_grid(grid_size=120):
         "depth_grid": np.round(depth_resampled, 2).tolist(),
         "normalized_elev": np.round(elev_normalized, 4).tolist(),
         "crs": str(src.crs),
-        "projected_bounds": {"min_x": left, "max_x": right, "min_y": bottom, "max_y": top},
+        "projected_bounds": {
+            "min_x": left,
+            "max_x": right,
+            "min_y": bottom,
+            "max_y": top,
+        },
         "dam_projected": {"x": dam_x, "y": dam_y},
         "dam_position": {"x": 0.0, "y": 0.0, "z": 0.0},
     }
@@ -94,7 +108,9 @@ def export_3d_terrain_grid(grid_size=120):
         with open(output_path, "w") as f:
             json.dump(terrain_data, f)
 
-    logging.info(f"Saved 3D WebGL terrain data: {OUTPUT_3D_DATA} ({grid_size}x{grid_size} vertices)")
+    logging.info(
+        f"Saved 3D WebGL terrain data: {OUTPUT_3D_DATA} ({grid_size}x{grid_size} vertices)"
+    )
 
 
 if __name__ == "__main__":

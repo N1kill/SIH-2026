@@ -1,4 +1,5 @@
 """Evidence records and human-gated approximate dam/reservoir reconstruction."""
+
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -66,7 +67,9 @@ class EvidenceManifest(BaseModel):
 
 
 def verify_evidence(manifest_path: Path) -> EvidenceManifest:
-    manifest = EvidenceManifest.model_validate_json(manifest_path.read_text(encoding="utf-8"))
+    manifest = EvidenceManifest.model_validate_json(
+        manifest_path.read_text(encoding="utf-8")
+    )
     for item in manifest.items:
         artifact = input_path(item.artifact_path)
         actual = sha256_file(artifact)
@@ -82,11 +85,15 @@ def _crest(project: Project) -> list[list[float]]:
     axis_bearing = (project.downstream_bearing_deg + 90.0) % 360.0
     half = project.dam_length_m / 2.0
     lon1, lat1, _ = geod.fwd(project.longitude, project.latitude, axis_bearing, half)
-    lon2, lat2, _ = geod.fwd(project.longitude, project.latitude, axis_bearing + 180.0, half)
+    lon2, lat2, _ = geod.fwd(
+        project.longitude, project.latitude, axis_bearing + 180.0, half
+    )
     return [[lon1, lat1], [project.longitude, project.latitude], [lon2, lat2]]
 
 
-def build_candidate(project: Project, terrain: Terrain | None = None) -> tuple[dict, dict]:
+def build_candidate(
+    project: Project, terrain: Terrain | None = None
+) -> tuple[dict, dict]:
     """Return a draft record and GeoJSON shoreline without modifying project config."""
     terrain = terrain or load_terrain(project, half_width=6000, size=200)
     bed = float(terrain.origin[2])
@@ -97,26 +104,44 @@ def build_candidate(project: Project, terrain: Terrain | None = None) -> tuple[d
     mask = terrain.reservoir_mask(project, level)
     if not mask.any():
         raise ValueError("DEM-derived reservoir candidate is empty")
-    polygons = [geom for geom, value in shapes(mask.astype("uint8"), mask=mask, transform=terrain.transform) if value == 1]
+    polygons = [
+        geom
+        for geom, value in shapes(
+            mask.astype("uint8"), mask=mask, transform=terrain.transform
+        )
+        if value == 1
+    ]
     polygons.sort(key=lambda geom: len(json.dumps(geom)), reverse=True)
     shoreline = transform_geom(terrain.crs, "EPSG:4326", polygons[0], precision=7)
-    edge_touched = bool(mask[0].any() or mask[-1].any() or mask[:, 0].any() or mask[:, -1].any())
+    edge_touched = bool(
+        mask[0].any() or mask[-1].any() or mask[:, 0].any() or mask[:, -1].any()
+    )
     cell_area = abs(float(terrain.transform.a * terrain.transform.e))
     levels = np.linspace(bed, top, 10)
     raw = []
     for candidate_level in levels:
         candidate_mask = terrain.reservoir_mask(project, float(candidate_level))
-        volume = float(np.maximum(candidate_level - terrain.elevation[candidate_mask], 0).sum() * cell_area)
+        volume = float(
+            np.maximum(candidate_level - terrain.elevation[candidate_mask], 0).sum()
+            * cell_area
+        )
         raw.append(volume)
     raw = [max(value - raw[0], 0.0) for value in raw]
     if raw[-1] <= 0:
         raise ValueError("DEM-derived stage-storage volume is empty")
     scale = project.reservoir_capacity_m3 / raw[-1]
-    stage_storage = [[round(float(stage), 3), round(volume * scale, 3)] for stage, volume in zip(levels, raw)]
+    stage_storage = [
+        [round(float(stage), 3), round(volume * scale, 3)]
+        for stage, volume in zip(levels, raw)
+    ]
     area_m2 = float(mask.sum() * cell_area)
     created = datetime.now(timezone.utc).isoformat()
-    candidate_imagery = ROOT / "data/raw/imagery" / f"{project.dam_id}-reconstruction-sentinel2-rgb.tif"
-    digitization_path = ROOT / "data/candidates" / project.dam_id / "sentinel-digitization.json"
+    candidate_imagery = (
+        ROOT / "data/raw/imagery" / f"{project.dam_id}-reconstruction-sentinel2-rgb.tif"
+    )
+    digitization_path = (
+        ROOT / "data/candidates" / project.dam_id / "sentinel-digitization.json"
+    )
     crest = _crest(project)
     crest_method = "Configured centre/length, perpendicular to downstream bearing."
     crest_uncertainty = [10, 30]
@@ -126,8 +151,13 @@ def build_candidate(project: Project, terrain: Terrain | None = None) -> tuple[d
         source_image = input_path(digitization["source_image"])
         if sha256_file(source_image) != digitization["source_image_sha256"]:
             raise ValueError("Sentinel source changed after crest digitization")
-        if digitization.get("approved") is not False or digitization.get("status") != "approximate":
-            raise ValueError("Candidate digitization must remain explicitly approximate and unapproved")
+        if (
+            digitization.get("approved") is not False
+            or digitization.get("status") != "approximate"
+        ):
+            raise ValueError(
+                "Candidate digitization must remain explicitly approximate and unapproved"
+            )
         crest = digitization["crest_coordinates_wgs84"]
         crest_method = digitization["method"]
         crest_uncertainty = digitization["estimated_horizontal_uncertainty_m"]
@@ -153,8 +183,11 @@ def build_candidate(project: Project, terrain: Terrain | None = None) -> tuple[d
             "reservoir_capacity_m3": project.reservoir_capacity_m3,
             "initial_water_level_m": project.initial_water_level_m,
             "maximum_water_level_m": project.maximum_water_level_m,
-            "imagery_path": (str(candidate_imagery.relative_to(ROOT)).replace("\\", "/")
-                             if candidate_imagery.is_file() else project.imagery_path),
+            "imagery_path": (
+                str(candidate_imagery.relative_to(ROOT)).replace("\\", "/")
+                if candidate_imagery.is_file()
+                else project.imagery_path
+            ),
             "crest_coordinates": crest,
             "reservoir_polygon_path": f"data/candidates/{project.dam_id}/reservoir-shoreline.geojson",
             "stage_storage": stage_storage,
@@ -176,9 +209,17 @@ def build_candidate(project: Project, terrain: Terrain | None = None) -> tuple[d
             "shoreline_horizontal_m": max(abs(float(terrain.transform.a)), 30.0),
             "stage_storage": "High: DEM is not bathymetry and the curve is capacity-scaled.",
         },
-        "warnings": (["Reservoir candidate touches the model boundary; shoreline may be truncated."] if edge_touched else [])
-            + ["Published water levels have an unstated vertical datum; DEM alignment is approximate.",
-               "Spillway location is not promoted because no sufficiently precise public geometry was verified."],
+        "warnings": (
+            [
+                "Reservoir candidate touches the model boundary; shoreline may be truncated."
+            ]
+            if edge_touched
+            else []
+        )
+        + [
+            "Published water levels have an unstated vertical datum; DEM alignment is approximate.",
+            "Spillway location is not promoted because no sufficiently precise public geometry was verified.",
+        ],
     }
     feature = {
         "type": "Feature",

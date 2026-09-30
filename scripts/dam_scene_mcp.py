@@ -1,4 +1,5 @@
 """Local MCP connector for portable dam scene packages. stdout is protocol only."""
+
 import json
 import sys
 from pathlib import Path
@@ -7,15 +8,29 @@ from typing import Annotated
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from mcp.server.fastmcp import FastMCP
 from pydantic import Field
-from src.dam_scene import ScenePackage, import_package, list_packages, load_package, package_path, validate_assets
+from src.dam_scene import (
+    ScenePackage,
+    import_package,
+    list_packages,
+    load_package,
+    package_path,
+    validate_assets,
+)
 
 mcp = FastMCP("dam_scene_mcp")
-READ = {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": False}
+READ = {
+    "readOnlyHint": True,
+    "destructiveHint": False,
+    "idempotentHint": True,
+    "openWorldHint": False,
+}
 
 
 @mcp.tool(annotations=READ)
-def dam_list_packages(offset: Annotated[int, Field(ge=0)] = 0,
-                      limit: Annotated[int, Field(ge=1, le=100)] = 20) -> dict:
+def dam_list_packages(
+    offset: Annotated[int, Field(ge=0)] = 0,
+    limit: Annotated[int, Field(ge=1, le=100)] = 20,
+) -> dict:
     """List installed portable scene packages with a next_offset for pagination."""
     return list_packages(offset, limit)
 
