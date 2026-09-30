@@ -296,8 +296,14 @@ export default function SimulatePage({ onBackToHome, onViewSimulation }) {
             </div>
 
             {/* Open the operational 2D/3D simulation dashboard */}
-            <button type="button" className="scroll-outcomes-btn" onClick={onViewSimulation}>
-              <span>VIEW SIMULATION OUTCOMES</span>
+            <button 
+              type="button" 
+              className={`scroll-outcomes-btn ${selectedDam.id !== 'machhu-ii' ? 'disabled' : ''}`}
+              onClick={onViewSimulation}
+              disabled={selectedDam.id !== 'machhu-ii'}
+              style={{ opacity: selectedDam.id !== 'machhu-ii' ? 0.5 : 1, cursor: selectedDam.id !== 'machhu-ii' ? 'not-allowed' : 'pointer' }}
+            >
+              <span>{selectedDam.id === 'machhu-ii' ? 'VIEW SIMULATION OUTCOMES' : 'SIMULATION NOT AVAILABLE'}</span>
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                 <path d="M7 2L7 12M7 12L3 8M7 12L11 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
