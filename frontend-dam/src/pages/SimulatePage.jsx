@@ -152,7 +152,7 @@ const OUTCOME_SECTIONS = [
 ];
 
 export default function SimulatePage({ onBackToHome }) {
-  const [selectedDamId, setSelectedDamId] = useState(INDIAN_DAMS[0].id);
+  const [selectedDamId, setSelectedDamId] = useState('machhu-ii');
   const [selectedPlot, setSelectedPlot] = useState(null);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -274,8 +274,8 @@ export default function SimulatePage({ onBackToHome }) {
                       <button
                         key={dam.id}
                         type="button"
-                        className={`dam-dropdown-item ${dam.id === selectedDamId ? 'active' : ''}`}
-                        onClick={() => handleSelectDam(dam.id)}
+                        className={`dam-dropdown-item ${dam.id === selectedDamId ? 'active' : ''} ${dam.id !== 'machhu-ii' ? 'disabled' : ''}`}
+                        onClick={() => dam.id === 'machhu-ii' && handleSelectDam(dam.id)}
                       >
                         <div className="dam-item-name">{dam.name}</div>
                         <div className="dam-item-meta">
