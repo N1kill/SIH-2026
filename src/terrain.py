@@ -91,7 +91,7 @@ def load_terrain(project: Project, half_width=6000, size=100) -> Terrain:
     outlet = rowcol(transform, ox+math.sin(a)*transform.a*1.5, oy+math.cos(a)*transform.a*1.5)
     if not valid[outlet]:
         raise ValueError("Downstream source cell has NoData")
-    fingerprint = hashlib.sha256(json.dumps(["twin-v6",project.model_dump(), path.stat().st_mtime_ns,
+    fingerprint = hashlib.sha256(json.dumps(["twin-v7",project.model_dump(), path.stat().st_mtime_ns,
                                             size, half_width], sort_keys=True).encode()).hexdigest()[:20]
     metadata = {"crs": crs, "bounds": list(bounds), "origin": [ox, oy, bed], "grid_size": size,
                 "cell_size_m": transform.a, "transform": list(transform)[:6], "cache_key": fingerprint,
@@ -117,7 +117,9 @@ def build_twin(project, half_width=6000, size=100):
                "project": project.model_dump(), "initial_level_m": level,
                "dam_local": [0, 0, 0], "river_lines": []}
     # Near-dam LOD is derived from the source DEM, never upscaled as claimed new survey detail.
-    detail=load_terrain(project,min(half_width,1000),min(size,100))
+    dam_extent = (project.dam_length_m / 2 * 1.15) if project.dam_length_m else 1000
+    detail_hw = min(half_width, max(1000, dam_extent))
+    detail=load_terrain(project, detail_hw, min(size, 100))
     detail_mask_level = max(level, project.maximum_water_level_m or level)
     payload["detail"]={**detail.metadata,"elevation":detail.elevation.round(3).tolist(),
                        "valid":detail.valid.tolist(),

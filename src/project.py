@@ -79,6 +79,7 @@ class Project(Inputs):
     dam_length_m: float | None = Field(default=None, gt=0)
     crest_width_m: float | None = Field(default=None, gt=0)
     crest_elevation_m: float | None = None
+    dam_elevation_m: float | None = None
     reservoir_capacity_m3: float = Field(gt=0)
     reservoir_surface_area_m2: float | None = Field(default=None, gt=0)
     initial_water_level_m: float | None = None

@@ -1,9 +1,10 @@
-# InundaX dam-break scenario laboratory
+# Pralaya — Dam-Break Emergency Decision-Support System
 
-InundaX is a local geospatial dam-break screening application for the SIH-2026
-Machhu-II case. It combines a reservoir mass balance, configurable breach growth,
-optional near-field SPH diagnostics, conservative DEM-based downstream routing,
-GIS exports, and a Three.js digital twin served by FastAPI.
+Pralaya is a local geospatial dam-break screening and emergency decision-support
+application built for the SIH-2026 Machhu-II case study. It combines a reservoir
+mass balance, configurable breach growth, optional near-field SPH diagnostics,
+conservative DEM-based downstream routing, GIS exports, and a Three.js 3D digital
+twin served by FastAPI.
 
 The default downstream model is a diffusive-wave screening approximation. It has
 not been calibrated against observed 1979 flood extents and must not be used as an
@@ -53,6 +54,28 @@ Far-field forecast depth, velocity, and arrival bands are generated when the for
 request sets `include_far_field: true`. They remain explicitly unavailable when that
 costlier ensemble routing is not requested; they are never filled with synthetic
 precision.
+
+## Architecture overview
+
+```
+Pralaya/
+├── server.py              # FastAPI entry point (uvicorn, port 8050)
+├── src/                   # Python simulation core, API routers, research agent
+├── frontend/              # React + Vite 3D operations map (TypeScript)
+├── outputs/3d/dashboard/  # Three.js digital twin and static dashboard
+├── scripts/               # Data preparation, simulation, reconstruction, research
+├── data/                  # Projects, evidence, DEM, raw inputs
+└── docs/                  # Implementation notes and requirements status
+```
+
+The **3D digital twin** (`outputs/3d/dashboard/`) renders the Machhu-II dam and
+reservoir in Three.js. It models intact, overtopping, and breach scenarios with
+stage-storage level accounting, cumulative release, an explicit mass residual HUD,
+and a slider-driven water-level control linked to the upstream reservoir surface.
+
+The **React operations map** (`frontend/`) overlays simulation-backed flood
+progression polygons, hazard zones, candidate-refuge facilities, and route-availability
+status on a 2D timeline driven by stored solver frames.
 
 ## Exact workflows
 
@@ -164,6 +187,8 @@ review step. `DAM_RESEARCH_RATE_LIMIT_DELAY_S` defaults to 12.5 seconds so the
 workflow can operate within common free-tier quotas; set it to `0` only when the
 selected provider has sufficient paid rate limits.
 
+## Running simulations
+
 Run without the UI and validate the mass ledger:
 
 ```powershell
@@ -194,7 +219,9 @@ python scripts\run_delft3d.py --simulation <simulation-id> --threads 2
 The second command requires `dflowfm-cli` on `PATH`. The comparison uses the stored
 release hydrograph and remains uncalibrated.
 
-Docker, when Docker Desktop is running:
+## Docker
+
+When Docker Desktop is running:
 
 ```powershell
 docker compose -f docker-compose.twin.yml build
@@ -231,6 +258,8 @@ repository and carry CRS metadata where applicable:
 
 For optional Earth Engine metadata refresh, copy `.env.example` to `.env`, configure
 `EE_PROJECT`, and authenticate outside the repository. Never commit credentials.
+
+## Further reading
 
 See [architecture and limitations](docs/IMPLEMENTATION.md), the live
 [implementation checklist](IMPLEMENTATION_CHECKLIST.md), and the directive-oriented
