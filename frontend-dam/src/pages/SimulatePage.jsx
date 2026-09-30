@@ -115,7 +115,7 @@ const OUTCOME_SECTIONS = [
 ];
 
 export default function SimulatePage({ onBackToHome, onViewSimulation }) {
-  const [selectedDamId, setSelectedDamId] = useState(INDIAN_DAMS[0].id);
+  const [selectedDamId, setSelectedDamId] = useState('machhu-ii');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const dropdownRef = useRef(null);
