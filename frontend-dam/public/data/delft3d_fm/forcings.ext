@@ -1,0 +1,16 @@
+[General]
+fileVersion = 2.02
+fileType = extForce
+
+[SourceSink]
+id = dam_release
+name = Dam release
+numCoordinates = 1
+xCoordinates = 688980.021
+yCoordinates = 2524934.985
+discharge = forcings.bc
+
+[Boundary]
+quantity = waterlevelbnd
+locationFile = downstream.pli
+forcingFile = forcings.bc

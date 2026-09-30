@@ -1,0 +1,13 @@
+{
+  "directive": "5B",
+  "timestamp": "2026-09-19T06:59:33.586571+00:00",
+  "mission": "Sentinel-1 SAR & Sentinel-2 Optical Flood Observation Pipeline",
+  "polarization": "VV + VH dual-pol",
+  "threshold_method": "Otsu Automatic Backscatter Thresholding (-16.0 dB)",
+  "spatial_resolution_m": 30.0,
+  "satellite_observed_flood_area_km2": 0.0,
+  "outputs": {
+    "flood_extent_tif": "C:\\Users\\S Srirama Mithilesh\\practice\\SIH-2026\\outputs\\gis\\gee_flood_extent.tif",
+    "validation_plot": "C:\\Users\\S Srirama Mithilesh\\practice\\SIH-2026\\outputs\\gis\\satellite_validation_plot.png"
+  }
+}

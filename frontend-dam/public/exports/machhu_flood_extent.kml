@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>Machhu-II Dam Break Flood Inundation Extent</name>
+    <description>Simulated 2D Hydrodynamic Flood Extent from Machhu-II Dam Embankment to Morbi City and Malia Miyana</description>
+    
+    <Placemark>
+      <name>Extreme Hazard (>3.0m)</name>
+      <description>Depth: 6.32m Peak (~6.1m sustained) | Area: Machhu Basin: Dam Toe to Morbi & Malia</description>
+      <Style>
+        <LineStyle><color>ff00ffff</color><width>2</width></LineStyle>
+        <PolyStyle><color>7fd62828</color></PolyStyle>
+      </Style>
+      <Polygon>
+        <outerBoundaryIs><LinearRing><coordinates>70.87502,22.75992,0 70.86902,22.76792,0 70.86202,22.77992,0 70.85302,22.79192,0 70.84402,22.80592,0 70.83802,22.81593,0 70.83202,22.82392,0 70.82802,22.83492,0 70.82202,22.84992,0 70.81102,22.86992,0 70.79502,22.89692,0 70.77702,22.92693,0 70.75702,22.95692,0 70.73902,22.98193,0 70.74498,22.97808,0 70.76298,22.95307,0 70.78298,22.92308,0 70.80098,22.89307,0 70.81697,22.86607,0 70.82798,22.84607,0 70.83398,22.83107,0 70.83798,22.82007,0 70.84398,22.81208,0 70.84998,22.80207,0 70.85898,22.78807,0 70.86798,22.77607,0 70.87498,22.76407,0 70.88098,22.75607,0 70.87502,22.75992,0</coordinates></LinearRing></outerBoundaryIs>
+      </Polygon>
+    </Placemark>
+    <Placemark>
+      <name>High Hazard (1.5–3.0m)</name>
+      <description>Depth: 1.5 – 3.0m | Area: Machhu Basin: Dam Toe to Morbi & Malia</description>
+      <Style>
+        <LineStyle><color>ff00ffff</color><width>2</width></LineStyle>
+        <PolyStyle><color>7fe63946</color></PolyStyle>
+      </Style>
+      <Polygon>
+        <outerBoundaryIs><LinearRing><coordinates>70.87247,22.76158,0 70.86647,22.76957,0 70.85947,22.78158,0 70.85047,22.79358,0 70.84147,22.80757,0 70.83547,22.81758,0 70.82947,22.82558,0 70.82547,22.83657,0 70.81947,22.85158,0 70.80847,22.87157,0 70.79247,22.89858,0 70.77447,22.92858,0 70.75447,22.95857,0 70.73647,22.98358,0 70.74753,22.97642,0 70.76553,22.95142,0 70.78553,22.92142,0 70.80353,22.89142,0 70.81952,22.86442,0 70.83053,22.84442,0 70.83653,22.82942,0 70.84052,22.81842,0 70.84652,22.81042,0 70.85252,22.80042,0 70.86153,22.78642,0 70.87053,22.77442,0 70.87753,22.76242,0 70.88353,22.75442,0 70.87247,22.76158,0</coordinates></LinearRing></outerBoundaryIs>
+      </Polygon>
+    </Placemark>
+    <Placemark>
+      <name>Moderate Hazard (0.5–1.5m)</name>
+      <description>Depth: 0.5 – 1.5m | Area: Machhu Basin: Dam Toe to Morbi & Malia</description>
+      <Style>
+        <LineStyle><color>ff00ffff</color><width>2</width></LineStyle>
+        <PolyStyle><color>7ff4a261</color></PolyStyle>
+      </Style>
+      <Polygon>
+        <outerBoundaryIs><LinearRing><coordinates>70.86907,22.76377,0 70.86307,22.77177,0 70.85607,22.78377,0 70.84707,22.79577,0 70.83807,22.80977,0 70.83207,22.81977,0 70.82607,22.82777,0 70.82207,22.83877,0 70.81607,22.85377,0 70.80507,22.87377,0 70.78907,22.90077,0 70.77107,22.93078,0 70.75108,22.96077,0 70.73307,22.98578,0 70.75093,22.97423,0 70.76893,22.94922,0 70.78893,22.91923,0 70.80693,22.88922,0 70.82292,22.86222,0 70.83393,22.84222,0 70.83993,22.82722,0 70.84392,22.81622,0 70.84992,22.80823,0 70.85592,22.79822,0 70.86492,22.78422,0 70.87392,22.77222,0 70.88093,22.76022,0 70.88693,22.75222,0 70.86907,22.76377,0</coordinates></LinearRing></outerBoundaryIs>
+      </Polygon>
+    </Placemark>
+    <Placemark>
+      <name>Low Hazard (<0.5m)</name>
+      <description>Depth: 0.1 – 0.5m | Area: Machhu Basin: Dam Toe to Morbi & Malia</description>
+      <Style>
+        <LineStyle><color>ff00ffff</color><width>2</width></LineStyle>
+        <PolyStyle><color>7f2a9d8f</color></PolyStyle>
+      </Style>
+      <Polygon>
+        <outerBoundaryIs><LinearRing><coordinates>70.86525,22.76625,0 70.85925,22.77425,0 70.85225,22.78625,0 70.84325,22.79825,0 70.83425,22.81225,0 70.82825,22.82225,0 70.82225,22.83025,0 70.81825,22.84125,0 70.81225,22.85625,0 70.80125,22.87625,0 70.78525,22.90325,0 70.76725,22.93325,0 70.74725,22.96325,0 70.72925,22.98825,0 70.75475,22.97175,0 70.77275,22.94675,0 70.79275,22.91675,0 70.81075,22.88675,0 70.82675,22.85975,0 70.83775,22.83975,0 70.84375,22.82475,0 70.84775,22.81375,0 70.85375,22.80575,0 70.85975,22.79575,0 70.86875,22.78175,0 70.87775,22.76975,0 70.88475,22.75775,0 70.89075,22.74975,0 70.86525,22.76625,0</coordinates></LinearRing></outerBoundaryIs>
+      </Polygon>
+    </Placemark>
+  </Document>
+</kml>

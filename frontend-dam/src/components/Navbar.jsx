@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import CTAButton from './CTAButton';
-import { NAV_PAGES, SYSTEM_META } from '../data/navigation';
+import { NAV_PAGES } from '../data/navigation';
 
 /**
  * Floating glassmorphic HUD navigation bar for PRALAYA
@@ -47,22 +47,23 @@ export default function Navbar({ currentPage = 'home', onNavigate }) {
       }}
     >
       <div
-        className="container"
         style={{
+          width: '100%',
+          padding: '0 clamp(18px, 3.5vw, 44px)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
         }}
       >
-        {/* Left: Brand & Coordinates */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '18px' }}>
+        {/* Left Corner: Brand */}
+        <div style={{ display: 'flex', alignItems: 'center' }}>
           <button
             type="button"
             onClick={(e) => handleNavClick(e, 'home')}
             style={{
               display: 'flex',
               alignItems: 'baseline',
-              gap: '8px',
+              gap: '9px',
               textDecoration: 'none',
               background: 'transparent',
               border: 'none',
@@ -94,35 +95,6 @@ export default function Navbar({ currentPage = 'home', onNavigate }) {
               DIGITAL TWIN
             </span>
           </button>
-
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              padding: '4px 10px',
-              borderRadius: '4px',
-              background: 'rgba(22, 34, 32, 0.6)',
-              border: '1px solid rgba(167, 182, 169, 0.1)',
-              fontFamily: 'var(--font-mono)',
-              fontSize: '10px',
-              color: 'var(--text-muted)',
-              letterSpacing: '0.08em',
-            }}
-            className="navbar-coords"
-          >
-            <span
-              style={{
-                width: '6px',
-                height: '6px',
-                borderRadius: '50%',
-                backgroundColor: '#5d8a67',
-                boxShadow: '0 0 8px #5d8a67',
-                display: 'inline-block',
-              }}
-            />
-            <span>{SYSTEM_META.coordinates}</span>
-          </div>
         </div>
 
         {/* Center: Navigation Pages (Home, Simulate, About, Contact Us, Docs) */}

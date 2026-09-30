@@ -1,0 +1,63 @@
+{
+  "project": "Machhu-II Dam Breach Simulation",
+  "directive": "5A",
+  "timestamp": "2026-09-25T11:55:40.286600+00:00",
+  "model_engine": "2D Unsteady Hydrodynamic Raster Engine (Manning / Diffusive Wave)",
+  "grid_resolution_m": 29.989044303443436,
+  "breach_parameters_used": {
+    "B_avg_m": 156.0,
+    "Z_HV": 1.4,
+    "t_f_hours": 2.497,
+    "Q_peak_m3s": 6647.0,
+    "V_reservoir_m3": 101000000,
+    "H_dam_m": 22.56
+  },
+  "peak_discharge_m3s": 6641.06594847223,
+  "total_inundation_area_km2": 73.43,
+  "area_depth_gt_2m_km2": 25.95,
+  "max_simulated_depth_m": 22.56,
+  "max_simulated_velocity_ms": 12.0,
+  "sanity_check_passed": true,
+  "metrics": {
+    "peak_discharge_m3s": 6641.06594847223,
+    "total_inundated_area_km2": 73.43,
+    "morbi_peak_depth_m": 8.38,
+    "morbi_arrival_time_hours": 9.23,
+    "max_depth_m": 22.56,
+    "max_velocity_ms": 12.0
+  },
+  "monitoring_gauges": {
+    "dam_toe": {
+      "name": "Machhu-II Dam Toe (0 km)",
+      "peak_depth_m": 22.56,
+      "arrival_time_hours": 0.07,
+      "peak_time_hours": 1.33
+    },
+    "morbi": {
+      "name": "Morbi City Center (7.5 km)",
+      "peak_depth_m": 8.38,
+      "arrival_time_hours": 9.23,
+      "peak_time_hours": 19.8
+    },
+    "lilapar": {
+      "name": "Lilapar / Dhuva (15 km)",
+      "peak_depth_m": 0.0,
+      "arrival_time_hours": null,
+      "peak_time_hours": 0.0
+    },
+    "malia": {
+      "name": "Malia Miyana (28 km)",
+      "peak_depth_m": 0.0,
+      "arrival_time_hours": null,
+      "peak_time_hours": 0.0
+    }
+  },
+  "output_files": {
+    "depth_max": "D:\\python\\HTML-CSS_project\\Js\\gemini_full_project\\bot\\sc-1\\Scratch\\3rdproject\\dam\\outputs\\simulation\\depth_max.tif",
+    "velocity_max": "D:\\python\\HTML-CSS_project\\Js\\gemini_full_project\\bot\\sc-1\\Scratch\\3rdproject\\dam\\outputs\\simulation\\velocity_max.tif",
+    "arrival_time": "D:\\python\\HTML-CSS_project\\Js\\gemini_full_project\\bot\\sc-1\\Scratch\\3rdproject\\dam\\outputs\\simulation\\arrival_time.tif",
+    "flood_duration": "D:\\python\\HTML-CSS_project\\Js\\gemini_full_project\\bot\\sc-1\\Scratch\\3rdproject\\dam\\outputs\\simulation\\flood_duration.tif",
+    "hydrograph_plot": "D:\\python\\HTML-CSS_project\\Js\\gemini_full_project\\bot\\sc-1\\Scratch\\3rdproject\\dam\\outputs\\gis\\morbi_hydrograph.png",
+    "depth_map": "D:\\python\\HTML-CSS_project\\Js\\gemini_full_project\\bot\\sc-1\\Scratch\\3rdproject\\dam\\outputs\\gis\\inundation_depth_map.png"
+  }
+}

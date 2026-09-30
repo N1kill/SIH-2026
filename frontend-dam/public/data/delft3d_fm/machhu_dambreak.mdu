@@ -1,0 +1,40 @@
+[General]
+Program = D-Flow FM
+Version = 1.2.60
+FileType = modelDef
+FileVersion = 1.09
+AutoStart = 0
+
+[Geometry]
+NetFile = machhu_net.nc
+BedlevType = 3
+StructureFile = structures.ini
+
+[Physics]
+UnifFrictType = 1
+UnifFrictCoef = 0.035
+
+[Numerics]
+CFLMax = 0.7
+
+[Time]
+RefDate = 20010101
+TUnit = S
+DtUser = 60
+DtMax = 15
+DtInit = 1
+TStart = 0
+TStop = 3000.0
+
+[External forcing]
+ExtForceFile =
+ExtForceFileNew = forcings.ext
+
+[Output]
+OutputDir = DFM_OUTPUT_machhu_dambreak
+MapInterval = 300
+MapFormat = 4
+NcFormat = 4
+wriMap_waterdepth = 1
+wriMap_velocity_vector = 1
+wriMap_velocity_magnitude = 1

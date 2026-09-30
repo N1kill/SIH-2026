@@ -11,13 +11,12 @@
 }
 
 .features-cta-box {
-  background: radial-gradient(circle at 50% 0%, rgba(62, 92, 69, 0.25) 0%, rgba(22, 34, 32, 0.9) 70%);
-  border: 1px solid rgba(93, 138, 103, 0.35);
+  background: radial-gradient(circle at 50% 0%, rgba(62, 92, 69, 0.25) 0%, #111a18 70%);
+  border: 1px solid rgba(93, 138, 103, 0.45);
   border-radius: 12px;
   padding: 64px 48px;
   text-align: center;
   margin-top: 40px;
-  backdrop-filter: blur(16px);
   position: relative;
 }
 

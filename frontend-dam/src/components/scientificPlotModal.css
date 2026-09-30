@@ -1,0 +1,407 @@
+/* Scientific Plot Lightbox & Inspector Modal */
+
+.sci-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(4, 8, 10, 0.94);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  animation: sciFadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes sciFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.sci-modal-dialog {
+  position: relative;
+  width: 100%;
+  max-width: 1200px;
+  max-height: 94vh;
+  background: #0f1a17;
+  border: 1px solid rgba(63, 168, 155, 0.35);
+  border-radius: 16px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.8), 0 0 40px rgba(63, 168, 155, 0.15);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: sciScaleUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes sciScaleUp {
+  from {
+    transform: scale(0.95);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* Header */
+.sci-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 20px 24px;
+  border-bottom: 1px solid rgba(167, 182, 169, 0.15);
+  background: rgba(22, 36, 33, 0.8);
+  flex-shrink: 0;
+}
+
+.sci-modal-title-wrap {
+  flex: 1;
+}
+
+.sci-modal-tags {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  flex-wrap: wrap;
+}
+
+.sci-tag-cat {
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #3fa89b;
+  background: rgba(63, 168, 155, 0.15);
+  border: 1px solid rgba(63, 168, 155, 0.3);
+  padding: 3px 8px;
+  border-radius: 4px;
+}
+
+.sci-tag-badge {
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #fde047;
+  background: rgba(253, 224, 71, 0.12);
+  border: 1px solid rgba(253, 224, 71, 0.3);
+  padding: 3px 8px;
+  border-radius: 4px;
+}
+
+.sci-tag-source {
+  font-family: var(--font-mono, monospace);
+  font-size: 9px;
+  letter-spacing: 0.05em;
+  color: #a7b6a9;
+  opacity: 0.75;
+}
+
+.sci-modal-title {
+  font-family: var(--font-heading, sans-serif);
+  font-size: 19px;
+  font-weight: 700;
+  color: #ffffff;
+  margin: 0 0 3px 0;
+  letter-spacing: -0.01em;
+}
+
+.sci-modal-subtitle {
+  font-size: 13px;
+  color: #a7b6a9;
+  margin: 0;
+}
+
+/* Actions */
+.sci-modal-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.sci-zoom-controls {
+  display: flex;
+  align-items: center;
+  background: rgba(10, 18, 16, 0.7);
+  border: 1px solid rgba(167, 182, 169, 0.2);
+  border-radius: 8px;
+  padding: 2px 4px;
+}
+
+.sci-ctrl-btn {
+  background: transparent;
+  border: none;
+  color: #f0f4ef;
+  font-size: 15px;
+  font-weight: 700;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.sci-ctrl-btn:hover:not(:disabled) {
+  background: rgba(63, 168, 155, 0.25);
+  color: #ffffff;
+}
+
+.sci-ctrl-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.sci-zoom-val {
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+  color: #3fa89b;
+  padding: 0 6px;
+  min-width: 44px;
+  text-align: center;
+}
+
+.sci-reset-btn {
+  font-size: 10px;
+  width: auto;
+  padding: 0 6px;
+  color: #fde047;
+}
+
+.sci-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: var(--font-mono, monospace);
+  letter-spacing: 0.04em;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.sci-btn-download {
+  background: rgba(63, 168, 155, 0.18);
+  border: 1px solid rgba(63, 168, 155, 0.45);
+  color: #5eead4;
+}
+
+.sci-btn-download:hover {
+  background: rgba(63, 168, 155, 0.32);
+  border-color: #5eead4;
+  color: #ffffff;
+}
+
+.sci-close-btn {
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #fca5a5;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.sci-close-btn:hover {
+  background: rgba(239, 68, 68, 0.35);
+  color: #ffffff;
+}
+
+/* Viewport & Image Canvas */
+.sci-modal-viewport {
+  flex: 1;
+  min-height: 360px;
+  max-height: 58vh;
+  overflow: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #08100e;
+  background-image: 
+    radial-gradient(circle at 50% 50%, rgba(63, 168, 155, 0.05) 0%, transparent 70%),
+    linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+  background-size: 100% 100%, 24px 24px, 24px 24px;
+  padding: 20px;
+  user-select: none;
+}
+
+.sci-modal-image-container {
+  max-width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sci-modal-img {
+  max-width: 100%;
+  max-height: 54vh;
+  width: auto;
+  height: auto;
+  border-radius: 8px;
+  border: 1px solid rgba(167, 182, 169, 0.18);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.7);
+  object-fit: contain;
+}
+
+/* Footer & Metrics */
+.sci-modal-footer {
+  padding: 18px 24px;
+  background: rgba(18, 30, 27, 0.95);
+  border-top: 1px solid rgba(167, 182, 169, 0.12);
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.sci-modal-desc {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: #c4d3c6;
+}
+
+.sci-desc-label {
+  display: block;
+  font-family: var(--font-mono, monospace);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  color: #3fa89b;
+  margin-bottom: 4px;
+}
+
+.sci-modal-desc p {
+  margin: 0;
+}
+
+.sci-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+.sci-metric-pill {
+  display: flex;
+  flex-direction: column;
+  background: rgba(10, 18, 16, 0.65);
+  border: 1px solid rgba(167, 182, 169, 0.15);
+  border-radius: 8px;
+  padding: 8px 12px;
+}
+
+.sci-metric-lbl {
+  font-family: var(--font-mono, monospace);
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: #8da490;
+  text-transform: uppercase;
+}
+
+.sci-metric-val {
+  font-family: var(--font-mono, monospace);
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #ffffff;
+  margin-top: 2px;
+}
+
+.sci-footer-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-top: 1px solid rgba(167, 182, 169, 0.08);
+  padding-top: 10px;
+  font-size: 11px;
+}
+
+.sci-pipeline-credit {
+  font-family: var(--font-mono, monospace);
+  color: #6f7f72;
+}
+
+.sci-cite-btn {
+  background: transparent;
+  border: 1px solid rgba(167, 182, 169, 0.2);
+  color: #a7b6a9;
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.sci-cite-btn:hover {
+  background: rgba(63, 168, 155, 0.15);
+  border-color: #3fa89b;
+  color: #3fa89b;
+}
+
+@media (max-width: 768px) {
+  .sci-modal-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .sci-modal-actions {
+    justify-content: space-between;
+  }
+  .sci-metrics-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* Universal Scientific Plot View Button */
+.view-plot-btn {
+  background: rgba(63, 168, 155, 0.2);
+  border: 1px solid rgba(63, 168, 155, 0.55);
+  color: #5eead4;
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  padding: 6px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(63, 168, 155, 0.15);
+}
+
+.view-plot-btn:hover {
+  background: rgba(63, 168, 155, 0.35);
+  border-color: #5eead4;
+  color: #ffffff;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(63, 168, 155, 0.3);
+}
+
+.view-plot-btn svg {
+  transition: transform 0.2s ease;
+}
+
+.view-plot-btn:hover svg {
+  transform: translateX(2px) translateY(-2px);
+}
+
