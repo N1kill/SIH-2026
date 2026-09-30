@@ -23,5 +23,7 @@ COPY data/ data/
 COPY --from=frontend /build/frontend/dist/ frontend/dist/
 COPY --from=frontend /build/frontend-dam/dist/ frontend-dam/dist/
 COPY --from=frontend /build/outputs/3d/dashboard/ outputs/3d/dashboard/
+ENV MALLOC_ARENA_MAX=2
+ENV PYTHONUNBUFFERED=1
 EXPOSE 8050
 CMD ["python","-m","uvicorn","server:app","--host","0.0.0.0","--port","8050","--workers","1"]

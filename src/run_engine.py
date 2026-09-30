@@ -9,6 +9,7 @@ import math
 import threading
 import time
 import uuid
+import gc
 import numpy as np
 from .project import ROOT, Project, Scenario
 from .terrain import load_terrain
@@ -552,6 +553,7 @@ class Run:
             self.update(status="FAILED", error=str(exc))
         finally:
             write_json(self.directory / "status.json", self.status())
+            gc.collect()
 
 
 class RunManager:

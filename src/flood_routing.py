@@ -10,13 +10,13 @@ import numpy as np
 class FloodRouter:
     def __init__(self, terrain, manning_n=0.04, wet_depth=0.1):
         self.terrain = terrain
-        self.bed = terrain.elevation
+        self.bed = terrain.elevation.astype(np.float32)
         self.valid = terrain.valid.copy()
-        self.depth = np.zeros_like(self.bed)
-        self.velocity = np.zeros_like(self.bed)
+        self.depth = np.zeros_like(self.bed, dtype=np.float32)
+        self.velocity = np.zeros_like(self.bed, dtype=np.float32)
         self.max_depth = self.depth.copy()
         self.max_velocity = self.depth.copy()
-        self.arrival = np.full_like(self.bed, -1)
+        self.arrival = np.full_like(self.bed, -1, dtype=np.float32)
         self.duration = self.depth.copy()
         self.dx = terrain.transform.a
         self.n = manning_n
