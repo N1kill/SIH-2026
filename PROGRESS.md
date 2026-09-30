@@ -2,6 +2,9 @@
 
 ## 2026-09-30 — Fresh-clone setup and first simulation
 
+- Removed the generated 2D `dist/` tree from Git tracking. A tracked HTML file
+  had pointed at ignored hashed assets and caused 404s on collaborators' clones.
+  The normal start paths now build or verify the complete bundle.
 - The root frontend build now installs each frontend's locked dependencies when
   missing. The Docker image includes both built frontends, the engineering twin,
   and the configured project inputs required by FastAPI.

@@ -8,6 +8,7 @@ at /, /simulation/, and /twin/twin.html respectively.
 import asyncio
 import json
 import os
+import re
 import threading
 import time
 import uuid
@@ -325,6 +326,24 @@ async def dflow_replay(ws: WebSocket):
 from src.dam_scene_api import router as dam_scene_router
 
 app.include_router(dam_scene_router)
+
+
+def require_frontend_assets(directory: Path, url_prefix: str) -> None:
+    index = directory / "index.html"
+    if not index.is_file():
+        raise RuntimeError(f"Missing {index}. Run npm ci and npm run build first.")
+    html = index.read_text(encoding="utf-8")
+    for asset in re.findall(r'(?:src|href)="([^"]+)"', html):
+        if asset.startswith(url_prefix):
+            path = directory / asset.removeprefix(url_prefix)
+            if not path.is_file():
+                raise RuntimeError(
+                    f"Missing built asset {path}. Run npm run build before starting FastAPI."
+                )
+
+
+require_frontend_assets(FRONTEND_DIR, "/simulation/")
+require_frontend_assets(FRONTEND_DAM_DIR, "/")
 app.mount(
     "/simulation",
     StaticFiles(directory=str(FRONTEND_DIR), html=True),

@@ -45,6 +45,11 @@ and run `python scripts/run_demo.py` after the same install and build commands.
 Open <http://127.0.0.1:8050>. The demo uses cached local DEM, river, Sentinel-2,
 land-use, and OSM facility data; it does not require internet access after preparation.
 The root build installs each frontend's locked npm dependencies on a fresh clone.
+Generated `frontend/dist/`, `frontend-dam/dist/`, and twin `vendor/` files are not
+stored in Git. `npm start` rebuilds them before starting FastAPI; `run_demo.py`
+builds them when they are missing. If starting Uvicorn directly, run `npm ci` and
+`npm run build` first. Do not copy a built `index.html` without its matching
+hashed CSS and JavaScript assets.
 If the 2D view has no completed run, select **Generate baseline simulation** there;
 the server runs the configured Machhu-II scenario and loads its saved result when
 finished. To adjust the scenario first, use the 3D Twin. Simulation runs are stored
