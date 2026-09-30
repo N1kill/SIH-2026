@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
+import random
 import re
 import threading
 import time
@@ -24,6 +25,14 @@ from .dam_research import (
     make_research_plan,
 )
 from .project import Project, ROOT
+
+
+def get_gemini_api_key() -> str | None:
+    keys = [os.getenv(f"GEMINI_KEY_{i}") for i in range(1, 4)]
+    valid_keys = [k for k in keys if k]
+    if valid_keys:
+        return random.choice(valid_keys)
+    return os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
 
 
 SYSTEM_PROMPT = """You are the InundaX dam evidence coordinator.
@@ -154,7 +163,7 @@ def provider_web_search(query: str, provider: str | None = None) -> dict:
         available = []
         if os.getenv("OPENAI_API_KEY"):
             available.append("openai")
-        if os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY"):
+        if get_gemini_api_key():
             available.append("google")
         available.append("searxng")
         errors = []
@@ -191,7 +200,7 @@ def provider_web_search(query: str, provider: str | None = None) -> dict:
         from google import genai
         from google.genai import types
 
-        api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+        api_key = get_gemini_api_key()
         client = genai.Client(api_key=api_key) if api_key else genai.Client()
         response = client.models.generate_content(
             model=os.getenv("DAM_SEARCH_MODEL", "gemini-3.6-flash"),
@@ -516,7 +525,7 @@ def build_agent(
     system_prompt = SYSTEM_PROMPT
     model_options: dict[str, Any] = {"temperature": 0}
     if model_id.startswith("google_genai:"):
-        api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+        api_key = get_gemini_api_key()
         if api_key:
             model_options["api_key"] = api_key
     if model_id.startswith("ollama:"):

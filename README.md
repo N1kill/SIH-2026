@@ -154,8 +154,8 @@ Set `OPENAI_API_KEY` in `.env` or the process environment. The default model is
 `openai:gpt-5-mini`; override it with `DAM_RESEARCH_MODEL` or `--model` using a
 LangChain `provider:model` identifier. Search is independent from the coordinator:
 set `DAM_SEARCH_PROVIDER` to `openai`, `google`, `ollama`, or local `searxng`
-(`auto` is the default), and use
-`GEMINI_API_KEY` for Google. For new Google projects, use a currently available
+(`auto` is the default), and use `GEMINI_API_KEY` (or `GEMINI_KEY_1`, `GEMINI_KEY_2`, `GEMINI_KEY_3` 
+for random selection) for Google. For new Google projects, use a currently available
 Gemini model such as `google_genai:gemini-3.6-flash`. The agent delegates identity/geometry,
 reservoir/hydrology, spillway/history, and safety/context research to specialists.
 
