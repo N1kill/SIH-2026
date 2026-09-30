@@ -1,0 +1,23 @@
+{
+  "dam_longitude": 70.8661350514,
+  "dam_latitude": 22.766743688,
+  "initial_water_level_m": 56.41,
+  "maximum_water_level_m": 57.3,
+  "reservoir_capacity_m3": 87900000.0,
+  "reservoir_surface_area_m2": 6382800.0,
+  "stage_storage": [
+    [54.584, 0.0],
+    [54.886, 6045673.196],
+    [55.187, 13829944.645],
+    [55.489, 22489127.176],
+    [55.791, 31854407.761],
+    [56.093, 40814695.094],
+    [56.395, 50541484.919],
+    [56.696, 62493953.707],
+    [56.998, 75112951.176],
+    [57.3, 87900000.0]
+  ],
+  "spillway_configured": false,
+  "provenance": "data/projects/machhu-ii.json and data/candidates/machhu-ii/reservoir-shoreline.geojson",
+  "data_status": "approximate"
+}
