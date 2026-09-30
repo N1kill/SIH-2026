@@ -36,6 +36,11 @@ interface RunSummary extends Record<string, any> {
   started_at: string;
 }
 
+interface ProjectConfig {
+  dam_id: string;
+  dam_height_m: number;
+}
+
 async function jsonResponse<T>(response: Response, label: string): Promise<T> {
   if (!response.ok) throw new Error(`${label} unavailable (${response.status})`);
   return response.json() as Promise<T>;
@@ -183,10 +188,20 @@ export function useSimulationData(): LoadedSimulationState {
     setGenerationError(null);
     setGeneration({ status: 'STARTING' });
     try {
+      const projects = await fetch('/api/project').then((response) =>
+        jsonResponse<ProjectConfig[]>(response, 'Project configuration'));
+      const project = projects.find((item) => item.dam_id === 'machhu-ii');
+      if (!project || !Number.isFinite(project.dam_height_m) || project.dam_height_m <= 0) {
+        throw new Error('Machhu-II dam height is unavailable in the project configuration.');
+      }
       const response = await fetch('/api/simulation/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ project_id: 'machhu-ii', name: 'Baseline from 2D operations' }),
+        body: JSON.stringify({
+          project_id: project.dam_id,
+          name: 'Full-height breach screening from 2D operations',
+          breach_depth_m: project.dam_height_m,
+        }),
       });
       if (!response.ok) {
         const body = await response.json().catch(() => null);

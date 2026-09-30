@@ -11,6 +11,11 @@
 - The 2D operations view offers a baseline run when no completed Machhu-II
   simulation exists. It reports real solver progress and loads the saved flood
   result after completion; it does not substitute example flood data.
+- Corrected that one-click scenario to use the project's configured structural
+  dam height as an explicitly labeled full-height breach screening depth. The
+  earlier 5 m default could leave the breach above the starting water level and
+  produce a completed zero-discharge run. The 2D view now explains dry results,
+  offers a new run, and plays short simulations at a visible pace.
 - The default Compose application no longer requires the optional research/GPU
   services; those run under the `research` profile.
 

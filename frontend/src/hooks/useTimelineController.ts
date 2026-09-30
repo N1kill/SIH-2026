@@ -30,9 +30,15 @@ export function useTimelineController(maxTime = 24.0): TimelineController {
   const [speed, setSpeed] = useState(1);
   const lastTickRef = useRef<number | null>(null);
 
-  const play = useCallback(() => setIsPlaying(true), []);
+  const play = useCallback(() => {
+    setCurrentTime((time) => time >= maxTime ? 0 : time);
+    setIsPlaying(true);
+  }, [maxTime]);
   const pause = useCallback(() => setIsPlaying(false), []);
-  const togglePlay = useCallback(() => setIsPlaying((p) => !p), []);
+  const togglePlay = useCallback(() => {
+    if (isPlaying) pause();
+    else play();
+  }, [isPlaying, pause, play]);
   const reset = useCallback(() => {
     setIsPlaying(false);
     setCurrentTime(0);
@@ -43,7 +49,7 @@ export function useTimelineController(maxTime = 24.0): TimelineController {
   }, [maxTime]);
 
   const stepForward = useCallback(() => {
-    setCurrentTime((t) => Math.min(maxTime, t + 1.0));
+    setCurrentTime((t) => Math.min(maxTime, t + maxTime / 10));
   }, [maxTime]);
 
   // Active Phase identification
@@ -64,8 +70,8 @@ export function useTimelineController(maxTime = 24.0): TimelineController {
       const dtSec = lastTickRef.current == null ? 0 : (now - lastTickRef.current) / 1000;
       lastTickRef.current = now;
 
-      // 1 real second = speed * 1.5 simulation hours
-      const simDt = dtSec * speed * 1.5;
+      // Keep short and long runs visible for roughly 12 seconds at normal speed.
+      const simDt = dtSec * speed * maxTime / 12;
 
       setCurrentTime((prev) => {
         const next = prev + simDt;
