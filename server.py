@@ -342,13 +342,7 @@ def require_frontend_assets(directory: Path, url_prefix: str) -> None:
                 )
 
 
-require_frontend_assets(FRONTEND_DIR, "/simulation/")
 require_frontend_assets(FRONTEND_DAM_DIR, "/")
-app.mount(
-    "/simulation",
-    StaticFiles(directory=str(FRONTEND_DIR), html=True),
-    name="simulation_2d",
-)
 app.mount(
     "/twin", StaticFiles(directory=str(DASHBOARD_DIR), html=True), name="simulation_3d"
 )

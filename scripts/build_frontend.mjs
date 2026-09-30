@@ -10,7 +10,7 @@ const runNpm=async(cwd,args)=>{
   process.stdout.write(result.stdout);
   process.stderr.write(result.stderr);
 };
-for(const directory of ['frontend-dam','frontend']){
+for(const directory of ['frontend-dam']){
   const root=new URL(`../${directory}/`,import.meta.url);
   try{await access(new URL('node_modules/vite/package.json',root));}
   catch{
