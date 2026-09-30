@@ -11,8 +11,9 @@ npm ci
 npm run dev
 ```
 
-For a production build, run `npm run build`. From the repository root, use
-`npm run build` to build both frontends and the Three.js dashboard dependencies.
+For a production build, run `npm run build`. From the repository root, run
+`npm ci` then `npm run build`; the root build installs both frontend lockfiles
+when their dependencies are absent and builds the Three.js dashboard dependencies.
 Start the FastAPI service with `npm start` from the repository root.
 
 The Vite development server proxies `/simulation`, `/twin`, `/api`, and `/ws`

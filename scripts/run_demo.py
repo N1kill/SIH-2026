@@ -9,7 +9,12 @@ from src.terrain import build_twin
 
 
 if __name__ == "__main__":
-    if not (ROOT / "outputs/3d/dashboard/vendor/three.module.js").exists():
+    required = (
+        "outputs/3d/dashboard/vendor/three.module.js",
+        "frontend/dist/index.html",
+        "frontend-dam/dist/index.html",
+    )
+    if any(not (ROOT / path).is_file() for path in required):
         raise SystemExit("Run npm ci and npm run build before the first demo")
     build_twin(projects()["machhu-ii"])
     import uvicorn

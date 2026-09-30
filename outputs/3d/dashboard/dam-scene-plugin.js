@@ -27,8 +27,8 @@ export class DamScenePlugin {
     this.manifest=manifest;
     const model=manifest.assets.find(a=>a.role==='model');
     if(model){
-      this.draco=new DRACOLoader().setDecoderPath('/vendor/addons/libs/draco/gltf/');
-      this.ktx=new KTX2Loader().setTranscoderPath('/vendor/addons/libs/basis/').detectSupport(this.renderer);
+      this.draco=new DRACOLoader().setDecoderPath(new URL('./vendor/addons/libs/draco/gltf/',import.meta.url).href);
+      this.ktx=new KTX2Loader().setTranscoderPath(new URL('./vendor/addons/libs/basis/',import.meta.url).href).detectSupport(this.renderer);
       const loader=new GLTFLoader().setDRACOLoader(this.draco).setKTX2Loader(this.ktx).setMeshoptDecoder(MeshoptDecoder);
       const gltf=await loader.loadAsync(baseURL+model.filename); this.root.add(gltf.scene);
       for(const b of manifest.gate_bindings){const node=gltf.scene.getObjectByName(b.node); if(!node)throw Error('Missing gate node '+b.node);this.gates.set(b.gate_id,{node,base:node.position[b.axis],axis:b.axis,max:b.maximum_opening_m});}

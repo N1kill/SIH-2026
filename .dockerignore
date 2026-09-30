@@ -1,10 +1,16 @@
 .git
 .agents
 node_modules
+frontend/dist
+frontend-dam/dist
+frontend/.chrome-review
 .venv
 **/__pycache__
 .env
-data
+data/cache
+data/evidence/*/sources
+data/scene-inbox
+data/scene-packages
 outputs/runs
 outputs/simulation
 outputs/gis

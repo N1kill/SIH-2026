@@ -3,17 +3,22 @@ import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
 import {fileURLToPath} from 'node:url';
 const execFileAsync=promisify(execFile);
-const buildCommand=process.platform==='win32'
-  ? {command:process.env.ComSpec||'cmd.exe',args:['/d','/s','/c','npm run build']}
-  : {command:'npm',args:['run','build']};
-
-const runBuild=async(cwd)=>{
-  const result=await execFileAsync(buildCommand.command,buildCommand.args,{cwd});
+const runNpm=async(cwd,args)=>{
+  const command=process.platform==='win32' ? process.env.ComSpec||'cmd.exe' : 'npm';
+  const commandArgs=process.platform==='win32' ? ['/d','/s','/c',`npm ${args.join(' ')}`] : args;
+  const result=await execFileAsync(command,commandArgs,{cwd});
   process.stdout.write(result.stdout);
   process.stderr.write(result.stderr);
 };
-await runBuild(fileURLToPath(new URL('../frontend-dam/',import.meta.url)));
-await runBuild(fileURLToPath(new URL('../frontend/',import.meta.url)));
+for(const directory of ['frontend-dam','frontend']){
+  const root=new URL(`../${directory}/`,import.meta.url);
+  try{await access(new URL('node_modules/vite/package.json',root));}
+  catch{
+    console.log(`Installing ${directory} dependencies from its lockfile...`);
+    await runNpm(fileURLToPath(root),['ci']);
+  }
+  await runNpm(fileURLToPath(root),['run','build']);
+}
 
 const target=new URL('../outputs/3d/dashboard/vendor/',import.meta.url);
 await mkdir(target,{recursive:true});

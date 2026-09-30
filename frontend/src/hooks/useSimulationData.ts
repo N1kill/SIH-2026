@@ -16,6 +16,18 @@ export interface LoadedSimulationState {
   mapData: SimulationMapData | null;
   loading: boolean;
   error: string | null;
+  empty: boolean;
+  generation: RunStatus | null;
+  generationError: string | null;
+  startSimulation: () => Promise<void>;
+}
+
+interface RunStatus {
+  simulation_id?: string;
+  status: string;
+  progress?: number;
+  frame_count?: number;
+  error?: string | null;
 }
 
 interface RunSummary extends Record<string, any> {
@@ -54,7 +66,8 @@ function adaptSummary(raw: RunSummary): SimulationSummary {
 }
 
 export function useSimulationData(): LoadedSimulationState {
-  const [state, setState] = useState<LoadedSimulationState>({
+  const [state, setState] = useState<Pick<LoadedSimulationState,
+    'terrain' | 'flood' | 'summary' | 'hydraulics' | 'mapData' | 'loading' | 'error' | 'empty'>>({
     terrain: null,
     flood: null,
     summary: null,
@@ -62,7 +75,11 @@ export function useSimulationData(): LoadedSimulationState {
     mapData: null,
     loading: true,
     error: null,
+    empty: false,
   });
+  const [generation, setGeneration] = useState<RunStatus | null>(null);
+  const [generationError, setGenerationError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     let isMounted = true;
@@ -78,7 +95,15 @@ export function useSimulationData(): LoadedSimulationState {
           .filter((run) => run.status === 'COMPLETE' && run.project?.dam_id === 'machhu-ii')
           .sort((a, b) => b.started_at.localeCompare(a.started_at));
         if (!completed.length) {
-          throw new Error('No completed Machhu-II simulation exists. Run a scenario to populate the 2D map.');
+          const active = await fetch('/api/simulation/status').then((r) =>
+            jsonResponse<RunStatus>(r, 'Simulation status'));
+          if (isMounted) {
+            if (active.simulation_id && !['COMPLETE', 'FAILED', 'CANCELLED'].includes(active.status)) {
+              setGeneration(active);
+            }
+            setState((prev) => ({ ...prev, loading: false, empty: true, error: null }));
+          }
+          return;
         }
         const selected = completed[0];
         const id = selected.simulation_id;
@@ -103,7 +128,10 @@ export function useSimulationData(): LoadedSimulationState {
             mapData: { riskZones, safeZones, facilities, evacuationRoutes },
             loading: false,
             error: null,
+            empty: false,
           });
+          setGeneration(null);
+          setGenerationError(null);
         }
       } catch (err: unknown) {
         if (isMounted) {
@@ -117,7 +145,59 @@ export function useSimulationData(): LoadedSimulationState {
     }
     loadData();
     return () => { isMounted = false; };
-  }, []);
+  }, [reloadKey]);
 
-  return state;
+  useEffect(() => {
+    if (!generation?.simulation_id || ['COMPLETE', 'FAILED', 'CANCELLED'].includes(generation.status)) return;
+    const controller = new AbortController();
+    const timer = window.setTimeout(async () => {
+      try {
+        const response = await fetch(`/api/simulation/results/${generation.simulation_id}`, {
+          signal: controller.signal,
+        });
+        const current = await jsonResponse<RunStatus>(response, 'Simulation status');
+        if (current.status === 'COMPLETE') {
+          setGeneration(current);
+          setState((prev) => ({ ...prev, loading: true }));
+          setReloadKey((key) => key + 1);
+        } else {
+          setGeneration(current);
+          if (current.status === 'FAILED' || current.status === 'CANCELLED') {
+            setGenerationError(current.error || `Simulation ${current.status.toLowerCase()}.`);
+          }
+        }
+      } catch (error) {
+        if (!controller.signal.aborted) {
+          setGenerationError(error instanceof Error ? error.message : 'Could not check simulation status.');
+          setGeneration(null);
+        }
+      }
+    }, 1500);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [generation]);
+
+  async function startSimulation() {
+    setGenerationError(null);
+    setGeneration({ status: 'STARTING' });
+    try {
+      const response = await fetch('/api/simulation/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ project_id: 'machhu-ii', name: 'Baseline from 2D operations' }),
+      });
+      if (!response.ok) {
+        const body = await response.json().catch(() => null);
+        throw new Error(body?.detail || `Could not start simulation (${response.status})`);
+      }
+      setGeneration(await response.json() as RunStatus);
+    } catch (error) {
+      setGeneration(null);
+      setGenerationError(error instanceof Error ? error.message : 'Could not start simulation.');
+    }
+  }
+
+  return { ...state, generation, generationError, startSimulation };
 }

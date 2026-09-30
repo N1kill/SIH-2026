@@ -28,7 +28,7 @@ the 2D flood map in `frontend/`, and the engineering twin in
 and processed inputs, while `outputs/` stores generated results and the static
 twin. The root `npm run build` prepares the frontends before FastAPI starts.
 
-Python 3.11–3.13 and Node.js 20+ are supported.
+Python 3.11–3.13 and Node.js 20.19+ or 22.12+ are supported.
 
 ```powershell
 python -m venv .venv
@@ -39,8 +39,20 @@ npm run build
 python scripts\run_demo.py
 ```
 
+On macOS or Linux, activate the environment with `source .venv/bin/activate`
+and run `python scripts/run_demo.py` after the same install and build commands.
+
 Open <http://127.0.0.1:8050>. The demo uses cached local DEM, river, Sentinel-2,
 land-use, and OSM facility data; it does not require internet access after preparation.
+The root build installs each frontend's locked npm dependencies on a fresh clone.
+If the 2D view has no completed run, select **Generate baseline simulation** there;
+the server runs the configured Machhu-II scenario and loads its saved result when
+finished. To adjust the scenario first, use the 3D Twin. Simulation runs are stored
+locally under `outputs/runs/` and are not included in a fresh clone.
+
+The default server listens only on this computer. For access from other machines on
+the same trusted network, run `python -m uvicorn server:app --host 0.0.0.0 --port 8050
+--workers 1` and open the host computer's IP address instead of `127.0.0.1`.
 
 The replay is driven by stored solver frames rather than a decorative animation.
 Each frame couples reservoir storage, stage-storage level, breach geometry and
@@ -217,13 +229,18 @@ docker compose -f docker-compose.twin.yml build
 docker compose -f docker-compose.twin.yml up
 ```
 
-The Compose stack starts the dashboard, Ollama, local SearXNG search, and a one-shot
-model initializer that pulls `qwen3:8b` into the persistent `ollama-models` volume.
-The first startup downloads roughly 5 GB; later starts reuse the volume. The dashboard
-connects to Ollama at `http://ollama:11434` inside the Compose network; Ollama is not
-bound to a host port, avoiding conflicts with the Windows Ollama desktop service.
-Compose exposes all configured NVIDIA GPUs to Ollama; remove `gpus: all` only on a
-host whose container runtime has no GPU support. Set
+Use `docker-compose.twin.yml` for the full application. The older
+`docker-compose.yml` serves only legacy static dashboard files and has no API.
+
+The default Compose stack starts the application without an Ollama or GPU requirement.
+For the optional local research services, run
+`docker compose -f docker-compose.twin.yml --profile research up --build`.
+That profile starts Ollama, SearXNG, and a one-shot initializer that downloads roughly
+5 GB for `qwen3:8b`; later starts reuse the `ollama-models` volume. The dashboard
+connects to Ollama at `http://ollama:11434` inside the Compose network. The research
+profile requests NVIDIA GPUs; remove `gpus: all` on a host without GPU support.
+To expose the dashboard to trusted LAN collaborators, set `INUNDAX_BIND_HOST` to the
+host computer's LAN address before running Compose. Set
 `OLLAMA_API_KEY` only if using Ollama's hosted web-search service. `EE_PROJECT` must
 remain a Google Cloud project ID, never an API key.
 

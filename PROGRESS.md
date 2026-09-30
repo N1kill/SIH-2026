@@ -1,5 +1,16 @@
 # SIH-2026 Pipeline Development Progress
 
+## 2026-09-30 — Fresh-clone setup and first simulation
+
+- The root frontend build now installs each frontend's locked dependencies when
+  missing. The Docker image includes both built frontends, the engineering twin,
+  and the configured project inputs required by FastAPI.
+- The 2D operations view offers a baseline run when no completed Machhu-II
+  simulation exists. It reports real solver progress and loads the saved flood
+  result after completion; it does not substitute example flood data.
+- The default Compose application no longer requires the optional research/GPU
+  services; those run under the `research` profile.
+
 ## 2026-09-29 — 3D contact boundaries and dam condition controls
 
 - The engineering reference now uses the configured crest and structural height
